@@ -15011,9 +15011,11 @@ components:
                   $ref: '#/components/schemas/Uuid'
                 name:
                   type: string
+                  example: Empleado de ejemplo
                 email:
                   type: string
                   format: email
+                  example: empleado@ejemplo.mx
             memberships:
               type: array
               items:
@@ -15049,12 +15051,14 @@ components:
                   $ref: '#/components/schemas/Timestamp'
             accessToken:
               type: string
+              example: ejemplo-access-token-0123456789abcdef
             accessTokenExpiresIn:
               type: integer
               minimum: 1
               description: Segundos de vigencia
             refreshToken:
               type: string
+              example: ejemplo-refresh-token-0123456789abcdef0123456789
             refreshTokenExpiresAt:
               $ref: '#/components/schemas/Timestamp'
         meta:
@@ -15076,6 +15080,7 @@ components:
             deviceCredential:
               type: string
               description: Se devuelve una sola vez
+              example: ejemplo-credencial-de-dispositivo-0123456789abcdef
         meta:
           $ref: '#/components/schemas/Meta'
     EnrollmentCodeResponse:
