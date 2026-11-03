@@ -30,7 +30,8 @@ class AuthRepository(
 
     suspend fun start() {
         stateHolder.set(AuthState.Loading)
-        if (store.deviceUuid == null) {
+        if (store.deviceUuid == null || store.branchId == null) {
+            store.wipeAll()
             stateHolder.set(AuthState.NeedsEnrollment)
             return
         }
@@ -51,7 +52,7 @@ class AuthRepository(
         val uuid = newUuid()
         return when (val r = apiCall { publicApi.enroll(DeviceEnrollRequest(code, uuid, displayName)) }) {
             is ApiResult.Success -> {
-                store.saveDevice(uuid, r.value.data.deviceCredential)
+                store.saveDevice(uuid, r.value.data.deviceCredential, r.value.data.device.branchId)
                 stateHolder.notify(null)
                 stateHolder.set(AuthState.NeedsLogin)
                 null
@@ -106,7 +107,9 @@ class AuthRepository(
 
     private suspend fun loadMe() {
         when (val r = apiCall { sessionApi.me() }) {
-            is ApiResult.Success -> stateHolder.set(AuthState.Authenticated(r.value.data))
+            is ApiResult.Success -> stateHolder.set(
+                store.branchId?.let { AuthState.Authenticated(r.value.data, it) } ?: AuthState.NeedsEnrollment,
+            )
             // Si la sesión o el dispositivo se perdieron, el refresher ya cambió el estado.
             is ApiResult.Failure -> if (store.refreshToken != null) stateHolder.set(AuthState.Offline)
         }

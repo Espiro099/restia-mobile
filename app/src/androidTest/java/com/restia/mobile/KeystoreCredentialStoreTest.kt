@@ -24,17 +24,18 @@ class KeystoreCredentialStoreTest {
 
     @Test
     fun guardaYLeeDesdeOtraInstancia() {
-        store.saveDevice("uuid", "credencial")
+        store.saveDevice("uuid", "credencial", "sucursal")
         store.saveRefreshToken("refresh")
         val other = KeystoreCredentialStore(context)
         assertEquals("uuid", other.deviceUuid)
         assertEquals("credencial", other.deviceCredential)
+        assertEquals("sucursal", other.branchId)
         assertEquals("refresh", other.refreshToken)
     }
 
     @Test
     fun noGuardaEnClaro() {
-        store.saveDevice("uuid-visible", "credencial-visible")
+        store.saveDevice("uuid-visible", "credencial-visible", "sucursal-visible")
         store.saveRefreshToken("refresh-visible")
         val raw = rawFile()
         assertFalse(raw.contains("visible"))
@@ -50,7 +51,7 @@ class KeystoreCredentialStoreTest {
 
     @Test
     fun cerrarSesionConservaElDispositivo() {
-        store.saveDevice("uuid", "credencial")
+        store.saveDevice("uuid", "credencial", "sucursal")
         store.saveRefreshToken("refresh")
         store.clearSession()
         assertNull(store.refreshToken)
@@ -59,7 +60,7 @@ class KeystoreCredentialStoreTest {
 
     @Test
     fun borrarTodoEliminaElDispositivo() {
-        store.saveDevice("uuid", "credencial")
+        store.saveDevice("uuid", "credencial", "sucursal")
         store.wipeAll()
         assertNull(store.deviceUuid)
         assertNull(store.deviceCredential)

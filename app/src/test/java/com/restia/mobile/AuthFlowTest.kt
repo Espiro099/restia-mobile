@@ -90,12 +90,21 @@ class AuthFlowTest {
     }
 
     @Test
+    fun `dispositivo sin sucursal guardada vuelve al alta`() = runBlocking {
+        store.branchId = null
+        repo.start()
+        assertEquals(AuthState.NeedsEnrollment, state.state.value)
+        assertNull(store.deviceCredential)
+    }
+
+    @Test
     fun `alta guarda la credencial y pide login`() = runBlocking {
         store.wipeAll()
         route { ok("""{"data":{"device":{"id":"d","branchId":"b","status":"ACTIVE","displayName":"x"},"deviceCredential":"cred-nueva"},"meta":{}}""", 201) }
         assertNull(repo.enroll("CODIGO123", "Tablet"))
         assertEquals("uuid-1", store.deviceUuid)
         assertEquals("cred-nueva", store.deviceCredential)
+        assertEquals("b", store.branchId)
         assertEquals(AuthState.NeedsLogin, state.state.value)
     }
 
@@ -118,7 +127,7 @@ class AuthFlowTest {
         assertNull(repo.login("a@restia.test", "secreto"))
         assertEquals("refresh-2", store.refreshToken)
         assertEquals("access-1", access.token)
-        assertTrue(state.state.value is AuthState.Authenticated)
+        assertEquals("b1", (state.state.value as AuthState.Authenticated).branchId)
         server.takeRequest()
         assertEquals("Bearer access-1", server.takeRequest().getHeader("Authorization"))
     }

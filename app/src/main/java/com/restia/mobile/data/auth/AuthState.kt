@@ -9,7 +9,7 @@ sealed interface AuthState {
     data object NeedsEnrollment : AuthState
     data object NeedsLogin : AuthState
     data object Offline : AuthState
-    data class Authenticated(val me: MeData) : AuthState
+    data class Authenticated(val me: MeData, val branchId: String) : AuthState
 }
 
 enum class SessionNotice { SESSION_EXPIRED, DEVICE_BLOCKED }

@@ -17,13 +17,15 @@ class KeystoreCredentialStore(context: Context) : CredentialStore {
 
     override val deviceUuid get() = read(DEVICE_UUID)
     override val deviceCredential get() = read(DEVICE_CREDENTIAL)
+    override val branchId get() = read(BRANCH_ID)
     override val refreshToken get() = read(REFRESH_TOKEN)
     override val pendingLogoutToken get() = read(PENDING_LOGOUT)
 
-    override fun saveDevice(deviceUuid: String, deviceCredential: String) {
+    override fun saveDevice(deviceUuid: String, deviceCredential: String, branchId: String) {
         prefs.edit()
             .putString(DEVICE_UUID, encrypt(deviceUuid))
             .putString(DEVICE_CREDENTIAL, encrypt(deviceCredential))
+            .putString(BRANCH_ID, encrypt(branchId))
             .commit()
     }
 
@@ -93,6 +95,7 @@ class KeystoreCredentialStore(context: Context) : CredentialStore {
         const val TAG_BITS = 128
         const val DEVICE_UUID = "device_uuid"
         const val DEVICE_CREDENTIAL = "device_credential"
+        const val BRANCH_ID = "branch_id"
         const val REFRESH_TOKEN = "refresh_token"
         const val PENDING_LOGOUT = "pending_logout_token"
     }
