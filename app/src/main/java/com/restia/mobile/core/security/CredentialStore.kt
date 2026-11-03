@@ -4,10 +4,11 @@ package com.restia.mobile.core.security
 interface CredentialStore {
     val deviceUuid: String?
     val deviceCredential: String?
+    val branchId: String?
     val refreshToken: String?
     val pendingLogoutToken: String?
 
-    fun saveDevice(deviceUuid: String, deviceCredential: String)
+    fun saveDevice(deviceUuid: String, deviceCredential: String, branchId: String)
     fun saveRefreshToken(token: String)
     fun savePendingLogoutToken(token: String?)
     fun clearSession()

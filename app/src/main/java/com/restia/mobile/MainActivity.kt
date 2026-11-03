@@ -7,18 +7,22 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.restia.mobile.data.auth.AuthState
 import com.restia.mobile.ui.auth.AuthViewModel
 import com.restia.mobile.ui.auth.EnrollScreen
-import com.restia.mobile.ui.auth.HomeScreen
 import com.restia.mobile.ui.auth.LoadingScreen
 import com.restia.mobile.ui.auth.LoginScreen
 import com.restia.mobile.ui.auth.OfflineScreen
+import com.restia.mobile.ui.tables.TablesScreen
+import com.restia.mobile.ui.tables.TablesViewModel
 import com.restia.mobile.ui.theme.RestiaTheme
 
 class MainActivity : ComponentActivity() {
+    private val repositories get() = (application as RestiaApplication).container.repositories
+
     private val viewModel: AuthViewModel by viewModels {
-        AuthViewModel.Factory((application as RestiaApplication).container.authRepository)
+        AuthViewModel.Factory(repositories.auth)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,7 +38,20 @@ class MainActivity : ComponentActivity() {
                     AuthState.Offline -> OfflineScreen(viewModel::start)
                     AuthState.NeedsEnrollment -> EnrollScreen(form, notice, viewModel::enroll)
                     AuthState.NeedsLogin -> LoginScreen(form, notice, viewModel::login)
-                    is AuthState.Authenticated -> HomeScreen(current.me, form, viewModel::logout)
+                    is AuthState.Authenticated -> {
+                        val membership = current.me.memberships.firstOrNull { it.branch.id == current.branchId }
+                        TablesScreen(
+                            // La clave incluye al usuario: otro inicio de sesión empieza sin la lista anterior.
+                            viewModel = viewModel(
+                                key = "mesas-${current.me.user.id}-${current.branchId}",
+                                factory = TablesViewModel.Factory(repositories.tables, current.branchId),
+                            ),
+                            branchName = membership?.branch?.name ?: current.me.user.name,
+                            role = membership?.role.orEmpty(),
+                            logoutEnabled = !form.busy,
+                            onLogout = viewModel::logout,
+                        )
+                    }
                 }
             }
         }

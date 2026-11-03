@@ -50,4 +50,23 @@ data class BranchDto(val id: String, val name: String)
 data class MembershipDto(val branch: BranchDto, val role: String, val permissions: List<String>)
 
 @Serializable
+data class PaginationDto(val page: Int, val lastPage: Int)
+
+@Serializable
+data class MetaDto(val pagination: PaginationDto? = null)
+
+@Serializable
+data class PagedEnvelope<T>(val data: List<T>, val meta: MetaDto = MetaDto())
+
+@Serializable
+data class TableDto(
+    val id: String,
+    val number: Int,
+    val capacity: Int,
+    val zone: String? = null,
+    val status: String,
+    val operationalState: String? = null,
+)
+
+@Serializable
 data class MeData(val user: UserDto, val memberships: List<MembershipDto>)

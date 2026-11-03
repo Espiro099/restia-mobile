@@ -13,7 +13,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -31,7 +30,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.restia.mobile.R
 import com.restia.mobile.core.network.ApiFailure
-import com.restia.mobile.core.network.MeData
 import com.restia.mobile.data.auth.SessionNotice
 
 @Composable
@@ -146,16 +144,5 @@ fun LoginScreen(form: FormState, notice: SessionNotice?, onLogin: (String, Strin
             enabled = !form.busy && email.contains('@') && password.isNotEmpty(),
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.action_login)) }
-    }
-}
-
-@Composable
-fun HomeScreen(me: MeData, form: FormState, onLogout: () -> Unit) {
-    ScreenColumn {
-        Text(stringResource(R.string.home_greeting, me.user.name), style = MaterialTheme.typography.titleLarge)
-        me.memberships.forEach {
-            Text(stringResource(R.string.home_membership, it.branch.name, it.role), style = MaterialTheme.typography.bodyMedium)
-        }
-        OutlinedButton(onClick = onLogout, enabled = !form.busy) { Text(stringResource(R.string.action_logout)) }
     }
 }
