@@ -1,4 +1,24 @@
 <resources>
     <string name="app_name">Restia</string>
-    <string name="home_subtitle">Aplicación para empleados</string>
+    <string name="enroll_title">Registrar este dispositivo</string>
+    <string name="enroll_body">Pide a un gerente un código de alta. Vence en 15 minutos y sirve una sola vez.</string>
+    <string name="login_title">Iniciar sesión</string>
+    <string name="field_code">Código de alta</string>
+    <string name="field_device_name">Nombre del dispositivo</string>
+    <string name="field_email">Correo</string>
+    <string name="field_password">Contraseña</string>
+    <string name="action_enroll">Registrar</string>
+    <string name="action_login">Entrar</string>
+    <string name="action_logout">Cerrar sesión</string>
+    <string name="action_retry">Reintentar</string>
+    <string name="offline_title">Sin conexión</string>
+    <string name="offline_body">No se pudo contactar al servidor. Tu sesión sigue guardada.</string>
+    <string name="home_greeting">Hola, %1$s</string>
+    <string name="home_membership">%1$s · %2$s</string>
+    <string name="notice_session_expired">Tu sesión terminó. Inicia sesión de nuevo.</string>
+    <string name="notice_device_blocked">Este dispositivo ya no está autorizado. Sus datos locales se borraron.</string>
+    <string name="error_network">Sin conexión. Revisa tu red e inténtalo de nuevo.</string>
+    <string name="error_server">El servidor no está disponible. Inténtalo más tarde.</string>
+    <string name="error_unexpected">Ocurrió un error inesperado.</string>
+    <string name="error_too_many">Demasiados intentos. Espera %1$d segundos.</string>
 </resources>
