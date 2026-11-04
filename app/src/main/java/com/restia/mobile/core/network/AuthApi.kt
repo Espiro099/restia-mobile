@@ -38,4 +38,11 @@ interface SessionApi {
         @Query("page") page: Int,
         @Query("perPage") perPage: Int,
     ): PagedEnvelope<TableDto>
+
+    @POST("branches/{branchId}/table-sessions")
+    suspend fun openTableSession(
+        @Path("branchId") branchId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: TableSessionOpenRequest,
+    ): Envelope<TableSessionDto>
 }

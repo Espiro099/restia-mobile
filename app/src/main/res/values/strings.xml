@@ -14,6 +14,14 @@
     <string name="offline_title">Sin conexión</string>
     <string name="offline_body">No se pudo contactar al servidor. Tu sesión sigue guardada.</string>
     <string name="action_refresh">Actualizar</string>
+    <string name="action_open">Abrir</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="open_title">Abrir mesa %1$d</string>
+    <string name="open_guests">Personas</string>
+    <string name="open_done">Mesa %1$d abierta</string>
+    <string name="open_reserved_at">Esta mesa tiene una reserva a las %1$s.</string>
+    <string name="open_reserved">Esta mesa tiene una reserva próxima.</string>
+    <string name="open_anyway">Abrir de todos modos</string>
     <string name="tables_empty">Esta sucursal aún no tiene mesas.</string>
     <string name="tables_stale">Puede estar desactualizado.</string>
     <string name="tables_not_loaded">No se pudieron cargar las mesas.</string>

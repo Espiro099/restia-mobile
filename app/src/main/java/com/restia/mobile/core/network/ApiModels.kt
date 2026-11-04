@@ -2,6 +2,7 @@ package com.restia.mobile.core.network
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 
 val ApiJson = Json {
     ignoreUnknownKeys = true
@@ -15,7 +16,12 @@ data class Envelope<T>(val data: T)
 data class ErrorEnvelope(val error: ErrorBody)
 
 @Serializable
-data class ErrorBody(val code: String, val message: String, val requestId: String? = null)
+data class ErrorBody(
+    val code: String,
+    val message: String,
+    val details: JsonObject? = null,
+    val requestId: String? = null,
+)
 
 @Serializable
 data class DeviceEnrollRequest(val code: String, val deviceUuid: String, val displayName: String)
@@ -67,6 +73,16 @@ data class TableDto(
     val status: String,
     val operationalState: String? = null,
 )
+
+@Serializable
+data class TableSessionOpenRequest(
+    val tableIds: List<String>,
+    val guestCount: Int,
+    val acknowledgeReservation: Boolean? = null,
+)
+
+@Serializable
+data class TableSessionDto(val id: String, val status: String, val guestCount: Int, val version: Int)
 
 @Serializable
 data class MeData(val user: UserDto, val memberships: List<MembershipDto>)

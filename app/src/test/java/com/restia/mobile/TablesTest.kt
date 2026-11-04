@@ -141,6 +141,9 @@ class TablesViewModelTest {
                         is ApiResult.Success -> com.restia.mobile.core.network.PagedEnvelope(r.value)
                         is ApiResult.Failure -> throw java.io.IOException("sin red")
                     }
+
+                override suspend fun openTableSession(branchId: String, idempotencyKey: String, body: com.restia.mobile.core.network.TableSessionOpenRequest) =
+                    error("sin uso")
             })
         }
     }
