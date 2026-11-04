@@ -29,7 +29,7 @@ fun BranchHome(
     // La clave incluye al usuario: otro inicio de sesión empieza sin la lista anterior.
     val tables: TablesViewModel = viewModel(
         key = "mesas-$userId-$branchId",
-        factory = TablesViewModel.Factory(repositories.tables, branchId),
+        factory = TablesViewModel.Factory(repositories.tables, branchId, repositories.drafts, userId),
     )
     val current = sessionId
     if (current == null) {
@@ -51,7 +51,16 @@ fun BranchHome(
             // La comanda en captura sobrevive a ir y volver de la lista de mesas.
             viewModel = viewModel(
                 key = "comanda-$userId-$current",
-                factory = OrderViewModel.Factory(repositories.menu, repositories.orders, branchId, current),
+                factory = OrderViewModel.Factory(
+                    repositories.menu,
+                    repositories.orders,
+                    repositories.drafts,
+                    repositories.contact,
+                    branchId,
+                    userId,
+                    current,
+                    tableNumber,
+                ),
             ),
             tableNumber = tableNumber,
             onBack = { sessionId = null },

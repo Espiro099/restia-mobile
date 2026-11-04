@@ -6,13 +6,16 @@ import com.restia.mobile.core.network.MenuProductDto
 import com.restia.mobile.core.network.OrderItemRequest
 import com.restia.mobile.core.network.OrderModifierOption
 import java.math.BigDecimal
+import kotlinx.serialization.Serializable
 
 const val MAX_QUANTITY = 50
 const val MAX_LINES = 100
 const val MAX_NOTES = 500
 
+@Serializable
 data class SelectedOption(val modifier: MenuModifierDto, val option: MenuOptionDto)
 
+@Serializable
 data class CartLine(
     val product: MenuProductDto,
     val options: List<SelectedOption>,

@@ -10,7 +10,9 @@ import com.restia.mobile.core.network.MenuProductDto
 import com.restia.mobile.core.network.MoneyDto
 import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.TableDto
+import com.restia.mobile.core.storage.ContactTracker
 import com.restia.mobile.data.orders.CartLine
+import com.restia.mobile.data.orders.DraftRepository
 import com.restia.mobile.data.orders.MAX_QUANTITY
 import com.restia.mobile.data.orders.MenuRepository
 import com.restia.mobile.data.orders.OrderRepository
@@ -21,6 +23,7 @@ import com.restia.mobile.ui.orders.OrderViewModel
 import com.restia.mobile.ui.orders.moneyText
 import com.restia.mobile.ui.tables.isOrderable
 import java.math.BigDecimal
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -108,6 +111,9 @@ class OrderFlowTest {
     private val posts = java.util.Collections.synchronizedList(mutableListOf<RecordedRequest>())
     private val bodies = java.util.Collections.synchronizedList(mutableListOf<String>())
     private var uuids = 0
+    private val blobs = InMemoryBlobStore()
+    private var nowMillis = 1_000_000L
+    private val contact = ContactTracker(blobs) { nowMillis }
     private var answers = ArrayDeque<MockResponse>()
     private var menuAnswer: () -> MockResponse = { MockResponse().setBody(MENU_JSON).setHeader("ETag", "\"3\"") }
 
@@ -143,9 +149,14 @@ class OrderFlowTest {
     }
 
     private fun start() {
-        vm = OrderViewModel(MenuRepository(api), OrderRepository(api), "b1", "s1", newUuid = { "uuid-${++uuids}" })
-        waitFor { vm.state.value.menu != null || vm.state.value.menuFailure != null }
+        vm = newViewModel()
+        waitFor { vm.state.value.ready && (vm.state.value.menu != null || vm.state.value.menuFailure != null) }
     }
+
+    private fun newViewModel(user: String = "u1") = OrderViewModel(
+        MenuRepository(api), OrderRepository(api), DraftRepository(blobs), contact, "b1", user, "s1", 7,
+        newUuid = { "uuid-${++uuids}" }, now = { Instant.parse("2026-11-03T10:00:00Z") },
+    )
 
     private fun addAgua(quantity: Int = 1) {
         vm.selectProduct(vm.state.value.menu!!.products.first { it.id == "p1" })
@@ -156,6 +167,89 @@ class OrderFlowTest {
     private fun send() {
         vm.send()
         waitFor { !vm.state.value.sending }
+    }
+
+    @Test
+    fun `el menu en disco sirve sin red al volver a abrir la app`() = runBlocking {
+        MenuRepository(api, blobs).load("b1")
+        menuAnswer = { MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST) }
+        val load = (MenuRepository(api, blobs).load("b1") as ApiResult.Success).value
+        assertEquals(3, load.menu.menuVersion)
+        assertTrue(load.stale)
+    }
+
+    @Test
+    fun `la comanda sobrevive al cierre de la app`() {
+        start()
+        addAgua(2)
+        waitFor { blobs.names("draft-").isNotEmpty() }
+        start()
+        assertEquals(2, vm.state.value.cart.single().quantity)
+        assertFalse(vm.state.value.uncertain)
+    }
+
+    @Test
+    fun `envio interrumpido por el cierre queda en duda y reintenta con los mismos identificadores`() {
+        start()
+        answers.add(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        answers.add(MockResponse().setResponseCode(201).setBody(ORDER_JSON))
+        addAgua()
+        send()
+        start()
+        assertTrue(vm.state.value.uncertain)
+        assertTrue(vm.state.value.reviewing)
+        send()
+        assertEquals(posts[0].getHeader("Idempotency-Key"), posts[1].getHeader("Idempotency-Key"))
+        assertEquals(bodies[0], bodies[1])
+        assertTrue(vm.state.value.sent)
+        waitFor { blobs.names("draft-").isEmpty() }
+    }
+
+    @Test
+    fun `un borrador no se envia solo al abrir la app`() {
+        start()
+        addAgua()
+        waitFor { blobs.names("draft-").isNotEmpty() }
+        start()
+        assertTrue(posts.isEmpty())
+    }
+
+    @Test
+    fun `otro usuario no ve el borrador - CRED-23`() = runBlocking {
+        start()
+        addAgua()
+        waitFor { blobs.names("draft-").isNotEmpty() }
+        val otro = newViewModel("u2")
+        waitFor { otro.state.value.ready }
+        assertTrue(otro.state.value.cart.isEmpty())
+        assertTrue(DraftRepository(blobs).listFor("u2", "b1").isEmpty())
+        assertEquals(7, DraftRepository(blobs).listFor("u1", "b1").single().tableNumber)
+    }
+
+    @Test
+    fun `tras 12 horas sin conexion es solo lectura pero se puede enviar`() {
+        answers.add(MockResponse().setResponseCode(201).setBody(ORDER_JSON))
+        contact.record()
+        start()
+        addAgua()
+        waitFor { blobs.names("draft-").isNotEmpty() }
+        nowMillis += 12 * 60 * 60 * 1000L + 1
+        start()
+        assertTrue(vm.state.value.readOnly)
+        vm.selectProduct(vm.state.value.menu!!.products.first { it.id == "p1" })
+        assertNull(vm.state.value.editor)
+        vm.removeLine(vm.state.value.cart.single())
+        assertEquals(1, vm.state.value.cart.size)
+        send()
+        assertTrue(vm.state.value.sent)
+    }
+
+    @Test
+    fun `borrador danado se ignora`() = runBlocking {
+        blobs.write("draft-u1_s1", "no es json")
+        start()
+        assertTrue(vm.state.value.cart.isEmpty())
+        assertTrue(DraftRepository(blobs).listFor("u1", "b1").isEmpty())
     }
 
     @Test
@@ -170,7 +264,8 @@ class OrderFlowTest {
         assertTrue(repo.load("b1") is ApiResult.Success)
         menuAnswer = { MockResponse().setResponseCode(304) }
         val again = repo.load("b1") as ApiResult.Success
-        assertEquals(3, again.value.menuVersion)
+        assertEquals(3, again.value.menu.menuVersion)
+        assertFalse(again.value.stale)
         server.takeRequest()
         assertEquals("\"3\"", server.takeRequest().getHeader("If-None-Match"))
     }
@@ -180,7 +275,7 @@ class OrderFlowTest {
         val repo = MenuRepository(api)
         repo.load("b1")
         menuAnswer = { MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST) }
-        assertTrue(repo.load("b1") is ApiResult.Success)
+        assertTrue((repo.load("b1") as ApiResult.Success).value.stale)
     }
 
     @Test
@@ -216,7 +311,7 @@ class OrderFlowTest {
         vm.addEditorToCart()
         send()
         assertEquals(
-            """{"sessionId":"s1","clientOrderUuid":"uuid-1","items":[{"productId":"p2","quantity":1,"modifierOptions":[{"modifierId":"m1","optionId":"o2"},{"modifierId":"m2","optionId":"e1"},{"modifierId":"m2","optionId":"e2"}],"notes":"sin cebolla"}]}""",
+            """{"sessionId":"s1","clientOrderUuid":"uuid-1","capturedAt":"2026-11-03T10:00:00Z","items":[{"productId":"p2","quantity":1,"modifierOptions":[{"modifierId":"m1","optionId":"o2"},{"modifierId":"m2","optionId":"e1"},{"modifierId":"m2","optionId":"e2"}],"notes":"sin cebolla"}]}""",
             bodies.single(),
         )
         assertEquals("uuid-2", posts.single().getHeader("Idempotency-Key"))

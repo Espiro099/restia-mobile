@@ -8,14 +8,19 @@ import com.restia.mobile.core.network.ApiResult
 import com.restia.mobile.core.network.MenuDto
 import com.restia.mobile.core.network.MenuProductDto
 import com.restia.mobile.core.network.OrderCreateRequest
+import com.restia.mobile.core.network.OrderItemRequest
+import com.restia.mobile.core.storage.ContactTracker
 import com.restia.mobile.data.orders.CartLine
+import com.restia.mobile.data.orders.DraftRepository
 import com.restia.mobile.data.orders.MAX_NOTES
 import com.restia.mobile.data.orders.MAX_QUANTITY
 import com.restia.mobile.data.orders.MenuRepository
+import com.restia.mobile.data.orders.OrderDraft
 import com.restia.mobile.data.orders.OrderRepository
 import com.restia.mobile.data.orders.SelectedOption
 import com.restia.mobile.data.orders.addToCart
 import com.restia.mobile.data.orders.invalidModifiers
+import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,7 +35,10 @@ data class ProductEditor(
 )
 
 data class OrderUiState(
+    /** El borrador guardado ya se restauró: antes de esto no se edita ni se envía. */
+    val ready: Boolean = false,
     val menu: MenuDto? = null,
+    val menuStale: Boolean = false,
     val menuFailure: ApiFailure? = null,
     val cart: List<CartLine> = emptyList(),
     val editor: ProductEditor? = null,
@@ -38,6 +46,8 @@ data class OrderUiState(
     val sending: Boolean = false,
     /** El envío pudo llegar al servidor: la comanda queda bloqueada hasta resolverlo. */
     val uncertain: Boolean = false,
+    /** Más de 12 h sin conexión: solo lectura hasta sincronizar (A-7). */
+    val readOnly: Boolean = false,
     val failure: ApiFailure? = null,
     val sent: Boolean = false,
 )
@@ -45,31 +55,59 @@ data class OrderUiState(
 class OrderViewModel(
     private val menuRepository: MenuRepository,
     private val orderRepository: OrderRepository,
+    private val drafts: DraftRepository,
+    private val contact: ContactTracker,
     private val branchId: String,
+    private val userId: String,
     private val sessionId: String,
+    private val tableNumber: Int,
     private val newUuid: () -> String = { UUID.randomUUID().toString() },
+    private val now: () -> Instant = Instant::now,
 ) : ViewModel() {
     private val _state = MutableStateFlow(OrderUiState())
     val state: StateFlow<OrderUiState> = _state
 
-    private var request: OrderCreateRequest? = null
-    private var idempotencyKey: String = ""
+    private var capturedAt: String? = null
+    private var clientOrderUuid: String? = null
+    private var idempotencyKey: String? = null
+    private var requestItems: List<OrderItemRequest>? = null
 
     init {
+        viewModelScope.launch { restore() }
         loadMenu()
+    }
+
+    private suspend fun restore() {
+        val draft = drafts.get(userId, sessionId)
+        if (draft != null) {
+            capturedAt = draft.capturedAt
+            clientOrderUuid = draft.clientOrderUuid
+            idempotencyKey = draft.idempotencyKey
+            requestItems = draft.requestItems
+        }
+        _state.value = _state.value.copy(
+            ready = true,
+            readOnly = contact.windowExpired(),
+            cart = draft?.lines.orEmpty(),
+            uncertain = draft?.attempted == true,
+            reviewing = draft?.attempted == true,
+        )
     }
 
     fun loadMenu() {
         viewModelScope.launch {
             _state.value = when (val r = menuRepository.load(branchId)) {
-                is ApiResult.Success -> _state.value.copy(menu = r.value, menuFailure = null)
-                is ApiResult.Failure -> _state.value.copy(menuFailure = r.failure)
+                is ApiResult.Success -> _state.value.copy(menu = r.value.menu, menuStale = r.value.stale, menuFailure = null, readOnly = contact.windowExpired())
+                is ApiResult.Failure -> _state.value.copy(menuFailure = r.failure, readOnly = contact.windowExpired())
             }
         }
     }
 
+    private val editable: Boolean
+        get() = _state.value.let { it.ready && !it.uncertain && !it.readOnly && !it.sending }
+
     fun selectProduct(product: MenuProductDto) {
-        if (product.availability != "AVAILABLE" || _state.value.uncertain) return
+        if (product.availability != "AVAILABLE" || !editable) return
         _state.value = _state.value.copy(editor = ProductEditor(product))
     }
 
@@ -98,6 +136,7 @@ class OrderViewModel(
 
     fun addEditorToCart() {
         val editor = _state.value.editor ?: return
+        if (!editable) return
         val modifiers = modifiersOf(editor.product)
         if (invalidModifiers(modifiers, editor.selected).isNotEmpty()) {
             updateEditor { it.copy(showInvalid = true) }
@@ -107,13 +146,16 @@ class OrderViewModel(
             m.options.filter { it.id in editor.selected[m.id].orEmpty() }.map { SelectedOption(m, it) }
         }
         val line = CartLine(editor.product, options, editor.quantity, editor.notes.trim().ifEmpty { null })
+        if (capturedAt == null) capturedAt = now().toString()
         _state.value = _state.value.copy(cart = addToCart(_state.value.cart, line), editor = null, failure = null)
+        persist()
     }
 
     fun removeLine(line: CartLine) {
-        if (_state.value.uncertain || _state.value.sending) return
+        if (!editable) return
         val cart = _state.value.cart - line
         _state.value = _state.value.copy(cart = cart, reviewing = cart.isNotEmpty(), failure = null)
+        persist()
     }
 
     fun setReviewing(reviewing: Boolean) {
@@ -126,34 +168,74 @@ class OrderViewModel(
      */
     fun send() {
         val state = _state.value
-        if (state.sending || state.cart.isEmpty()) return
+        if (!state.ready || state.sending || state.cart.isEmpty()) return
         val items = state.cart.map { it.toRequest() }
-        val body = request?.takeIf { it.items == items } ?: OrderCreateRequest(sessionId, newUuid(), items).also {
-            request = it
+        if (requestItems != items || clientOrderUuid == null || idempotencyKey == null) {
+            clientOrderUuid = newUuid()
             idempotencyKey = newUuid()
+            requestItems = items
         }
+        val at = capturedAt ?: now().toString().also { capturedAt = it }
+        val body = OrderCreateRequest(sessionId, clientOrderUuid!!, at, items)
+        val key = idempotencyKey!!
         _state.value = state.copy(sending = true, failure = null)
         viewModelScope.launch {
-            _state.value = when (val r = orderRepository.create(branchId, idempotencyKey, body)) {
+            // Se guarda antes de enviar: si la app muere aquí, al volver queda en duda y no se duplica.
+            drafts.save(draft(state.cart, attempted = true))
+            when (val r = orderRepository.create(branchId, key, body)) {
                 is ApiResult.Success -> {
-                    request = null
-                    OrderUiState(menu = _state.value.menu, sent = true)
+                    drafts.delete(userId, sessionId)
+                    clearIdentifiers()
+                    _state.value = OrderUiState(ready = true, menu = _state.value.menu, menuStale = _state.value.menuStale, sent = true)
                 }
-                is ApiResult.Failure -> _state.value.copy(sending = false, failure = r.failure, uncertain = isUncertain(r.failure))
+                is ApiResult.Failure -> {
+                    val uncertain = isUncertain(r.failure)
+                    if (!uncertain) drafts.save(draft(state.cart, attempted = false))
+                    _state.value = _state.value.copy(sending = false, failure = r.failure, uncertain = uncertain, readOnly = contact.windowExpired())
+                    if ((r.failure as? ApiFailure.Server)?.code == PRODUCT_UNAVAILABLE) loadMenu()
+                }
             }
-            if ((_state.value.failure as? ApiFailure.Server)?.code == PRODUCT_UNAVAILABLE) loadMenu()
         }
     }
 
     /** Descarta una comanda en duda: si ya había entrado, seguirá en cocina. */
     fun discard() {
         if (_state.value.sending) return
-        request = null
+        clearIdentifiers()
         _state.value = _state.value.copy(cart = emptyList(), reviewing = false, uncertain = false, failure = null)
+        viewModelScope.launch { drafts.delete(userId, sessionId) }
     }
 
     fun consumeSent() {
         _state.value = _state.value.copy(sent = false)
+    }
+
+    private fun clearIdentifiers() {
+        capturedAt = null
+        clientOrderUuid = null
+        idempotencyKey = null
+        requestItems = null
+    }
+
+    private fun draft(cart: List<CartLine>, attempted: Boolean) = OrderDraft(
+        userId = userId,
+        branchId = branchId,
+        sessionId = sessionId,
+        tableNumber = tableNumber,
+        capturedAt = capturedAt ?: now().toString(),
+        lines = cart,
+        clientOrderUuid = clientOrderUuid,
+        idempotencyKey = idempotencyKey,
+        requestItems = requestItems,
+        attempted = attempted,
+    )
+
+    private fun persist() {
+        val cart = _state.value.cart
+        val snapshot = draft(cart, attempted = false)
+        viewModelScope.launch {
+            if (cart.isEmpty()) drafts.delete(userId, sessionId) else drafts.save(snapshot)
+        }
     }
 
     private fun isUncertain(failure: ApiFailure): Boolean = when (failure) {
@@ -169,11 +251,16 @@ class OrderViewModel(
     class Factory(
         private val menu: MenuRepository,
         private val orders: OrderRepository,
+        private val drafts: DraftRepository,
+        private val contact: ContactTracker,
         private val branchId: String,
+        private val userId: String,
         private val sessionId: String,
+        private val tableNumber: Int,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = OrderViewModel(menu, orders, branchId, sessionId) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T =
+            OrderViewModel(menu, orders, drafts, contact, branchId, userId, sessionId, tableNumber) as T
     }
 
     private companion object {

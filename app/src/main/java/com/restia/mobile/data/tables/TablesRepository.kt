@@ -1,13 +1,19 @@
 package com.restia.mobile.data.tables
 
+import com.restia.mobile.core.network.ApiJson
 import com.restia.mobile.core.network.ApiResult
 import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.TableDto
 import com.restia.mobile.core.network.TableSessionDto
 import com.restia.mobile.core.network.TableSessionOpenRequest
 import com.restia.mobile.core.network.apiCall
+import com.restia.mobile.core.storage.BlobStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.ListSerializer
 
-class TablesRepository(private val api: SessionApi) {
+class TablesRepository(private val api: SessionApi, private val cache: BlobStore? = null) {
     /** Recorre todas las páginas, porque la sucursal se muestra completa. */
     suspend fun list(branchId: String): ApiResult<List<TableDto>> = apiCall {
         val tables = mutableListOf<TableDto>()
@@ -18,8 +24,31 @@ class TablesRepository(private val api: SessionApi) {
             val lastPage = response.meta.pagination?.lastPage ?: page
             page++
         } while (page <= lastPage && page <= MAX_PAGES)
-        tables.sortedBy { it.number }
+        tables.sortedBy { it.number }.also { saveCache(branchId, it) }
     }
+
+    /** Última lista conocida, para consultar sin conexión (A-7). */
+    suspend fun cached(branchId: String): List<TableDto>? {
+        val store = cache ?: return null
+        return withContext(Dispatchers.IO) {
+            store.read(name(branchId))?.let {
+                try {
+                    ApiJson.decodeFromString(ListSerializer(TableDto.serializer()), it)
+                } catch (_: SerializationException) {
+                    null
+                }
+            }
+        }
+    }
+
+    private suspend fun saveCache(branchId: String, tables: List<TableDto>) {
+        val store = cache ?: return
+        withContext(Dispatchers.IO) {
+            store.write(name(branchId), ApiJson.encodeToString(ListSerializer(TableDto.serializer()), tables))
+        }
+    }
+
+    private fun name(branchId: String) = "tables-$branchId"
 
     suspend fun openSession(
         branchId: String,

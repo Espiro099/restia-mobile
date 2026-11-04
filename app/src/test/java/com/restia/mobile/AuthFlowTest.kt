@@ -49,6 +49,7 @@ class AuthFlowTest {
     private lateinit var state: AuthStateHolder
     private lateinit var repo: AuthRepository
     private lateinit var sessionApi: SessionApi
+    private val blobs = InMemoryBlobStore()
 
     @Before
     fun setUp() {
@@ -64,7 +65,7 @@ class AuthFlowTest {
         val refresher = TokenRefresher(store, access, publicApi, state)
         val client = base.newBuilder().addInterceptor(BearerInterceptor(access, refresher)).authenticator(TokenAuthenticator(refresher)).build()
         sessionApi = Retrofit.Builder().baseUrl(url).client(client).addConverterFactory(converter).build().create(SessionApi::class.java)
-        repo = AuthRepository(store, access, publicApi, sessionApi, refresher, state, newUuid = { "uuid-${++uuids}" })
+        repo = AuthRepository(store, access, publicApi, sessionApi, refresher, state, blobs, newUuid = { "uuid-${++uuids}" })
     }
 
     private var uuids = 0
@@ -236,6 +237,35 @@ class AuthFlowTest {
         repo.start()
         assertEquals(AuthState.Offline, state.state.value)
         assertEquals("refresh-1", store.refreshToken)
+    }
+
+    @Test
+    fun `sin red y con datos conocidos entra para capturar borradores`() = runBlocking {
+        blobs.write("me", ME.substringAfter("{\"data\":").substringBeforeLast(",\"meta\""))
+        route { MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST) }
+        repo.start()
+        val current = state.state.value as AuthState.Authenticated
+        assertEquals("Ana", current.me.user.name)
+        assertEquals("b1", current.branchId)
+        assertEquals("refresh-1", store.refreshToken)
+    }
+
+    @Test
+    fun `sesion revocada no entra aunque haya datos conocidos`() = runBlocking {
+        blobs.write("me", ME.substringAfter("{\"data\":").substringBeforeLast(",\"meta\""))
+        route { ok(error("SESSION_REVOKED"), 401) }
+        repo.start()
+        assertEquals(AuthState.NeedsLogin, state.state.value)
+    }
+
+    @Test
+    fun `login guarda los datos del usuario y logout los borra`() = runBlocking {
+        store.refreshToken = null
+        route { if (it.path == "/auth/me") ok(ME) else if (it.path == "/auth/logout") MockResponse().setResponseCode(204) else ok(tokens("a", "r"), 201) }
+        repo.login("a@restia.test", "x")
+        assertNotNull(blobs.read("me"))
+        repo.logout()
+        assertNull(blobs.read("me"))
     }
 
     @Test

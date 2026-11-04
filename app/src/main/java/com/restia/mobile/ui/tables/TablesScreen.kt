@@ -185,6 +185,12 @@ fun TablesScreen(
             state.sentTableNumber?.let {
                 Text(stringResource(R.string.order_sent, it), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
+            state.pendingDrafts.forEach { draft ->
+                TextButton(
+                    onClick = { onOrder(draft.sessionId, draft.tableNumber) },
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                ) { Text(stringResource(R.string.tables_pending_draft, draft.tableNumber)) }
+            }
             TextButton(
                 onClick = viewModel::refresh,
                 enabled = !state.refreshing,

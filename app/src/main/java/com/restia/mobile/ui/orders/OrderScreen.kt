@@ -144,10 +144,11 @@ private fun ReviewDialog(viewModel: OrderViewModel, state: OrderUiState) {
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.cart.forEach { line ->
-                    CartLineRow(line, state.uncertain || state.sending) { viewModel.removeLine(line) }
+                    CartLineRow(line, state.uncertain || state.sending || state.readOnly) { viewModel.removeLine(line) }
                 }
                 HorizontalDivider()
                 estimate?.let { Text(stringResource(R.string.order_estimate, moneyText(it, currency))) }
+                if (state.readOnly) Text(stringResource(R.string.order_read_only), color = MaterialTheme.colorScheme.error)
                 if (state.uncertain) {
                     Text(stringResource(R.string.order_uncertain), color = MaterialTheme.colorScheme.error)
                 } else {
@@ -203,6 +204,14 @@ fun OrderScreen(viewModel: OrderViewModel, tableNumber: Int, onBack: () -> Unit,
         val menu = state.menu
         when {
             menu != null -> LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
+                if (state.menuStale || state.readOnly) {
+                    item(key = "avisos") {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            if (state.menuStale) Text(stringResource(R.string.order_menu_stale), color = MaterialTheme.colorScheme.error)
+                            if (state.readOnly) Text(stringResource(R.string.order_read_only), color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
                 menu.products.groupBy { it.category }.forEach { (category, products) ->
                     item(key = "c-$category") {
                         Text(

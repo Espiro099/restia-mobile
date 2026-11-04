@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.ApiResult
 import com.restia.mobile.core.network.TableDto
+import com.restia.mobile.data.orders.DraftRepository
+import com.restia.mobile.data.orders.OrderDraft
 import com.restia.mobile.data.tables.TablesRepository
 import java.util.UUID
 import kotlinx.coroutines.Job
@@ -50,6 +52,8 @@ data class TablesUiState(
     /** Sesión recién abierta: la pantalla pasa a la comanda y la consume. */
     val opened: OpenedSession? = null,
     val sentTableNumber: Int? = null,
+    /** Comandas de este usuario sin enviar: nunca salen solas, el mesero decide. */
+    val pendingDrafts: List<OrderDraft> = emptyList(),
 )
 
 class TablesViewModel(
@@ -57,6 +61,8 @@ class TablesViewModel(
     private val branchId: String,
     private val pollMillis: Long = POLL_MILLIS,
     private val newKey: () -> String = { UUID.randomUUID().toString() },
+    private val drafts: DraftRepository? = null,
+    private val userId: String = "",
 ) : ViewModel() {
     private val _state = MutableStateFlow(TablesUiState())
     val state: StateFlow<TablesUiState> = _state
@@ -89,10 +95,19 @@ class TablesViewModel(
 
     private suspend fun load() {
         _state.value = _state.value.copy(refreshing = true)
+        drafts?.let { _state.value = _state.value.copy(pendingDrafts = it.listFor(userId, branchId)) }
         _state.value = when (val result = repository.list(branchId)) {
             is ApiResult.Success -> _state.value.copy(tables = result.value, loaded = true, refreshing = false, failure = null)
             // Conserva la última lista conocida: una falla de red no debe vaciar el piso.
-            is ApiResult.Failure -> _state.value.copy(refreshing = false, failure = result.failure)
+            is ApiResult.Failure -> {
+                val current = _state.value
+                val cached = if (current.loaded) null else repository.cached(branchId)
+                if (cached != null) {
+                    current.copy(tables = cached, loaded = true, refreshing = false, failure = result.failure)
+                } else {
+                    current.copy(refreshing = false, failure = result.failure)
+                }
+            }
         }
     }
 
@@ -158,9 +173,15 @@ class TablesViewModel(
         return server.details?.get("reservationStartAt")?.jsonPrimitive?.contentOrNull ?: ""
     }
 
-    class Factory(private val repository: TablesRepository, private val branchId: String) : ViewModelProvider.Factory {
+    class Factory(
+        private val repository: TablesRepository,
+        private val branchId: String,
+        private val drafts: DraftRepository,
+        private val userId: String,
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = TablesViewModel(repository, branchId) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T =
+            TablesViewModel(repository, branchId, drafts = drafts, userId = userId) as T
     }
 
     private companion object {
