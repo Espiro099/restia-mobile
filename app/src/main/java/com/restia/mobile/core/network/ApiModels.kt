@@ -72,6 +72,7 @@ data class TableDto(
     val zone: String? = null,
     val status: String,
     val operationalState: String? = null,
+    val currentSessionId: String? = null,
 )
 
 @Serializable
@@ -83,6 +84,53 @@ data class TableSessionOpenRequest(
 
 @Serializable
 data class TableSessionDto(val id: String, val status: String, val guestCount: Int, val version: Int)
+
+@Serializable
+data class MoneyDto(val amount: String, val currency: String)
+
+@Serializable
+data class MenuProductDto(
+    val id: String,
+    val name: String,
+    val description: String? = null,
+    val category: String,
+    val displayOrder: Int,
+    val price: MoneyDto,
+    val availability: String,
+    val modifierIds: List<String> = emptyList(),
+)
+
+@Serializable
+data class MenuOptionDto(val id: String, val name: String, val priceDelta: MoneyDto)
+
+@Serializable
+data class MenuModifierDto(
+    val id: String,
+    val name: String,
+    val minSelections: Int,
+    val maxSelections: Int,
+    val options: List<MenuOptionDto>,
+)
+
+@Serializable
+data class MenuDto(val menuVersion: Int, val products: List<MenuProductDto>, val modifiers: List<MenuModifierDto>)
+
+@Serializable
+data class OrderModifierOption(val modifierId: String, val optionId: String)
+
+@Serializable
+data class OrderItemRequest(
+    val productId: String,
+    val quantity: Int,
+    val modifierOptions: List<OrderModifierOption>? = null,
+    val notes: String? = null,
+)
+
+@Serializable
+data class OrderCreateRequest(val sessionId: String, val clientOrderUuid: String, val items: List<OrderItemRequest>)
+
+@Serializable
+data class OrderDto(val id: String, val clientOrderUuid: String, val status: String, val total: MoneyDto)
 
 @Serializable
 data class MeData(val user: UserDto, val memberships: List<MembershipDto>)

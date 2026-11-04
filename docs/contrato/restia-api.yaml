@@ -14996,6 +14996,7 @@ components:
           example:
           - tables.read
           - table_sessions.open
+          - orders.create
     AuthMeResponse:
       type: object
       required:
@@ -15966,9 +15967,11 @@ components:
         amount:
           type: string
           pattern: ^-?\d+(\.\d{1,4})?$
+          example: '120.00'
         currency:
           type: string
           pattern: ^[A-Z]{3}$
+          example: MXN
       additionalProperties: false
     CatalogStatus:
       type: string
@@ -16468,23 +16471,29 @@ components:
           type: string
         name:
           type: string
+          example: Agua mineral
         description:
           type: string
           nullable: true
           maxLength: 1000
         category:
           type: string
+          example: Bebidas
         displayOrder:
           type: integer
           minimum: 0
         price:
           $ref: '#/components/schemas/Money'
         availability:
-          $ref: '#/components/schemas/ProductAvailability'
+          allOf:
+          - $ref: '#/components/schemas/ProductAvailability'
+          example: AVAILABLE
         modifierIds:
           type: array
           items:
             $ref: '#/components/schemas/Uuid'
+          example:
+          - 6fa459ea-ee8a-4ca4-894e-db77e160355e
         imageUrl:
           type: string
           format: uri
@@ -16500,15 +16509,20 @@ components:
       - options
       properties:
         id:
-          $ref: '#/components/schemas/Uuid'
+          type: string
+          format: uuid
+          example: 6fa459ea-ee8a-4ca4-894e-db77e160355e
         name:
           type: string
+          example: Tamaño
         minSelections:
           type: integer
           minimum: 0
+          example: 1
         maxSelections:
           type: integer
           minimum: 1
+          example: 1
         options:
           type: array
           items:
@@ -16519,9 +16533,12 @@ components:
             - priceDelta
             properties:
               id:
-                $ref: '#/components/schemas/Uuid'
+                type: string
+                format: uuid
+                example: 16fd2706-8baf-433b-82eb-8c7fada847da
               name:
                 type: string
+                example: Grande
               priceDelta:
                 $ref: '#/components/schemas/Money'
     MenuResponse:

@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -140,8 +141,10 @@ fun TablesScreen(
     branchName: String,
     role: String,
     canOpenTables: Boolean,
+    canOrder: Boolean,
     logoutEnabled: Boolean,
     onLogout: () -> Unit,
+    onOrder: (sessionId: String, tableNumber: Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     LifecycleStartEffect(viewModel) {
@@ -149,6 +152,12 @@ fun TablesScreen(
         onStopOrDispose { viewModel.stopPolling() }
     }
     state.opening?.let { OpenTableDialog(it, viewModel) }
+    LaunchedEffect(state.opened) {
+        state.opened?.let {
+            viewModel.consumeOpened()
+            if (canOrder) onOrder(it.sessionId, it.tableNumber)
+        }
+    }
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
@@ -173,8 +182,8 @@ fun TablesScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
-            state.openedTableNumber?.let {
-                Text(stringResource(R.string.open_done, it), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            state.sentTableNumber?.let {
+                Text(stringResource(R.string.order_sent, it), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
             TextButton(
                 onClick = viewModel::refresh,
@@ -192,7 +201,15 @@ fun TablesScreen(
                 ) {
                     items(state.tables, key = { it.id }) { table ->
                         // El permiso solo ajusta la interfaz; el backend siempre lo valida.
-                        TableCard(table, if (canOpenTables && isOpenable(table)) ({ viewModel.selectTable(table) }) else null)
+                        val session = table.currentSessionId
+                        TableCard(
+                            table,
+                            when {
+                                canOpenTables && isOpenable(table) -> ({ viewModel.selectTable(table) })
+                                canOrder && session != null && isOrderable(table) -> ({ onOrder(session, table.number) })
+                                else -> null
+                            },
+                        )
                     }
                 }
             }
