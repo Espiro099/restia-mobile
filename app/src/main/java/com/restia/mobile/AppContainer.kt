@@ -13,6 +13,8 @@ import com.restia.mobile.core.security.KeystoreCredentialStore
 import com.restia.mobile.data.auth.AuthRepository
 import com.restia.mobile.data.auth.AuthStateHolder
 import com.restia.mobile.data.auth.TokenRefresher
+import com.restia.mobile.data.orders.MenuRepository
+import com.restia.mobile.data.orders.OrderRepository
 import com.restia.mobile.data.tables.TablesRepository
 import java.util.concurrent.TimeUnit
 import okhttp3.MediaType.Companion.toMediaType
@@ -21,7 +23,12 @@ import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 
 /** Une las dependencias. No registra cuerpos de peticiones: llevan contraseñas y tokens. */
-class Repositories(val auth: AuthRepository, val tables: TablesRepository)
+class Repositories(
+    val auth: AuthRepository,
+    val tables: TablesRepository,
+    val menu: MenuRepository,
+    val orders: OrderRepository,
+)
 
 fun buildRepositories(baseUrl: String, store: CredentialStore): Repositories {
     val accessToken = AccessTokenHolder()
@@ -41,7 +48,12 @@ fun buildRepositories(baseUrl: String, store: CredentialStore): Repositories {
         .build()
     val sessionApi = Retrofit.Builder().baseUrl(baseUrl).client(sessionClient).addConverterFactory(converter).build()
         .create(SessionApi::class.java)
-    return Repositories(AuthRepository(store, accessToken, publicApi, sessionApi, refresher, state), TablesRepository(sessionApi))
+    return Repositories(
+        AuthRepository(store, accessToken, publicApi, sessionApi, refresher, state),
+        TablesRepository(sessionApi),
+        MenuRepository(sessionApi),
+        OrderRepository(sessionApi),
+    )
 }
 
 class AppContainer(context: Context) {

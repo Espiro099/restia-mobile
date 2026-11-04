@@ -136,6 +136,8 @@ class TablesViewModelTest {
             return TablesRepository(object : SessionApi {
                 override suspend fun me() = error("sin uso")
                 override suspend fun logout() = error("sin uso")
+                override suspend fun getMenu(branchId: String, etag: String?) = error("sin uso")
+                override suspend fun createOrder(branchId: String, idempotencyKey: String, body: com.restia.mobile.core.network.OrderCreateRequest) = error("sin uso")
                 override suspend fun listTables(branchId: String, page: Int, perPage: Int) =
                     when (val r = outer.next()) {
                         is ApiResult.Success -> com.restia.mobile.core.network.PagedEnvelope(r.value)

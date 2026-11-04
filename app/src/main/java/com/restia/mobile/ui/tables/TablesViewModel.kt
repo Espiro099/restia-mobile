@@ -23,6 +23,14 @@ const val MAX_GUESTS = 200
 fun isOpenable(table: TableDto): Boolean =
     table.status == "ACTIVE" && (table.operationalState == "LIBRE" || table.operationalState == "POSIBLE_OCUPACION")
 
+private val ORDERABLE_STATES = setOf("OCUPADA_SIN_COMANDA", "ESPERANDO_COMIDA", "CONSUMIENDO", "CUENTA_SOLICITADA")
+
+/** Una mesa con sesión en servicio recibe comandas; en limpieza ya no (D-17, T-2). */
+fun isOrderable(table: TableDto): Boolean =
+    table.status == "ACTIVE" && table.currentSessionId != null && table.operationalState in ORDERABLE_STATES
+
+data class OpenedSession(val sessionId: String, val tableNumber: Int)
+
 data class OpenTableState(
     val table: TableDto,
     val guests: Int = 2,
@@ -39,7 +47,9 @@ data class TablesUiState(
     /** Hay un error, y lo que se muestra puede estar desactualizado (A-7). */
     val failure: ApiFailure? = null,
     val opening: OpenTableState? = null,
-    val openedTableNumber: Int? = null,
+    /** Sesión recién abierta: la pantalla pasa a la comanda y la consume. */
+    val opened: OpenedSession? = null,
+    val sentTableNumber: Int? = null,
 )
 
 class TablesViewModel(
@@ -88,7 +98,7 @@ class TablesViewModel(
 
     fun selectTable(table: TableDto) {
         if (!isOpenable(table)) return
-        _state.value = _state.value.copy(opening = OpenTableState(table), openedTableNumber = null)
+        _state.value = _state.value.copy(opening = OpenTableState(table), sentTableNumber = null)
     }
 
     fun setGuests(guests: Int) {
@@ -97,6 +107,14 @@ class TablesViewModel(
         _state.value = _state.value.copy(
             opening = opening.copy(guests = guests.coerceIn(1, MAX_GUESTS), failure = null, reservationStartAt = null),
         )
+    }
+
+    fun consumeOpened() {
+        _state.value = _state.value.copy(opened = null)
+    }
+
+    fun notifyOrderSent(tableNumber: Int) {
+        _state.value = _state.value.copy(sentTableNumber = tableNumber)
     }
 
     fun dismissOpen() {
@@ -113,7 +131,7 @@ class TablesViewModel(
             when (val r = repository.openSession(branchId, opening.table.id, opening.guests, acknowledge, key)) {
                 is ApiResult.Success -> {
                     intent = null
-                    _state.value = _state.value.copy(opening = null, openedTableNumber = opening.table.number)
+                    _state.value = _state.value.copy(opening = null, opened = OpenedSession(r.value.id, opening.table.number))
                     load()
                 }
                 is ApiResult.Failure -> {

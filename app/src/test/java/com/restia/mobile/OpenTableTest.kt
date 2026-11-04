@@ -6,6 +6,7 @@ import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.TableDto
 import com.restia.mobile.data.tables.TablesRepository
 import com.restia.mobile.ui.tables.MAX_GUESTS
+import com.restia.mobile.ui.tables.OpenedSession
 import com.restia.mobile.ui.tables.TablesViewModel
 import com.restia.mobile.ui.tables.isOpenable
 import java.util.concurrent.TimeUnit
@@ -116,7 +117,7 @@ class OpenTableTest {
         assertEquals("clave-1", post.getHeader("Idempotency-Key"))
         assertEquals("""{"tableIds":["t1"],"guestCount":3}""", post.body.readUtf8())
         assertNull(vm.state.value.opening)
-        assertEquals(1, vm.state.value.openedTableNumber)
+        assertEquals(OpenedSession("s1", 1), vm.state.value.opened)
     }
 
     @Test

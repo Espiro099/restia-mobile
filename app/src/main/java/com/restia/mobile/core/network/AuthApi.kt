@@ -39,6 +39,19 @@ interface SessionApi {
         @Query("perPage") perPage: Int,
     ): PagedEnvelope<TableDto>
 
+    @GET("branches/{branchId}/menu")
+    suspend fun getMenu(
+        @Path("branchId") branchId: String,
+        @Header("If-None-Match") etag: String?,
+    ): Response<Envelope<MenuDto>>
+
+    @POST("branches/{branchId}/orders")
+    suspend fun createOrder(
+        @Path("branchId") branchId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: OrderCreateRequest,
+    ): Envelope<OrderDto>
+
     @POST("branches/{branchId}/table-sessions")
     suspend fun openTableSession(
         @Path("branchId") branchId: String,
