@@ -1193,16 +1193,26 @@ paths:
         required: false
         schema:
           type: string
+      - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
           description: Mesas de la sucursal
           headers:
             X-Request-ID:
               $ref: '#/components/headers/XRequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TableListResponse'
+        '304':
+          description: Sin cambios desde el ETag enviado
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -1213,6 +1223,8 @@ paths:
           $ref: '#/components/responses/ValidationFailed'
         '500':
           $ref: '#/components/responses/InternalError'
+      description: Se consulta periódicamente con ETag (RT-1). El ETag describe los resultados de esa
+        página y sus filtros.
     post:
       tags:
       - Tables
@@ -4286,16 +4298,26 @@ paths:
         required: false
         schema:
           $ref: '#/components/schemas/BusinessDate'
+      - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
           description: Comandas
           headers:
             X-Request-ID:
               $ref: '#/components/headers/XRequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderListResponse'
+        '304':
+          description: Sin cambios desde el ETag enviado
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -4306,6 +4328,8 @@ paths:
           $ref: '#/components/responses/ValidationFailed'
         '500':
           $ref: '#/components/responses/InternalError'
+      description: Se consulta periódicamente con ETag (RT-1). El ETag describe los resultados de esa
+        página y sus filtros.
     post:
       tags:
       - Orders
@@ -4545,16 +4569,26 @@ paths:
         required: false
         schema:
           $ref: '#/components/schemas/Uuid'
+      - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
           description: Unidades, de la más antigua a la más reciente
           headers:
             X-Request-ID:
               $ref: '#/components/headers/XRequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderUnitQueueResponse'
+        '304':
+          description: Sin cambios desde el ETag enviado
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -4565,6 +4599,8 @@ paths:
           $ref: '#/components/responses/ValidationFailed'
         '500':
           $ref: '#/components/responses/InternalError'
+      description: Se consulta periódicamente con ETag (RT-1). El ETag describe los resultados de esa
+        página y sus filtros.
   /branches/{branchId}/order-units/transitions:
     post:
       tags:
@@ -14997,6 +15033,8 @@ components:
           - tables.read
           - table_sessions.open
           - orders.create
+          - orders.read
+          - order_units.deliver
     AuthMeResponse:
       type: object
       required:
@@ -16783,6 +16821,7 @@ components:
           $ref: '#/components/schemas/Uuid'
         name:
           type: string
+          example: Grande
         priceDelta:
           $ref: '#/components/schemas/Money'
     OrderItem:
@@ -16803,9 +16842,11 @@ components:
           $ref: '#/components/schemas/Uuid'
         name:
           type: string
+          example: Agua mineral
         quantity:
           type: integer
           minimum: 1
+          example: 1
         unitPrice:
           $ref: '#/components/schemas/Money'
         modifiers:
@@ -16816,6 +16857,7 @@ components:
           type: string
           nullable: true
           maxLength: 500
+          example: Sin hielo
         units:
           type: array
           items:

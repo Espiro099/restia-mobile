@@ -142,8 +142,10 @@ fun TablesScreen(
     role: String,
     canOpenTables: Boolean,
     canOrder: Boolean,
+    canViewOrders: Boolean,
     logoutEnabled: Boolean,
     onLogout: () -> Unit,
+    onViewTable: (sessionId: String, tableNumber: Int) -> Unit,
     onOrder: (sessionId: String, tableNumber: Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
@@ -155,7 +157,7 @@ fun TablesScreen(
     LaunchedEffect(state.opened) {
         state.opened?.let {
             viewModel.consumeOpened()
-            if (canOrder) onOrder(it.sessionId, it.tableNumber)
+            if (canOrder) onOrder(it.sessionId, it.tableNumber) else if (canViewOrders) onViewTable(it.sessionId, it.tableNumber)
         }
     }
     Scaffold(
@@ -181,9 +183,6 @@ fun TablesScreen(
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
-            }
-            state.sentTableNumber?.let {
-                Text(stringResource(R.string.order_sent, it), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
             state.pendingDrafts.forEach { draft ->
                 TextButton(
@@ -212,7 +211,7 @@ fun TablesScreen(
                             table,
                             when {
                                 canOpenTables && isOpenable(table) -> ({ viewModel.selectTable(table) })
-                                canOrder && session != null && isOrderable(table) -> ({ onOrder(session, table.number) })
+                                canViewOrders && session != null && hasSession(table) -> ({ onViewTable(session, table.number) })
                                 else -> null
                             },
                         )
