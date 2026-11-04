@@ -14904,7 +14904,9 @@ components:
         id:
           $ref: '#/components/schemas/Uuid'
         branchId:
-          $ref: '#/components/schemas/Uuid'
+          type: string
+          format: uuid
+          example: 7c9e6679-7425-40de-944b-e07fc1f90ae7
         type:
           type: string
           enum:
@@ -14973,9 +14975,12 @@ components:
           - name
           properties:
             id:
-              $ref: '#/components/schemas/Uuid'
+              type: string
+              format: uuid
+              example: 7c9e6679-7425-40de-944b-e07fc1f90ae7
             name:
               type: string
+              example: Sucursal de ejemplo
         role:
           type: string
           enum:
@@ -14983,10 +14988,14 @@ components:
           - MANAGER
           - WAITER
           - KITCHEN
+          example: WAITER
         permissions:
           type: array
           items:
             type: string
+          example:
+          - tables.read
+          - table_sessions.open
     AuthMeResponse:
       type: object
       required:

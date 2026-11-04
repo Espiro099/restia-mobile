@@ -3,6 +3,8 @@ package com.restia.mobile.data.tables
 import com.restia.mobile.core.network.ApiResult
 import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.TableDto
+import com.restia.mobile.core.network.TableSessionDto
+import com.restia.mobile.core.network.TableSessionOpenRequest
 import com.restia.mobile.core.network.apiCall
 
 class TablesRepository(private val api: SessionApi) {
@@ -17,6 +19,17 @@ class TablesRepository(private val api: SessionApi) {
             page++
         } while (page <= lastPage && page <= MAX_PAGES)
         tables.sortedBy { it.number }
+    }
+
+    suspend fun openSession(
+        branchId: String,
+        tableId: String,
+        guestCount: Int,
+        acknowledgeReservation: Boolean,
+        idempotencyKey: String,
+    ): ApiResult<TableSessionDto> = apiCall {
+        val body = TableSessionOpenRequest(listOf(tableId), guestCount, acknowledgeReservation.takeIf { it })
+        api.openTableSession(branchId, idempotencyKey, body).data
     }
 
     private companion object {

@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
                             ),
                             branchName = membership?.branch?.name ?: current.me.user.name,
                             role = membership?.role.orEmpty(),
+                            canOpenTables = membership?.permissions?.contains("table_sessions.open") == true,
                             logoutEnabled = !form.busy,
                             onLogout = viewModel::logout,
                         )
