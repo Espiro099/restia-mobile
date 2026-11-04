@@ -1,5 +1,6 @@
 package com.restia.mobile.core.network
 
+import okhttp3.ResponseBody
 import retrofit2.Call
 import retrofit2.Response
 import retrofit2.http.Body
@@ -44,6 +45,22 @@ interface SessionApi {
         @Path("branchId") branchId: String,
         @Header("If-None-Match") etag: String?,
     ): Response<Envelope<MenuDto>>
+
+    @GET("branches/{branchId}/orders")
+    suspend fun listOrders(
+        @Path("branchId") branchId: String,
+        @Query("sessionId") sessionId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+        @Header("If-None-Match") etag: String?,
+    ): Response<PagedEnvelope<OrderDto>>
+
+    @POST("branches/{branchId}/order-units/transitions")
+    suspend fun transitionUnits(
+        @Path("branchId") branchId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: UnitTransitionRequest,
+    ): ResponseBody
 
     @POST("branches/{branchId}/orders")
     suspend fun createOrder(

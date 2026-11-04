@@ -25,11 +25,11 @@ const val MAX_GUESTS = 200
 fun isOpenable(table: TableDto): Boolean =
     table.status == "ACTIVE" && (table.operationalState == "LIBRE" || table.operationalState == "POSIBLE_OCUPACION")
 
-private val ORDERABLE_STATES = setOf("OCUPADA_SIN_COMANDA", "ESPERANDO_COMIDA", "CONSUMIENDO", "CUENTA_SOLICITADA")
+private val IN_SERVICE_STATES = setOf("OCUPADA_SIN_COMANDA", "ESPERANDO_COMIDA", "CONSUMIENDO", "CUENTA_SOLICITADA")
 
-/** Una mesa con sesión en servicio recibe comandas; en limpieza ya no (D-17, T-2). */
-fun isOrderable(table: TableDto): Boolean =
-    table.status == "ACTIVE" && table.currentSessionId != null && table.operationalState in ORDERABLE_STATES
+/** Una mesa con sesión en servicio muestra sus rondas y recibe comandas; en limpieza ya no (D-17, T-2). */
+fun hasSession(table: TableDto): Boolean =
+    table.status == "ACTIVE" && table.currentSessionId != null && table.operationalState in IN_SERVICE_STATES
 
 data class OpenedSession(val sessionId: String, val tableNumber: Int)
 
@@ -51,7 +51,6 @@ data class TablesUiState(
     val opening: OpenTableState? = null,
     /** Sesión recién abierta: la pantalla pasa a la comanda y la consume. */
     val opened: OpenedSession? = null,
-    val sentTableNumber: Int? = null,
     /** Comandas de este usuario sin enviar: nunca salen solas, el mesero decide. */
     val pendingDrafts: List<OrderDraft> = emptyList(),
 )
@@ -113,7 +112,7 @@ class TablesViewModel(
 
     fun selectTable(table: TableDto) {
         if (!isOpenable(table)) return
-        _state.value = _state.value.copy(opening = OpenTableState(table), sentTableNumber = null)
+        _state.value = _state.value.copy(opening = OpenTableState(table))
     }
 
     fun setGuests(guests: Int) {
@@ -126,10 +125,6 @@ class TablesViewModel(
 
     fun consumeOpened() {
         _state.value = _state.value.copy(opened = null)
-    }
-
-    fun notifyOrderSent(tableNumber: Int) {
-        _state.value = _state.value.copy(sentTableNumber = tableNumber)
     }
 
     fun dismissOpen() {
