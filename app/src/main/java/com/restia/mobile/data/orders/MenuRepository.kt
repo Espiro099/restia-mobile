@@ -1,33 +1,59 @@
 package com.restia.mobile.data.orders
 
+import com.restia.mobile.core.network.ApiJson
 import com.restia.mobile.core.network.ApiResult
 import com.restia.mobile.core.network.MenuDto
 import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.apiCall
 import com.restia.mobile.core.network.parseError
+import com.restia.mobile.core.storage.BlobStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 
-/** Conserva el último menú y su ETag en memoria. La caché en disco de A-7 sigue pendiente. */
-class MenuRepository(private val api: SessionApi) {
-    private var menu: MenuDto? = null
-    private var etag: String? = null
+/** [stale] indica que viene de caché porque no se pudo consultar al servidor (A-7). */
+data class MenuLoad(val menu: MenuDto, val stale: Boolean)
 
-    suspend fun load(branchId: String): ApiResult<MenuDto> {
-        val result = apiCall { api.getMenu(branchId, etag.takeIf { menu != null }) }
+@Serializable
+private data class CachedMenu(val menu: MenuDto, val etag: String? = null)
+
+class MenuRepository(private val api: SessionApi, private val cache: BlobStore? = null) {
+    private var cached: CachedMenu? = null
+
+    suspend fun load(branchId: String): ApiResult<MenuLoad> {
+        val known = cached ?: readCache(branchId)?.also { cached = it }
+        val result = apiCall { api.getMenu(branchId, known?.etag.takeIf { known != null }) }
         val response = when (result) {
-            is ApiResult.Failure -> return menu?.let { ApiResult.Success(it) } ?: result
+            is ApiResult.Failure -> return known?.let { ApiResult.Success(MenuLoad(it.menu, stale = true)) } ?: result
             is ApiResult.Success -> result.value
         }
         val body = response.body()?.data
         return when {
-            response.code() == 304 -> menu?.let { ApiResult.Success(it) } ?: ApiResult.Failure(parseError(304, null, null))
+            response.code() == 304 -> known?.let { ApiResult.Success(MenuLoad(it.menu, stale = false)) }
+                ?: ApiResult.Failure(parseError(304, null, null))
             response.isSuccessful && body != null -> {
-                menu = body
-                etag = response.headers()["ETag"]
-                ApiResult.Success(body)
+                val fresh = CachedMenu(body, response.headers()["ETag"])
+                cached = fresh
+                withContext(Dispatchers.IO) { cache?.write(name(branchId), ApiJson.encodeToString(CachedMenu.serializer(), fresh)) }
+                ApiResult.Success(MenuLoad(body, stale = false))
             }
-            else -> ApiResult.Failure(
-                parseError(response.code(), response.errorBody()?.string(), response.headers()["Retry-After"]),
-            )
+            else -> {
+                val failure = parseError(response.code(), response.errorBody()?.string(), response.headers()["Retry-After"])
+                if (known != null && failure.status >= 500) ApiResult.Success(MenuLoad(known.menu, stale = true)) else ApiResult.Failure(failure)
+            }
         }
     }
+
+    private suspend fun readCache(branchId: String): CachedMenu? = withContext(Dispatchers.IO) {
+        cache?.read(name(branchId))?.let {
+            try {
+                ApiJson.decodeFromString(CachedMenu.serializer(), it)
+            } catch (_: SerializationException) {
+                null
+            }
+        }
+    }
+
+    private fun name(branchId: String) = "menu-$branchId"
 }

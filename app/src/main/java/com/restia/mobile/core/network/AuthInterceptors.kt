@@ -1,6 +1,7 @@
 package com.restia.mobile.core.network
 
 import com.restia.mobile.core.security.AccessTokenHolder
+import com.restia.mobile.core.storage.ContactTracker
 import com.restia.mobile.data.auth.RefreshResult
 import com.restia.mobile.data.auth.TokenRefresher
 import java.util.UUID
@@ -13,6 +14,12 @@ import okhttp3.Route
 class RequestIdInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response =
         chain.proceed(chain.request().newBuilder().header("X-Request-ID", UUID.randomUUID().toString()).build())
+}
+
+/** Solo una respuesta exitosa cuenta como contacto con el servidor (A-7). */
+class ContactInterceptor(private val contact: ContactTracker) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response =
+        chain.proceed(chain.request()).also { if (it.isSuccessful || it.code == 304) contact.record() }
 }
 
 class BearerInterceptor(

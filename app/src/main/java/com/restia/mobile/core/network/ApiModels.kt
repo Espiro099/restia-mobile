@@ -127,7 +127,12 @@ data class OrderItemRequest(
 )
 
 @Serializable
-data class OrderCreateRequest(val sessionId: String, val clientOrderUuid: String, val items: List<OrderItemRequest>)
+data class OrderCreateRequest(
+    val sessionId: String,
+    val clientOrderUuid: String,
+    val capturedAt: String? = null,
+    val items: List<OrderItemRequest>,
+)
 
 @Serializable
 data class OrderDto(val id: String, val clientOrderUuid: String, val status: String, val total: MoneyDto)

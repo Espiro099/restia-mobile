@@ -1,8 +1,10 @@
 package com.restia.mobile.data.auth
 
 import com.restia.mobile.core.network.ApiFailure
+import com.restia.mobile.core.network.ApiJson
 import com.restia.mobile.core.network.ApiResult
 import com.restia.mobile.core.network.DeviceEnrollRequest
+import com.restia.mobile.core.network.MeData
 import com.restia.mobile.core.network.MobileLoginRequest
 import com.restia.mobile.core.network.MobileRefreshRequest
 import com.restia.mobile.core.network.PublicAuthApi
@@ -10,6 +12,7 @@ import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.apiCall
 import com.restia.mobile.core.security.AccessTokenHolder
 import com.restia.mobile.core.security.CredentialStore
+import com.restia.mobile.core.storage.BlobStore
 import java.io.IOException
 import java.util.UUID
 import kotlinx.serialization.SerializationException
@@ -23,6 +26,7 @@ class AuthRepository(
     private val sessionApi: SessionApi,
     private val refresher: TokenRefresher,
     private val stateHolder: AuthStateHolder,
+    private val cache: BlobStore? = null,
     private val newUuid: () -> String = { UUID.randomUUID().toString() },
 ) {
     val state = stateHolder.state
@@ -42,7 +46,7 @@ class AuthRepository(
         }
         when (withContext(Dispatchers.IO) { refresher.refresh(null) }) {
             is RefreshResult.Success -> loadMe()
-            RefreshResult.Unavailable -> stateHolder.set(AuthState.Offline)
+            RefreshResult.Unavailable -> setOffline()
             RefreshResult.Rejected, RefreshResult.DeviceBlocked -> Unit
         }
     }
@@ -102,17 +106,34 @@ class AuthRepository(
         if (failed && refreshToken != null) store.savePendingLogoutToken(refreshToken)
         accessToken.token = null
         store.clearSession()
+        withContext(Dispatchers.IO) { cache?.delete(ME) }
         if (state.value !is AuthState.NeedsEnrollment) stateHolder.set(AuthState.NeedsLogin)
     }
 
     private suspend fun loadMe() {
         when (val r = apiCall { sessionApi.me() }) {
-            is ApiResult.Success -> stateHolder.set(
-                store.branchId?.let { AuthState.Authenticated(r.value.data, it) } ?: AuthState.NeedsEnrollment,
-            )
+            is ApiResult.Success -> {
+                withContext(Dispatchers.IO) { cache?.write(ME, ApiJson.encodeToString(MeData.serializer(), r.value.data)) }
+                stateHolder.set(store.branchId?.let { AuthState.Authenticated(r.value.data, it) } ?: AuthState.NeedsEnrollment)
+            }
             // Si la sesión o el dispositivo se perdieron, el refresher ya cambió el estado.
-            is ApiResult.Failure -> if (store.refreshToken != null) stateHolder.set(AuthState.Offline)
+            is ApiResult.Failure -> if (store.refreshToken != null) setOffline()
         }
+    }
+
+    /** Sin red, entra con los datos conocidos para capturar borradores (A-7); el backend revalida al reconectar. */
+    private suspend fun setOffline() {
+        val me = withContext(Dispatchers.IO) {
+            cache?.read(ME)?.let {
+                try {
+                    ApiJson.decodeFromString(MeData.serializer(), it)
+                } catch (_: SerializationException) {
+                    null
+                }
+            }
+        }
+        val branchId = store.branchId
+        stateHolder.set(if (me != null && branchId != null) AuthState.Authenticated(me, branchId) else AuthState.Offline)
     }
 
     private suspend fun flushPendingLogout() {
@@ -134,5 +155,6 @@ class AuthRepository(
 
     private companion object {
         const val DEVICE_NOT_ENROLLED = "DEVICE_NOT_ENROLLED"
+        const val ME = "me"
     }
 }

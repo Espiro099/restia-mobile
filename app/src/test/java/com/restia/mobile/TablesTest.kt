@@ -94,6 +94,18 @@ class TablesRepositoryTest {
     }
 
     @Test
+    fun `la lista en disco sirve sin red al volver a abrir la app`() = runBlocking {
+        val blobs = InMemoryBlobStore()
+        val api = Retrofit.Builder().baseUrl(server.url("/")).client(OkHttpClient())
+            .addConverterFactory(ApiJson.asConverterFactory("application/json".toMediaType())).build()
+            .create(SessionApi::class.java)
+        assertEquals(null, TablesRepository(api, blobs).cached("b1"))
+        server.enqueue(MockResponse().setBody(page(listOf(table(1)), 1, 1)))
+        TablesRepository(api, blobs).list("b1")
+        assertEquals(1, TablesRepository(api, blobs).cached("b1")?.single()?.number)
+    }
+
+    @Test
     fun `cada estado del contrato tiene su texto`() {
         val expected = mapOf(
             "LIBRE" to R.string.table_free,

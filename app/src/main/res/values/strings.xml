@@ -19,6 +19,9 @@
     <string name="open_title">Abrir mesa %1$d</string>
     <string name="open_guests">Personas</string>
     <string name="order_sent">Comanda de la mesa %1$d enviada</string>
+    <string name="tables_pending_draft">Mesa %1$d: comanda sin enviar</string>
+    <string name="order_menu_stale">Menú posiblemente desactualizado.</string>
+    <string name="order_read_only">Llevas más de 12 horas sin conexión: esta comanda es solo de lectura hasta enviarla.</string>
     <string name="order_title">Comanda · Mesa %1$d</string>
     <string name="order_back">Mesas</string>
     <string name="order_sold_out">Agotado</string>
