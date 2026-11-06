@@ -50,8 +50,15 @@ class OrderRepository(private val api: SessionApi) {
         }
     }
 
-    suspend fun deliver(branchId: String, idempotencyKey: String, units: List<UnitVersion>): ApiResult<Unit> = apiCall {
-        api.transitionUnits(branchId, idempotencyKey, UnitTransitionRequest("DELIVER", units)).close()
+    suspend fun deliver(branchId: String, idempotencyKey: String, units: List<UnitVersion>): ApiResult<Unit> =
+        transition(branchId, idempotencyKey, UnitTransitionRequest("DELIVER", units))
+
+    /** Solo unidades PENDING; el motivo es obligatorio (3 a 500 caracteres). */
+    suspend fun cancel(branchId: String, idempotencyKey: String, units: List<UnitVersion>, reason: String): ApiResult<Unit> =
+        transition(branchId, idempotencyKey, UnitTransitionRequest("CANCEL", units, reason))
+
+    private suspend fun transition(branchId: String, idempotencyKey: String, body: UnitTransitionRequest): ApiResult<Unit> = apiCall {
+        api.transitionUnits(branchId, idempotencyKey, body).close()
     }
 
     private fun serverFailure(response: Response<*>) =

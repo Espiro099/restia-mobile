@@ -12,12 +12,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,7 +45,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 
-private const val SENT_NOTICE_MILLIS = 5_000L
+private const val NOTICE_MILLIS = 5_000L
 
 @StringRes
 fun unitStatusLabel(status: String): Int = when (status) {
@@ -56,6 +58,20 @@ fun unitStatusLabel(status: String): Int = when (status) {
     else -> R.string.unit_unknown
 }
 
+/** Texto para una falla de entrega o cancelación, según el código del contrato. */
+@StringRes
+fun actionFailureText(failure: ApiFailure): Int? = when {
+    failure == ApiFailure.Network -> R.string.error_network
+    failure !is ApiFailure.Server -> R.string.error_unexpected
+    failure.status >= 500 -> R.string.error_server
+    failure.code == "ORDER_UNIT_INVALID_STATE" -> R.string.cancel_invalid_state
+    failure.code == "ORDER_UNIT_PAID" -> R.string.cancel_paid
+    failure.status == 409 -> R.string.table_deliver_conflict
+    failure.status == 403 -> R.string.error_action_forbidden
+    // Otros 4xx: el mensaje del servidor, si lo trae.
+    else -> null
+}
+
 private fun roundTime(iso: String?): String? = iso?.let {
     runCatching {
         OffsetDateTime.parse(it).atZoneSameInstant(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm"))
@@ -66,17 +82,30 @@ private fun total(money: MoneyDto): String =
     runCatching { moneyText(BigDecimal(money.amount), money.currency) }.getOrDefault(money.amount)
 
 @Composable
-private fun failureText(failure: ApiFailure): String = when {
+private fun loadFailureText(failure: ApiFailure): String = when {
     failure == ApiFailure.Network -> stringResource(R.string.error_network)
     failure is ApiFailure.Server && failure.status >= 500 -> stringResource(R.string.error_server)
-    failure is ApiFailure.Server && failure.status == 409 -> stringResource(R.string.table_deliver_conflict)
     failure is ApiFailure.Server -> failure.message ?: stringResource(R.string.error_unexpected)
     else -> stringResource(R.string.error_unexpected)
 }
 
 @Composable
-private fun ItemRow(item: OrderItemDto, canDeliver: Boolean, busy: Boolean, onDeliver: () -> Unit) {
+private fun failureText(failure: ApiFailure): String =
+    actionFailureText(failure)?.let { stringResource(it) }
+        ?: (failure as? ApiFailure.Server)?.message
+        ?: stringResource(R.string.error_unexpected)
+
+@Composable
+private fun ItemRow(
+    item: OrderItemDto,
+    canDeliver: Boolean,
+    canCancel: Boolean,
+    busy: Boolean,
+    onDeliver: () -> Unit,
+    onCancel: () -> Unit,
+) {
     val ready = readyUnits(listOf(item)).size
+    val pending = pendingUnits(item).size
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(modifier = Modifier.weight(1f)) {
             Text(item.quantity.toString() + " × " + item.name, style = MaterialTheme.typography.bodyLarge)
@@ -91,14 +120,27 @@ private fun ItemRow(item: OrderItemDto, canDeliver: Boolean, busy: Boolean, onDe
                 )
             }
         }
-        if (canDeliver && ready > 0) {
-            OutlinedButton(onClick = onDeliver, enabled = !busy) { Text(stringResource(R.string.table_deliver, ready)) }
+        Column(horizontalAlignment = Alignment.End) {
+            if (canDeliver && ready > 0) {
+                OutlinedButton(onClick = onDeliver, enabled = !busy) { Text(stringResource(R.string.table_deliver, ready)) }
+            }
+            if (canCancel && pending > 0) {
+                TextButton(onClick = onCancel, enabled = !busy) { Text(stringResource(R.string.cancel_action)) }
+            }
         }
     }
 }
 
 @Composable
-private fun RoundCard(index: Int, order: OrderDto, canDeliver: Boolean, busy: Boolean, onDeliver: (OrderItemDto) -> Unit) {
+private fun RoundCard(
+    index: Int,
+    order: OrderDto,
+    canDeliver: Boolean,
+    canCancel: Boolean,
+    busy: Boolean,
+    onDeliver: (OrderItemDto) -> Unit,
+    onCancel: (OrderItemDto) -> Unit,
+) {
     Card {
         Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val time = roundTime(order.createdAt)
@@ -106,10 +148,49 @@ private fun RoundCard(index: Int, order: OrderDto, canDeliver: Boolean, busy: Bo
                 if (time != null) stringResource(R.string.table_round_at, index, time) else stringResource(R.string.table_round, index),
                 style = MaterialTheme.typography.titleMedium,
             )
-            order.items.forEach { item -> ItemRow(item, canDeliver, busy) { onDeliver(item) } }
+            order.items.forEach { item ->
+                ItemRow(item, canDeliver, canCancel, busy, { onDeliver(item) }, { onCancel(item) })
+            }
             Text(stringResource(R.string.table_round_total, total(order.total)), style = MaterialTheme.typography.bodySmall)
         }
     }
+}
+
+@Composable
+private fun CancelDialog(state: CancelState, viewModel: TableViewModel) {
+    AlertDialog(
+        onDismissRequest = viewModel::dismissCancel,
+        title = { Text(stringResource(R.string.cancel_title, state.item.name)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(pluralStringResource(R.plurals.cancel_pending, state.available, state.available))
+                if (state.available > 1) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        OutlinedButton(onClick = { viewModel.setCancelCount(state.count - 1) }, enabled = !state.submitting && state.count > 1) { Text("−") }
+                        Text(state.count.toString(), style = MaterialTheme.typography.titleLarge)
+                        OutlinedButton(onClick = { viewModel.setCancelCount(state.count + 1) }, enabled = !state.submitting && state.count < state.available) { Text("+") }
+                    }
+                }
+                OutlinedTextField(
+                    value = state.reason,
+                    onValueChange = viewModel::setCancelReason,
+                    label = { Text(stringResource(R.string.cancel_reason)) },
+                    supportingText = { Text(stringResource(R.string.cancel_reason_hint, REASON_MIN)) },
+                    enabled = !state.submitting,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                state.failure?.let { Text(failureText(it), color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = viewModel::confirmCancel, enabled = state.canConfirm) {
+                Text(stringResource(R.string.cancel_confirm, state.count))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = viewModel::dismissCancel, enabled = !state.submitting) { Text(stringResource(R.string.cancel_back)) }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -119,6 +200,7 @@ fun TableScreen(
     tableNumber: Int,
     canOrder: Boolean,
     canDeliver: Boolean,
+    canCancel: Boolean,
     onBack: () -> Unit,
     onAddOrder: () -> Unit,
 ) {
@@ -128,13 +210,20 @@ fun TableScreen(
         viewModel.startPolling()
         onStopOrDispose { viewModel.stopPolling() }
     }
-    // El aviso confirma el envío; dejarlo fijo haría creer que se acaba de enviar otra comanda.
+    // Los avisos confirman una acción; dejarlos fijos haría creer que acaba de pasar otra.
     LaunchedEffect(state.sent) {
         if (state.sent) {
-            delay(SENT_NOTICE_MILLIS)
+            delay(NOTICE_MILLIS)
             viewModel.clearSent()
         }
     }
+    LaunchedEffect(state.cancelled) {
+        if (state.cancelled != null) {
+            delay(NOTICE_MILLIS)
+            viewModel.clearCancelled()
+        }
+    }
+    state.cancelling?.let { CancelDialog(it, viewModel) }
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
@@ -154,21 +243,24 @@ fun TableScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             state.failure?.let {
                 Text(
-                    stringResource(if (state.loaded) R.string.tables_stale else R.string.table_not_loaded) + " " + failureText(it),
+                    stringResource(if (state.loaded) R.string.tables_stale else R.string.table_not_loaded) + " " + loadFailureText(it),
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
-            state.deliverFailure?.let {
+            state.actionFailure?.let {
                 Text(failureText(it), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
             if (state.sent) {
                 Text(stringResource(R.string.order_sent, tableNumber), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
+            state.cancelled?.let {
+                Text(pluralStringResource(R.plurals.cancel_done, it, it), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
             if (canDeliver && state.readyCount > 0) {
                 Button(
                     onClick = viewModel::deliverAll,
-                    enabled = !state.delivering,
+                    enabled = !state.busy,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 ) { Text(pluralStringResource(R.plurals.table_deliver_all, state.readyCount, state.readyCount)) }
             }
@@ -181,7 +273,7 @@ fun TableScreen(
                 ) {
                     val rounds = state.orders.withIndex().toList()
                     items(rounds, key = { it.value.id }) { (index, order) ->
-                        RoundCard(index + 1, order, canDeliver, state.delivering, viewModel::deliverItem)
+                        RoundCard(index + 1, order, canDeliver, canCancel, state.busy, viewModel::deliverItem, viewModel::startCancel)
                     }
                 }
             }

@@ -92,6 +92,7 @@ fun BranchHome(
             tableNumber = tableNumber,
             canOrder = canOrder,
             canDeliver = "order_units.deliver" in permissions,
+            canCancel = "order_units.cancel" in permissions,
             onBack = { sessionId = null },
             onAddOrder = { capturing = true },
         )
