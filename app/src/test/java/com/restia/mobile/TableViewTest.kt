@@ -59,11 +59,11 @@ class TableViewPureTest {
     @Test
     fun `cada estado del contrato tiene su texto`() {
         val expected = mapOf(
-            "PENDING" to R.string.unit_pending, "PREPARING" to R.string.unit_preparing, "READY" to R.string.unit_ready,
-            "DELIVERED" to R.string.unit_delivered, "CANCELLED" to R.string.unit_cancelled, "VOIDED" to R.string.unit_voided,
+            "PENDING" to R.plurals.unit_pending, "PREPARING" to R.plurals.unit_preparing, "READY" to R.plurals.unit_ready,
+            "DELIVERED" to R.plurals.unit_delivered, "CANCELLED" to R.plurals.unit_cancelled, "VOIDED" to R.plurals.unit_voided,
         )
         expected.forEach { (status, label) -> assertEquals(label, unitStatusLabel(status)) }
-        assertEquals(R.string.unit_unknown, unitStatusLabel("NUEVO"))
+        assertEquals(R.plurals.unit_unknown, unitStatusLabel("NUEVO"))
     }
 
     @Test

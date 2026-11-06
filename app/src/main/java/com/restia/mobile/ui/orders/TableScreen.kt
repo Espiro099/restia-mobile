@@ -1,6 +1,7 @@
 package com.restia.mobile.ui.orders
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,15 +48,16 @@ import kotlinx.coroutines.delay
 
 private const val NOTICE_MILLIS = 5_000L
 
-@StringRes
+/** Texto con la cantidad y concordancia: "1 pendiente", "3 pendientes". */
+@PluralsRes
 fun unitStatusLabel(status: String): Int = when (status) {
-    "PENDING" -> R.string.unit_pending
-    "PREPARING" -> R.string.unit_preparing
-    "READY" -> R.string.unit_ready
-    "DELIVERED" -> R.string.unit_delivered
-    "CANCELLED" -> R.string.unit_cancelled
-    "VOIDED" -> R.string.unit_voided
-    else -> R.string.unit_unknown
+    "PENDING" -> R.plurals.unit_pending
+    "PREPARING" -> R.plurals.unit_preparing
+    "READY" -> R.plurals.unit_ready
+    "DELIVERED" -> R.plurals.unit_delivered
+    "CANCELLED" -> R.plurals.unit_cancelled
+    "VOIDED" -> R.plurals.unit_voided
+    else -> R.plurals.unit_unknown
 }
 
 /** Texto para una falla de entrega o cancelación, según el código del contrato. */
@@ -114,7 +116,7 @@ private fun ItemRow(
             // El estado siempre va en texto, por unidad agrupada.
             item.units.groupingBy { it.status }.eachCount().forEach { (status, count) ->
                 Text(
-                    count.toString() + " " + stringResource(unitStatusLabel(status)),
+                    pluralStringResource(unitStatusLabel(status), count, count),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (status == "READY") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
