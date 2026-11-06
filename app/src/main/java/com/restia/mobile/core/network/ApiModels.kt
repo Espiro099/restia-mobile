@@ -135,7 +135,41 @@ data class OrderCreateRequest(
 )
 
 @Serializable
-data class OrderDto(val id: String, val clientOrderUuid: String, val status: String, val total: MoneyDto)
+data class OrderDto(
+    val id: String,
+    val clientOrderUuid: String,
+    val status: String,
+    val total: MoneyDto,
+    val createdAt: String? = null,
+    val items: List<OrderItemDto> = emptyList(),
+)
+
+@Serializable
+data class OrderItemDto(
+    val id: String,
+    val name: String,
+    val quantity: Int,
+    val modifiers: List<OrderModifierDto> = emptyList(),
+    val notes: String? = null,
+    val units: List<OrderUnitDto> = emptyList(),
+)
+
+@Serializable
+data class OrderModifierDto(val name: String)
+
+@Serializable
+data class OrderUnitDto(val id: String, val status: String, val version: Int)
+
+@Serializable
+data class UnitVersion(val id: String, val version: Int)
+
+@Serializable
+data class UnitTransitionRequest(
+    val action: String,
+    val units: List<UnitVersion>,
+    /** Obligatorio en CANCEL y VOID; con explicitNulls = false no se envía si es null. */
+    val reason: String? = null,
+)
 
 @Serializable
 data class MeData(val user: UserDto, val memberships: List<MembershipDto>)

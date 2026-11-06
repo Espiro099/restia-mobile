@@ -21,7 +21,7 @@ import com.restia.mobile.data.orders.addToCart
 import com.restia.mobile.data.orders.invalidModifiers
 import com.restia.mobile.ui.orders.OrderViewModel
 import com.restia.mobile.ui.orders.moneyText
-import com.restia.mobile.ui.tables.isOrderable
+import com.restia.mobile.ui.tables.hasSession
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.concurrent.TimeUnit
@@ -93,13 +93,13 @@ class OrderCartTest {
     }
 
     @Test
-    fun `solo recibe comandas una mesa en servicio con sesion`() {
+    fun `solo una mesa en servicio con sesion muestra rondas`() {
         val t = TableDto("t", 1, 4, null, "ACTIVE", "CONSUMIENDO", "s")
-        assertTrue(isOrderable(t))
-        assertTrue(isOrderable(t.copy(operationalState = "CUENTA_SOLICITADA")))
-        assertFalse(isOrderable(t.copy(operationalState = "POR_LIMPIAR")))
-        assertFalse(isOrderable(t.copy(operationalState = "LIBRE")))
-        assertFalse(isOrderable(t.copy(currentSessionId = null)))
+        assertTrue(hasSession(t))
+        assertTrue(hasSession(t.copy(operationalState = "CUENTA_SOLICITADA")))
+        assertFalse(hasSession(t.copy(operationalState = "POR_LIMPIAR")))
+        assertFalse(hasSession(t.copy(operationalState = "LIBRE")))
+        assertFalse(hasSession(t.copy(currentSessionId = null)))
     }
 }
 

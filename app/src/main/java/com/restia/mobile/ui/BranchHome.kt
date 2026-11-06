@@ -9,10 +9,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.restia.mobile.Repositories
 import com.restia.mobile.ui.orders.OrderScreen
 import com.restia.mobile.ui.orders.OrderViewModel
+import com.restia.mobile.ui.orders.TableScreen
+import com.restia.mobile.ui.orders.TableViewModel
 import com.restia.mobile.ui.tables.TablesScreen
 import com.restia.mobile.ui.tables.TablesViewModel
 
-/** Mesas y comanda. Una navegación simple basta mientras sean dos pantallas. */
+/** Mesas, vista de una mesa y comanda. Una navegación simple basta por ahora. */
 @Composable
 fun BranchHome(
     repositories: Repositories,
@@ -26,6 +28,8 @@ fun BranchHome(
 ) {
     var sessionId by rememberSaveable { mutableStateOf<String?>(null) }
     var tableNumber by rememberSaveable { mutableStateOf(0) }
+    var capturing by rememberSaveable { mutableStateOf(false) }
+    val canOrder = "orders.create" in permissions
     // La clave incluye al usuario: otro inicio de sesión empieza sin la lista anterior.
     val tables: TablesViewModel = viewModel(
         key = "mesas-$userId-$branchId",
@@ -38,15 +42,28 @@ fun BranchHome(
             branchName = branchName,
             role = role,
             canOpenTables = "table_sessions.open" in permissions,
-            canOrder = "orders.create" in permissions,
+            canOrder = canOrder,
+            canViewOrders = "orders.read" in permissions,
             logoutEnabled = logoutEnabled,
             onLogout = onLogout,
+            onViewTable = { session, number ->
+                sessionId = session
+                tableNumber = number
+                capturing = false
+            },
             onOrder = { session, number ->
                 sessionId = session
                 tableNumber = number
+                capturing = canOrder
             },
         )
-    } else {
+        return
+    }
+    val table: TableViewModel = viewModel(
+        key = "mesa-$userId-$current",
+        factory = TableViewModel.Factory(repositories.orders, branchId, current),
+    )
+    if (capturing) {
         OrderScreen(
             // La comanda en captura sobrevive a ir y volver de la lista de mesas.
             viewModel = viewModel(
@@ -63,11 +80,21 @@ fun BranchHome(
                 ),
             ),
             tableNumber = tableNumber,
-            onBack = { sessionId = null },
+            onBack = { capturing = false },
             onSent = {
-                tables.notifyOrderSent(tableNumber)
-                sessionId = null
+                table.notifySent()
+                capturing = false
             },
+        )
+    } else {
+        TableScreen(
+            viewModel = table,
+            tableNumber = tableNumber,
+            canOrder = canOrder,
+            canDeliver = "order_units.deliver" in permissions,
+            canCancel = "order_units.cancel" in permissions,
+            onBack = { sessionId = null },
+            onAddOrder = { capturing = true },
         )
     }
 }

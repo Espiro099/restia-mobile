@@ -24,6 +24,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -65,8 +66,10 @@ private fun failureText(failure: ApiFailure): String = when (failure) {
     ApiFailure.Network -> stringResource(R.string.error_network)
     ApiFailure.Unexpected -> stringResource(R.string.error_unexpected)
     is ApiFailure.Server -> when {
-        failure.status == 429 && failure.retryAfterSeconds != null ->
-            stringResource(R.string.error_too_many, failure.retryAfterSeconds)
+        failure.status == 429 && failure.retryAfterSeconds != null -> {
+            val seconds = failure.retryAfterSeconds.coerceIn(1L, Int.MAX_VALUE.toLong()).toInt()
+            pluralStringResource(R.plurals.error_too_many, seconds, seconds)
+        }
         failure.status >= 500 -> stringResource(R.string.error_server)
         else -> failure.message ?: stringResource(R.string.error_unexpected)
     }
