@@ -173,3 +173,18 @@ data class UnitTransitionRequest(
 
 @Serializable
 data class MeData(val user: UserDto, val memberships: List<MembershipDto>)
+
+/** D-37: el gerente escribe sus datos en este dispositivo. La contraseña nunca se guarda ni se registra. */
+@Serializable
+data class ApprovalRequest(
+    val approverEmail: String,
+    val approverPassword: String,
+    val action: String,
+    val resourceIds: List<String>,
+    val reason: String,
+) {
+    override fun toString(): String = "ApprovalRequest(action=$action, resourceIds=$resourceIds)"
+}
+
+@Serializable
+data class ApprovalData(val approvalToken: String, val expiresIn: Int)

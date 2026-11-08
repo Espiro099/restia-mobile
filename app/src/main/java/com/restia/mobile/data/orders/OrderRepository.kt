@@ -2,6 +2,8 @@ package com.restia.mobile.data.orders
 
 import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.ApiResult
+import com.restia.mobile.core.network.ApprovalData
+import com.restia.mobile.core.network.ApprovalRequest
 import com.restia.mobile.core.network.OrderCreateRequest
 import com.restia.mobile.core.network.OrderDto
 import com.restia.mobile.core.network.SessionApi
@@ -57,9 +59,16 @@ class OrderRepository(private val api: SessionApi) {
     suspend fun cancel(branchId: String, idempotencyKey: String, units: List<UnitVersion>, reason: String): ApiResult<Unit> =
         transition(branchId, idempotencyKey, UnitTransitionRequest("CANCEL", units, reason))
 
-    private suspend fun transition(branchId: String, idempotencyKey: String, body: UnitTransitionRequest): ApiResult<Unit> = apiCall {
-        api.transitionUnits(branchId, idempotencyKey, body).close()
-    }
+    /** Unidades PREPARING o READY. Sin `order_units.void`, exige el token de un gerente (D-37). */
+    suspend fun void(branchId: String, idempotencyKey: String, units: List<UnitVersion>, reason: String, approvalToken: String?): ApiResult<Unit> =
+        transition(branchId, idempotencyKey, UnitTransitionRequest("VOID", units, reason), approvalToken)
+
+    /** Token de un solo uso, ligado a la acción, las unidades y el motivo. */
+    suspend fun approveVoid(branchId: String, email: String, password: String, unitIds: List<String>, reason: String): ApiResult<ApprovalData> =
+        apiCall { api.createApproval(branchId, ApprovalRequest(email, password, "ORDER_UNIT_VOID", unitIds, reason)).data }
+
+    private suspend fun transition(branchId: String, idempotencyKey: String, body: UnitTransitionRequest, approvalToken: String? = null): ApiResult<Unit> =
+        apiCall { api.transitionUnits(branchId, idempotencyKey, body, approvalToken).close() }
 
     private fun serverFailure(response: Response<*>) =
         parseError(response.code(), response.errorBody()?.string(), response.headers()["Retry-After"])

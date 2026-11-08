@@ -61,7 +61,7 @@ fun BranchHome(
     }
     val table: TableViewModel = viewModel(
         key = "mesa-$userId-$current",
-        factory = TableViewModel.Factory(repositories.orders, branchId, current),
+        factory = TableViewModel.Factory(repositories.orders, branchId, current, canVoidDirectly = "order_units.void" in permissions),
     )
     if (capturing) {
         OrderScreen(
@@ -93,6 +93,8 @@ fun BranchHome(
             canOrder = canOrder,
             canDeliver = "order_units.deliver" in permissions,
             canCancel = "order_units.cancel" in permissions,
+            // Sin el permiso directo, igual puede anular con la autorización de un gerente (D-37).
+            canVoid = "order_units.void" in permissions || "order_units.cancel" in permissions,
             onBack = { sessionId = null },
             onAddOrder = { capturing = true },
         )

@@ -60,7 +60,16 @@ interface SessionApi {
         @Path("branchId") branchId: String,
         @Header("Idempotency-Key") idempotencyKey: String,
         @Body body: UnitTransitionRequest,
+        // Solo en VOID sin permiso directo; Retrofit no envía el header si es null.
+        @Header("X-Approval-Token") approvalToken: String? = null,
     ): ResponseBody
+
+    /** Credenciales incorrectas responden 403, nunca 401, para no tocar la sesión del mesero. */
+    @POST("branches/{branchId}/approvals")
+    suspend fun createApproval(
+        @Path("branchId") branchId: String,
+        @Body body: ApprovalRequest,
+    ): Envelope<ApprovalData>
 
     @POST("branches/{branchId}/orders")
     suspend fun createOrder(

@@ -31,6 +31,10 @@ fun readyUnits(items: List<OrderItemDto>): List<UnitVersion> =
 fun pendingUnits(item: OrderItemDto): List<UnitVersion> =
     item.units.filter { it.status == "PENDING" }.map { UnitVersion(it.id, it.version) }
 
+/** Unidades que se pueden anular: cocina ya las empezó o están listas (O-3). */
+fun voidableUnits(item: OrderItemDto): List<UnitVersion> =
+    item.units.filter { it.status == "PREPARING" || it.status == "READY" }.map { UnitVersion(it.id, it.version) }
+
 fun isValidReason(reason: String): Boolean = reason.trim().length in REASON_MIN..REASON_MAX
 
 data class CancelState(
@@ -45,6 +49,38 @@ data class CancelState(
     val canConfirm: Boolean get() = !submitting && count in 1..available && isValidReason(reason)
 }
 
+/** Token de un gerente (D-37): sirve una vez, para estas unidades y este motivo. */
+data class Approval(val token: String, val units: List<UnitVersion>, val reason: String, val validUntil: Long) {
+    override fun toString(): String = "Approval(units=$units)"
+}
+
+data class VoidState(
+    val item: OrderItemDto,
+    val count: Int,
+    /** Sin `order_units.void`, un gerente autoriza en este dispositivo. */
+    val needsApproval: Boolean,
+    val reason: String = "",
+    val approverEmail: String = "",
+    /** Solo en memoria y solo hasta pedir el token. */
+    val approverPassword: String = "",
+    val approval: Approval? = null,
+    val submitting: Boolean = false,
+    val failure: ApiFailure? = null,
+) {
+    val available: Int get() = voidableUnits(item).size
+    val units: List<UnitVersion> get() = voidableUnits(item).take(count)
+
+    /** Hay token para lo que está elegido ahora; si cambia la cantidad o el motivo, ya no sirve. */
+    val approved: Boolean get() = approval != null && approval.units == units && approval.reason == reason.trim()
+    val showsApprover: Boolean get() = needsApproval && !approved
+    private val hasCredentials: Boolean get() = approverEmail.trim().contains('@') && approverPassword.isNotEmpty()
+    val canConfirm: Boolean
+        get() = !submitting && count in 1..available && isValidReason(reason) && (!showsApprover || hasCredentials)
+
+    // La contraseña nunca debe aparecer en un log o un reporte de fallo.
+    override fun toString(): String = "VoidState(item=${item.id}, count=$count, needsApproval=$needsApproval, approved=$approved)"
+}
+
 data class TableUiState(
     val orders: List<OrderDto> = emptyList(),
     val loaded: Boolean = false,
@@ -56,17 +92,24 @@ data class TableUiState(
     val cancelling: CancelState? = null,
     /** Cuántas unidades se acaban de cancelar, para el aviso. */
     val cancelled: Int? = null,
+    val voiding: VoidState? = null,
+    val voided: Int? = null,
+    /** Acción de actionFailure: el mismo código se explica distinto al cancelar que al anular. */
+    val failedAction: String? = null,
 ) {
     val readyCount: Int get() = orders.sumOf { order -> readyUnits(order.items).size }
-    val busy: Boolean get() = delivering || cancelling?.submitting == true
+    val busy: Boolean get() = delivering || cancelling?.submitting == true || voiding?.submitting == true
 }
 
 class TableViewModel(
     private val repository: OrderRepository,
     private val branchId: String,
     private val sessionId: String,
+    /** `order_units.void`: anula sin pedir autorización. */
+    private val canVoidDirectly: Boolean = false,
     private val pollMillis: Long = POLL_MILLIS,
     private val newKey: () -> String = { UUID.randomUUID().toString() },
+    private val now: () -> Long = { System.nanoTime() / 1_000_000 },
 ) : ViewModel() {
     private val _state = MutableStateFlow(TableUiState())
     val state: StateFlow<TableUiState> = _state
@@ -117,6 +160,10 @@ class TableViewModel(
         _state.value = _state.value.copy(cancelled = null)
     }
 
+    fun clearVoided() {
+        _state.value = _state.value.copy(voided = null)
+    }
+
     private suspend fun load() {
         _state.value = when (val r = repository.listForSession(branchId, sessionId)) {
             is ApiResult.Success -> _state.value.copy(orders = r.value, loaded = true, failure = null)
@@ -133,12 +180,13 @@ class TableViewModel(
         if (units.isEmpty() || _state.value.busy) return
         val batch = units.take(MAX_UNITS_PER_BATCH)
         val key = keyFor(Pair("DELIVER", batch))
-        _state.value = _state.value.copy(delivering = true, actionFailure = null, cancelled = null)
+        _state.value = _state.value.copy(delivering = true, actionFailure = null, cancelled = null, voided = null)
         viewModelScope.launch {
             val result = repository.deliver(branchId, key, batch)
             _state.value = _state.value.copy(
                 delivering = false,
                 actionFailure = (result as? ApiResult.Failure)?.failure,
+                failedAction = "DELIVER",
             )
             if (result is ApiResult.Success) intent = null
             // Tanto si entró como si otro empleado se adelantó, hay que ver el estado actual.
@@ -150,7 +198,7 @@ class TableViewModel(
     fun startCancel(item: OrderItemDto) {
         val available = pendingUnits(item).size
         if (available == 0 || _state.value.busy) return
-        _state.value = _state.value.copy(cancelling = CancelState(item, available), actionFailure = null, cancelled = null)
+        _state.value = _state.value.copy(cancelling = CancelState(item, available), actionFailure = null, cancelled = null, voided = null)
     }
 
     fun setCancelCount(count: Int) {
@@ -191,7 +239,94 @@ class TableViewModel(
                     } else {
                         // Cocina empezó, otro empleado cambió algo o ya se pagó: hay que ver el estado actual.
                         intent = null
-                        _state.value.copy(cancelling = null, actionFailure = failure)
+                        _state.value.copy(cancelling = null, actionFailure = failure, failedAction = "CANCEL")
+                    }
+                }
+            }
+            load()
+        }
+    }
+
+    /** Por omisión propone anular todo lo empezado o listo de la partida. */
+    fun startVoid(item: OrderItemDto) {
+        val available = voidableUnits(item).size
+        if (available == 0 || _state.value.busy) return
+        _state.value = _state.value.copy(
+            voiding = VoidState(item, available, needsApproval = !canVoidDirectly),
+            actionFailure = null,
+            cancelled = null,
+            voided = null,
+        )
+    }
+
+    private fun editVoid(change: (VoidState) -> VoidState) {
+        val current = _state.value.voiding ?: return
+        if (current.submitting) return
+        _state.value = _state.value.copy(voiding = change(current))
+    }
+
+    fun setVoidCount(count: Int) = editVoid { it.copy(count = count.coerceIn(1, it.available)) }
+
+    fun setVoidReason(reason: String) = editVoid { it.copy(reason = reason.take(REASON_MAX)) }
+
+    fun setApproverEmail(email: String) = editVoid { it.copy(approverEmail = email.take(254)) }
+
+    fun setApproverPassword(password: String) = editVoid { it.copy(approverPassword = password.take(1024)) }
+
+    fun dismissVoid() {
+        if (_state.value.voiding?.submitting == true) return
+        _state.value = _state.value.copy(voiding = null)
+    }
+
+    fun confirmVoid() {
+        val current = _state.value.voiding ?: return
+        if (!current.canConfirm || _state.value.delivering) return
+        val units = current.units
+        val reason = current.reason.trim()
+        val key = keyFor(Triple("VOID", units, reason))
+        _state.value = _state.value.copy(voiding = current.copy(submitting = true, failure = null))
+        viewModelScope.launch {
+            var approval = current.approval?.takeIf { current.approved && now() < it.validUntil }
+            if (current.needsApproval && approval == null) {
+                if (current.approved) {
+                    // El token venció sin usarse: el gerente tiene que volver a escribir sus datos.
+                    _state.value = _state.value.copy(voiding = current.copy(approval = null, failure = EXPIRED))
+                    return@launch
+                }
+                val r = repository.approveVoid(branchId, current.approverEmail.trim(), current.approverPassword, units.map { it.id }, reason)
+                when (r) {
+                    is ApiResult.Success -> {
+                        val margin = minOf(5, r.value.expiresIn / 2) * 1000L
+                        approval = Approval(r.value.approvalToken, units, reason, now() + r.value.expiresIn * 1000L - margin)
+                        // Ya no se necesita: no se queda en memoria más de lo necesario.
+                        _state.value = _state.value.copy(voiding = current.copy(submitting = true, approval = approval, approverPassword = ""))
+                    }
+                    is ApiResult.Failure -> {
+                        // Con la red caída se conserva para reintentar; si el servidor la rechazó, se borra.
+                        val keep = if (isRetryable(r.failure)) current.approverPassword else ""
+                        _state.value = _state.value.copy(voiding = current.copy(approverPassword = keep, failure = r.failure))
+                        return@launch
+                    }
+                }
+            }
+            val sent = _state.value.voiding ?: current
+            when (val result = repository.void(branchId, key, units, reason, approval?.token)) {
+                is ApiResult.Success -> {
+                    intent = null
+                    _state.value = _state.value.copy(voiding = null, voided = units.size)
+                }
+                is ApiResult.Failure -> {
+                    val failure = result.failure
+                    _state.value = when {
+                        // La respuesta pudo perderse: se reintenta con la misma clave y el mismo token.
+                        isRetryable(failure) -> _state.value.copy(voiding = sent.copy(submitting = false, failure = failure))
+                        // Venció, ya se usó o no corresponde: se pide otra autorización sin cerrar el diálogo.
+                        failure is ApiFailure.Server && failure.code == "APPROVAL_INVALID" ->
+                            _state.value.copy(voiding = sent.copy(submitting = false, approval = null, failure = failure))
+                        else -> {
+                            intent = null
+                            _state.value.copy(voiding = null, actionFailure = failure, failedAction = "VOID")
+                        }
                     }
                 }
             }
@@ -206,12 +341,16 @@ class TableViewModel(
         private val repository: OrderRepository,
         private val branchId: String,
         private val sessionId: String,
+        private val canVoidDirectly: Boolean,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = TableViewModel(repository, branchId, sessionId) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T = TableViewModel(repository, branchId, sessionId, canVoidDirectly) as T
     }
 
     private companion object {
         const val POLL_MILLIS = 15_000L
+
+        /** Se muestra igual que el APPROVAL_INVALID del servidor. */
+        val EXPIRED = ApiFailure.Server(409, "APPROVAL_INVALID", null, null)
     }
 }
