@@ -50,6 +50,26 @@
         <item quantity="other">Se cancelaron %1$d platillos.</item>
     </plurals>
     <string name="cancel_invalid_state">Cocina ya empezó al menos uno de estos platillos, así que no se canceló ninguno. Revisa lo que sigue pendiente.</string>
+    <string name="void_action">Anular</string>
+    <string name="void_title">Anular %1$s</string>
+    <plurals name="void_available">
+        <item quantity="one">%1$d platillo ya en cocina o listo. Se pierde lo preparado.</item>
+        <item quantity="other">%1$d platillos ya en cocina o listos. Se pierde lo preparado.</item>
+    </plurals>
+    <string name="void_confirm">Anular %1$d</string>
+    <string name="void_approver_title">Autorización de un gerente</string>
+    <string name="void_approver_body">El gerente escribe aquí su correo y contraseña. No se guardan en este teléfono.</string>
+    <string name="void_approver_email">Correo del gerente</string>
+    <string name="void_approver_password">Contraseña del gerente</string>
+    <string name="void_approved">Autorizado. Confirma para anular.</string>
+    <plurals name="void_done">
+        <item quantity="one">Se anuló %1$d platillo.</item>
+        <item quantity="other">Se anularon %1$d platillos.</item>
+    </plurals>
+    <string name="void_denied">No se pudo autorizar. Revisa el correo y la contraseña, y que el gerente pueda anular en esta sucursal.</string>
+    <string name="void_approval_invalid">La autorización venció o ya se usó. El gerente tiene que escribir sus datos de nuevo.</string>
+    <string name="void_invalid_state">Al menos uno de estos platillos ya cambió de estado, así que no se anuló ninguno. Revisa la mesa.</string>
+    <string name="void_paid">Al menos uno de estos platillos ya está pagado, así que no se anuló ninguno.</string>
     <string name="cancel_paid">Este platillo ya está pagado; no se puede cancelar.</string>
     <string name="error_action_forbidden">No tienes permiso para esta acción.</string>
     <plurals name="unit_pending">

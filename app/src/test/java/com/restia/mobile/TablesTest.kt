@@ -151,7 +151,8 @@ class TablesViewModelTest {
                 override suspend fun getMenu(branchId: String, etag: String?) = error("sin uso")
                 override suspend fun createOrder(branchId: String, idempotencyKey: String, body: com.restia.mobile.core.network.OrderCreateRequest) = error("sin uso")
                 override suspend fun listOrders(branchId: String, sessionId: String, page: Int, perPage: Int, etag: String?) = error("sin uso")
-                override suspend fun transitionUnits(branchId: String, idempotencyKey: String, body: com.restia.mobile.core.network.UnitTransitionRequest) = error("sin uso")
+                override suspend fun transitionUnits(branchId: String, idempotencyKey: String, body: com.restia.mobile.core.network.UnitTransitionRequest, approvalToken: String?) = error("sin uso")
+                override suspend fun createApproval(branchId: String, body: com.restia.mobile.core.network.ApprovalRequest) = error("sin uso")
                 override suspend fun listTables(branchId: String, page: Int, perPage: Int) =
                     when (val r = outer.next()) {
                         is ApiResult.Success -> com.restia.mobile.core.network.PagedEnvelope(r.value)

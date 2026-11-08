@@ -15,6 +15,7 @@ import com.restia.mobile.ui.orders.pendingUnits
 import com.restia.mobile.ui.orders.TableViewModel
 import com.restia.mobile.ui.orders.readyUnits
 import com.restia.mobile.ui.orders.unitStatusLabel
+import com.restia.mobile.ui.orders.voidableUnits
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -90,6 +91,22 @@ class TableViewPureTest {
         assertEquals(R.string.error_server, actionFailureText(server(503, "SERVICE_BUSY")))
         assertEquals(R.string.error_network, actionFailureText(ApiFailure.Network))
         assertNull(actionFailureText(server(422, "VALIDATION_FAILED")))
+    }
+
+    @Test
+    fun `al anular los mismos codigos se explican distinto`() {
+        fun server(status: Int, code: String?) = ApiFailure.Server(status, code, "del servidor", null)
+        assertEquals(R.string.void_invalid_state, actionFailureText(server(409, "ORDER_UNIT_INVALID_STATE"), "VOID"))
+        assertEquals(R.string.void_paid, actionFailureText(server(409, "ORDER_UNIT_PAID"), "VOID"))
+        assertEquals(R.string.void_denied, actionFailureText(server(403, "APPROVAL_DENIED"), "VOID"))
+        assertEquals(R.string.void_approval_invalid, actionFailureText(server(409, "APPROVAL_INVALID"), "VOID"))
+        assertEquals(R.string.cancel_invalid_state, actionFailureText(server(409, "ORDER_UNIT_INVALID_STATE"), "CANCEL"))
+    }
+
+    @Test
+    fun `solo lo empezado o listo se puede anular`() {
+        val item = OrderItemDto("i", "Sopa", 4, units = listOf(OrderUnitDto("a", "PENDING", 1), OrderUnitDto("b", "PREPARING", 2), OrderUnitDto("c", "READY", 3), OrderUnitDto("d", "DELIVERED", 4)))
+        assertEquals(listOf("b" to 2, "c" to 3), voidableUnits(item).map { it.id to it.version })
     }
 }
 
@@ -416,5 +433,205 @@ class TableViewFlowTest {
         waitFor { vm.state.value.cancelling == null }
         assertEquals(1, posts.size)
         assertTrue(bodies.single().contains("CANCEL"))
+    }
+
+    // --- Anular (VOID) con autorización de un gerente (D-37) ---
+
+    private var clock = 0L
+
+    private fun voidVm(direct: Boolean) {
+        vm.stopPolling()
+        vm = TableViewModel(repo, "b1", "s1", canVoidDirectly = direct, pollMillis = 3_600_000, newKey = { "clave-${++keys}" }, now = { clock })
+    }
+
+    private fun approvalOk(expiresIn: Int = 120) = MockResponse().setResponseCode(201).setBody("""{"data":{"approvalToken":"token-1","expiresIn":$expiresIn},"meta":{}}""")
+
+    private fun voidAndWait() {
+        vm.confirmVoid()
+        waitFor { vm.state.value.voiding?.submitting != true }
+    }
+
+    private fun startedTable() {
+        getAnswer = { MockResponse().setBody(list(order("1", "2026-11-03T10:00:00Z", unit("a", "PENDING"), unit("b", "PREPARING", 2), unit("c", "READY", 5)))) }
+        loaded()
+    }
+
+    private fun fillApprover(password: String = "clave-del-gerente") {
+        vm.setVoidReason("Se cayó el plato")
+        vm.setApproverEmail("gerente@ejemplo.mx")
+        vm.setApproverPassword(password)
+    }
+
+    @Test
+    fun `sin permiso pide la autorizacion y anula con el token`() {
+        voidVm(direct = false)
+        startedTable()
+        answers.add(approvalOk())
+        answers.add(MockResponse().setBody(ok))
+        vm.startVoid(firstItem())
+        assertEquals(2, vm.state.value.voiding!!.count)
+        assertTrue(vm.state.value.voiding!!.showsApprover)
+        vm.setVoidReason("Se cayó el plato")
+        assertFalse("sin gerente no deja confirmar", vm.state.value.voiding!!.canConfirm)
+        fillApprover()
+        voidAndWait()
+
+        assertEquals("/branches/b1/approvals", posts[0].path)
+        assertEquals(
+            """{"approverEmail":"gerente@ejemplo.mx","approverPassword":"clave-del-gerente","action":"ORDER_UNIT_VOID","resourceIds":["b","c"],"reason":"Se cayó el plato"}""",
+            ApiJson.parseToJsonElement(bodies[0]).toString(),
+        )
+        assertNull(posts[0].getHeader("Idempotency-Key"))
+        assertEquals("/branches/b1/order-units/transitions", posts[1].path)
+        assertEquals("token-1", posts[1].getHeader("X-Approval-Token"))
+        assertEquals("""{"action":"VOID","units":[{"id":"b","version":2},{"id":"c","version":5}],"reason":"Se cayó el plato"}""", ApiJson.parseToJsonElement(bodies[1]).toString())
+        assertNull(vm.state.value.voiding)
+        assertEquals(2, vm.state.value.voided)
+    }
+
+    @Test
+    fun `con permiso directo anula sin autorizacion ni token`() {
+        voidVm(direct = true)
+        startedTable()
+        answers.add(MockResponse().setBody(ok))
+        vm.startVoid(firstItem())
+        assertFalse(vm.state.value.voiding!!.showsApprover)
+        vm.setVoidCount(1)
+        vm.setVoidReason("Se cayó el plato")
+        voidAndWait()
+        assertEquals(1, posts.size)
+        assertNull(posts[0].getHeader("X-Approval-Token"))
+        assertTrue(bodies[0].contains("\"b\"") && !bodies[0].contains("\"c\""))
+        assertEquals(1, vm.state.value.voided)
+    }
+
+    @Test
+    fun `credenciales rechazadas dejan el dialogo y borran la contrasena`() {
+        voidVm(direct = false)
+        startedTable()
+        answers.add(MockResponse().setResponseCode(403).setBody("""{"error":{"code":"APPROVAL_DENIED","message":"m","requestId":"r"}}"""))
+        vm.startVoid(firstItem())
+        fillApprover("mala")
+        voidAndWait()
+        val state = vm.state.value.voiding!!
+        assertEquals("APPROVAL_DENIED", (state.failure as ApiFailure.Server).code)
+        assertEquals("", state.approverPassword)
+        assertEquals("gerente@ejemplo.mx", state.approverEmail)
+        assertEquals(1, posts.size)
+        assertFalse(state.canConfirm)
+    }
+
+    @Test
+    fun `sin red al pedir autorizacion conserva los datos para reintentar`() {
+        voidVm(direct = false)
+        startedTable()
+        answers.add(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        vm.startVoid(firstItem())
+        fillApprover()
+        voidAndWait()
+        assertEquals(ApiFailure.Network, vm.state.value.voiding!!.failure)
+        assertEquals("clave-del-gerente", vm.state.value.voiding!!.approverPassword)
+        assertTrue(vm.state.value.voiding!!.canConfirm)
+    }
+
+    @Test
+    fun `respuesta perdida reintenta con la misma clave y el mismo token`() {
+        voidVm(direct = false)
+        startedTable()
+        answers.add(approvalOk())
+        answers.add(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        answers.add(MockResponse().setBody(ok))
+        vm.startVoid(firstItem())
+        fillApprover()
+        voidAndWait()
+        val state = vm.state.value.voiding!!
+        assertEquals(ApiFailure.Network, state.failure)
+        assertTrue("ya autorizado, sin pedir otra vez al gerente", state.approved && !state.showsApprover)
+        assertEquals("", state.approverPassword)
+        voidAndWait()
+        assertEquals(3, posts.size)
+        assertEquals(posts[1].getHeader("Idempotency-Key"), posts[2].getHeader("Idempotency-Key"))
+        assertEquals("token-1", posts[2].getHeader("X-Approval-Token"))
+        assertEquals(2, vm.state.value.voided)
+    }
+
+    @Test
+    fun `token rechazado por el servidor pide otra autorizacion sin cerrar`() {
+        voidVm(direct = false)
+        startedTable()
+        answers.add(approvalOk())
+        answers.add(MockResponse().setResponseCode(409).setBody("""{"error":{"code":"APPROVAL_INVALID","message":"m","requestId":"r"}}"""))
+        vm.startVoid(firstItem())
+        fillApprover()
+        voidAndWait()
+        val state = vm.state.value.voiding!!
+        assertEquals("APPROVAL_INVALID", (state.failure as ApiFailure.Server).code)
+        assertNull(state.approval)
+        assertTrue(state.showsApprover)
+        assertFalse("hace falta la contraseña otra vez", state.canConfirm)
+    }
+
+    @Test
+    fun `token vencido en el telefono no se envia`() {
+        voidVm(direct = false)
+        startedTable()
+        answers.add(approvalOk(expiresIn = 120))
+        answers.add(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        vm.startVoid(firstItem())
+        fillApprover()
+        voidAndWait()
+        clock += 121_000
+        voidAndWait()
+        assertEquals(2, posts.size)
+        val state = vm.state.value.voiding!!
+        assertEquals("APPROVAL_INVALID", (state.failure as ApiFailure.Server).code)
+        assertTrue(state.showsApprover)
+    }
+
+    @Test
+    fun `cambiar la cantidad tras autorizar exige otra autorizacion`() {
+        voidVm(direct = false)
+        startedTable()
+        answers.add(approvalOk())
+        answers.add(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        vm.startVoid(firstItem())
+        fillApprover()
+        voidAndWait()
+        assertTrue(vm.state.value.voiding!!.approved)
+        vm.setVoidCount(1)
+        assertTrue(vm.state.value.voiding!!.showsApprover)
+        vm.setVoidCount(2)
+        assertTrue("volver a lo autorizado sirve", vm.state.value.voiding!!.approved)
+    }
+
+    @Test
+    fun `si algo cambio de estado cierra el dialogo y lo explica como anulacion`() {
+        voidVm(direct = true)
+        startedTable()
+        answers.add(MockResponse().setResponseCode(409).setBody("""{"error":{"code":"ORDER_UNIT_INVALID_STATE","message":"m","requestId":"r"}}"""))
+        vm.startVoid(firstItem())
+        vm.setVoidReason("Se cayó el plato")
+        voidAndWait()
+        assertNull(vm.state.value.voiding)
+        assertEquals("VOID", vm.state.value.failedAction)
+        assertEquals("ORDER_UNIT_INVALID_STATE", (vm.state.value.actionFailure as ApiFailure.Server).code)
+    }
+
+    @Test
+    fun `sin nada empezado no abre la anulacion`() {
+        voidVm(direct = true)
+        getAnswer = { MockResponse().setBody(list(order("1", "2026-11-03T10:00:00Z", unit("a", "PENDING")))) }
+        loaded()
+        vm.startVoid(firstItem())
+        assertNull(vm.state.value.voiding)
+    }
+
+    @Test
+    fun `la contrasena no aparece en el estado impreso`() {
+        voidVm(direct = false)
+        startedTable()
+        vm.startVoid(firstItem())
+        fillApprover("secreta-123")
+        assertFalse(vm.state.value.toString().contains("secreta-123"))
     }
 }
