@@ -22,6 +22,26 @@
     <string name="tables_pending_draft">Mesa %1$d: comanda sin enviar</string>
     <string name="order_menu_stale">Menú posiblemente desactualizado.</string>
     <string name="order_read_only">Llevas más de 12 horas sin conexión: esta comanda es solo de lectura hasta enviarla.</string>
+    <string name="table_title">Mesa %1$d</string>
+    <string name="table_round">Ronda %1$d</string>
+    <string name="table_round_at">Ronda %1$d · %2$s</string>
+    <string name="table_round_total">Total de la ronda: %1$s</string>
+    <string name="table_add_order">Agregar comanda</string>
+    <string name="table_empty">Esta mesa aún no tiene comandas.</string>
+    <string name="table_not_loaded">No se pudieron cargar las comandas.</string>
+    <string name="table_deliver">Entregar %1$d</string>
+    <plurals name="table_deliver_all">
+        <item quantity="one">Entregar %1$d platillo listo</item>
+        <item quantity="other">Entregar %1$d platillos listos</item>
+    </plurals>
+    <string name="table_deliver_conflict">Otro empleado actualizó estos platillos. Revisa el estado actual.</string>
+    <string name="unit_pending">pendiente</string>
+    <string name="unit_preparing">en preparación</string>
+    <string name="unit_ready">listo</string>
+    <string name="unit_delivered">entregado</string>
+    <string name="unit_cancelled">cancelado</string>
+    <string name="unit_voided">anulado</string>
+    <string name="unit_unknown">estado desconocido</string>
     <string name="order_title">Comanda · Mesa %1$d</string>
     <string name="order_back">Mesas</string>
     <string name="order_sold_out">Agotado</string>
