@@ -35,13 +35,51 @@
         <item quantity="other">Entregar %1$d platillos listos</item>
     </plurals>
     <string name="table_deliver_conflict">Otro empleado actualizó estos platillos. Revisa el estado actual.</string>
-    <string name="unit_pending">pendiente</string>
-    <string name="unit_preparing">en preparación</string>
-    <string name="unit_ready">listo</string>
-    <string name="unit_delivered">entregado</string>
-    <string name="unit_cancelled">cancelado</string>
-    <string name="unit_voided">anulado</string>
-    <string name="unit_unknown">estado desconocido</string>
+    <string name="cancel_action">Cancelar</string>
+    <string name="cancel_title">Cancelar %1$s</string>
+    <plurals name="cancel_pending">
+        <item quantity="one">Cocina aún no empieza %1$d platillo.</item>
+        <item quantity="other">Cocina aún no empieza %1$d platillos.</item>
+    </plurals>
+    <string name="cancel_reason">Motivo</string>
+    <string name="cancel_reason_hint">Obligatorio, al menos %1$d caracteres.</string>
+    <string name="cancel_confirm">Cancelar %1$d</string>
+    <string name="cancel_back">Volver</string>
+    <plurals name="cancel_done">
+        <item quantity="one">Se canceló %1$d platillo.</item>
+        <item quantity="other">Se cancelaron %1$d platillos.</item>
+    </plurals>
+    <string name="cancel_invalid_state">Cocina ya empezó al menos uno de estos platillos, así que no se canceló ninguno. Revisa lo que sigue pendiente.</string>
+    <string name="cancel_paid">Este platillo ya está pagado; no se puede cancelar.</string>
+    <string name="error_action_forbidden">No tienes permiso para esta acción.</string>
+    <plurals name="unit_pending">
+        <item quantity="one">%1$d pendiente</item>
+        <item quantity="other">%1$d pendientes</item>
+    </plurals>
+    <plurals name="unit_preparing">
+        <item quantity="one">%1$d en preparación</item>
+        <item quantity="other">%1$d en preparación</item>
+    </plurals>
+    <plurals name="unit_ready">
+        <item quantity="one">%1$d listo</item>
+        <item quantity="other">%1$d listos</item>
+    </plurals>
+    <plurals name="unit_delivered">
+        <item quantity="one">%1$d entregado</item>
+        <item quantity="other">%1$d entregados</item>
+    </plurals>
+    <plurals name="unit_cancelled">
+        <item quantity="one">%1$d cancelado</item>
+        <item quantity="other">%1$d cancelados</item>
+    </plurals>
+    <plurals name="unit_voided">
+        <item quantity="one">%1$d anulado</item>
+        <item quantity="other">%1$d anulados</item>
+    </plurals>
+    <plurals name="unit_unknown">
+        <item quantity="one">%1$d en estado desconocido</item>
+        <item quantity="other">%1$d en estado desconocido</item>
+    </plurals>
     <string name="order_title">Comanda · Mesa %1$d</string>
     <string name="order_back">Mesas</string>
     <string name="order_sold_out">Agotado</string>
@@ -85,5 +123,8 @@
     <string name="error_network">Sin conexión. Revisa tu red e inténtalo de nuevo.</string>
     <string name="error_server">El servidor no está disponible. Inténtalo más tarde.</string>
     <string name="error_unexpected">Ocurrió un error inesperado.</string>
-    <string name="error_too_many">Demasiados intentos. Espera %1$d segundos.</string>
+    <plurals name="error_too_many">
+        <item quantity="one">Demasiados intentos. Espera %1$d segundo.</item>
+        <item quantity="other">Demasiados intentos. Espera %1$d segundos.</item>
+    </plurals>
 </resources>

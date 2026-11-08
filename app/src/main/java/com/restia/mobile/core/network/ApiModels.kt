@@ -164,7 +164,12 @@ data class OrderUnitDto(val id: String, val status: String, val version: Int)
 data class UnitVersion(val id: String, val version: Int)
 
 @Serializable
-data class UnitTransitionRequest(val action: String, val units: List<UnitVersion>)
+data class UnitTransitionRequest(
+    val action: String,
+    val units: List<UnitVersion>,
+    /** Obligatorio en CANCEL y VOID; con explicitNulls = false no se envía si es null. */
+    val reason: String? = null,
+)
 
 @Serializable
 data class MeData(val user: UserDto, val memberships: List<MembershipDto>)

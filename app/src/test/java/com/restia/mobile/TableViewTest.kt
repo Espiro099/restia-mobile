@@ -8,6 +8,10 @@ import com.restia.mobile.core.network.OrderUnitDto
 import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.data.orders.OrderRepository
 import com.restia.mobile.ui.orders.MAX_UNITS_PER_BATCH
+import com.restia.mobile.ui.orders.REASON_MAX
+import com.restia.mobile.ui.orders.actionFailureText
+import com.restia.mobile.ui.orders.isValidReason
+import com.restia.mobile.ui.orders.pendingUnits
 import com.restia.mobile.ui.orders.TableViewModel
 import com.restia.mobile.ui.orders.readyUnits
 import com.restia.mobile.ui.orders.unitStatusLabel
@@ -55,11 +59,37 @@ class TableViewPureTest {
     @Test
     fun `cada estado del contrato tiene su texto`() {
         val expected = mapOf(
-            "PENDING" to R.string.unit_pending, "PREPARING" to R.string.unit_preparing, "READY" to R.string.unit_ready,
-            "DELIVERED" to R.string.unit_delivered, "CANCELLED" to R.string.unit_cancelled, "VOIDED" to R.string.unit_voided,
+            "PENDING" to R.plurals.unit_pending, "PREPARING" to R.plurals.unit_preparing, "READY" to R.plurals.unit_ready,
+            "DELIVERED" to R.plurals.unit_delivered, "CANCELLED" to R.plurals.unit_cancelled, "VOIDED" to R.plurals.unit_voided,
         )
         expected.forEach { (status, label) -> assertEquals(label, unitStatusLabel(status)) }
-        assertEquals(R.string.unit_unknown, unitStatusLabel("NUEVO"))
+        assertEquals(R.plurals.unit_unknown, unitStatusLabel("NUEVO"))
+    }
+
+    @Test
+    fun `solo las unidades pendientes se pueden cancelar`() {
+        val item = OrderItemDto("i", "Sopa", 3, units = listOf(OrderUnitDto("a", "PENDING", 2), OrderUnitDto("b", "PREPARING", 2), OrderUnitDto("c", "PENDING", 5)))
+        assertEquals(listOf("a" to 2, "c" to 5), pendingUnits(item).map { it.id to it.version })
+    }
+
+    @Test
+    fun `el motivo cumple los limites del contrato sin contar espacios`() {
+        assertFalse(isValidReason("  ab  "))
+        assertTrue(isValidReason("abc"))
+        assertTrue(isValidReason("x".repeat(REASON_MAX)))
+        assertFalse(isValidReason("x".repeat(REASON_MAX + 1)))
+    }
+
+    @Test
+    fun `cada falla de cancelacion tiene su texto`() {
+        fun server(status: Int, code: String?) = ApiFailure.Server(status, code, "del servidor", null)
+        assertEquals(R.string.cancel_invalid_state, actionFailureText(server(409, "ORDER_UNIT_INVALID_STATE")))
+        assertEquals(R.string.cancel_paid, actionFailureText(server(409, "ORDER_UNIT_PAID")))
+        assertEquals(R.string.table_deliver_conflict, actionFailureText(server(409, "VERSION_CONFLICT")))
+        assertEquals(R.string.error_action_forbidden, actionFailureText(server(403, "FORBIDDEN")))
+        assertEquals(R.string.error_server, actionFailureText(server(503, "SERVICE_BUSY")))
+        assertEquals(R.string.error_network, actionFailureText(ApiFailure.Network))
+        assertNull(actionFailureText(server(422, "VALIDATION_FAILED")))
     }
 }
 
@@ -191,7 +221,7 @@ class TableViewFlowTest {
         assertEquals("""{"action":"DELIVER","units":[{"id":"a","version":3}]}""", bodies.single())
         assertEquals("clave-1", posts.single().getHeader("Idempotency-Key"))
         assertEquals("/branches/b1/order-units/transitions", posts.single().path)
-        assertNull(vm.state.value.deliverFailure)
+        assertNull(vm.state.value.actionFailure)
     }
 
     @Test
@@ -219,10 +249,10 @@ class TableViewFlowTest {
         answers.add(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
         answers.add(MockResponse().setBody("""{"data":[],"meta":{}}"""))
         deliverAllAndWait()
-        assertEquals(ApiFailure.Network, vm.state.value.deliverFailure)
+        assertEquals(ApiFailure.Network, vm.state.value.actionFailure)
         deliverAllAndWait()
         assertEquals(posts[0].getHeader("Idempotency-Key"), posts[1].getHeader("Idempotency-Key"))
-        assertNull(vm.state.value.deliverFailure)
+        assertNull(vm.state.value.actionFailure)
     }
 
     @Test
@@ -244,7 +274,7 @@ class TableViewFlowTest {
         getAnswer = { MockResponse().setBody(list(order("1", "2026-11-03T10:00:00Z", unit("a", "DELIVERED", 2)))) }
         deliverAllAndWait()
         waitFor { vm.state.value.readyCount == 0 }
-        assertEquals("VERSION_CONFLICT", (vm.state.value.deliverFailure as ApiFailure.Server).code)
+        assertEquals("VERSION_CONFLICT", (vm.state.value.actionFailure as ApiFailure.Server).code)
         assertEquals("DELIVERED", vm.state.value.orders[0].items[0].units[0].status)
     }
 
@@ -268,5 +298,123 @@ class TableViewFlowTest {
         vm.deliverAll()
         waitFor { !vm.state.value.delivering }
         assertEquals(1, posts.size)
+    }
+
+    private val ok = """{"data":[],"meta":{}}"""
+
+    private fun cancelAndWait() {
+        vm.confirmCancel()
+        waitFor { vm.state.value.cancelling?.submitting != true }
+    }
+
+    private fun firstItem() = vm.state.value.orders[0].items[0]
+
+    @Test
+    fun `cancelar envia solo las pendientes con su version y el motivo`() {
+        getAnswer = { MockResponse().setBody(list(order("1", "2026-11-03T10:00:00Z", unit("a", "PENDING", 3), unit("b", "PREPARING"), unit("c", "PENDING", 7)))) }
+        loaded()
+        answers.add(MockResponse().setBody(ok))
+        vm.startCancel(firstItem())
+        assertEquals(2, vm.state.value.cancelling!!.count)
+        vm.setCancelReason("  El cliente cambió de opinión  ")
+        cancelAndWait()
+        val body = ApiJson.parseToJsonElement(bodies.single()).toString()
+        assertEquals("""{"action":"CANCEL","units":[{"id":"a","version":3},{"id":"c","version":7}],"reason":"El cliente cambió de opinión"}""", body)
+        assertEquals("/branches/b1/order-units/transitions", posts.single().path)
+        assertNull(vm.state.value.cancelling)
+        assertEquals(2, vm.state.value.cancelled)
+    }
+
+    @Test
+    fun `se puede cancelar solo una parte de lo pendiente`() {
+        getAnswer = { MockResponse().setBody(list(order("1", "2026-11-03T10:00:00Z", unit("a", "PENDING"), unit("c", "PENDING")))) }
+        loaded()
+        answers.add(MockResponse().setBody(ok))
+        vm.startCancel(firstItem())
+        vm.setCancelCount(0)
+        assertEquals(1, vm.state.value.cancelling!!.count)
+        vm.setCancelCount(9)
+        assertEquals(2, vm.state.value.cancelling!!.count)
+        vm.setCancelCount(1)
+        vm.setCancelReason("Error de captura")
+        cancelAndWait()
+        assertTrue(bodies.single().contains("\"a\"") && !bodies.single().contains("\"c\""))
+        assertEquals(1, vm.state.value.cancelled)
+    }
+
+    @Test
+    fun `sin motivo valido no envia`() {
+        getAnswer = { MockResponse().setBody(list(order("1", "2026-11-03T10:00:00Z", unit("a", "PENDING")))) }
+        loaded()
+        vm.startCancel(firstItem())
+        vm.setCancelReason("no")
+        vm.confirmCancel()
+        assertTrue(posts.isEmpty())
+        assertFalse(vm.state.value.cancelling!!.canConfirm)
+    }
+
+    @Test
+    fun `sin pendientes no abre la cancelacion`() {
+        getAnswer = { MockResponse().setBody(list(order("1", "2026-11-03T10:00:00Z", unit("a", "READY")))) }
+        loaded()
+        vm.startCancel(firstItem())
+        assertNull(vm.state.value.cancelling)
+    }
+
+    @Test
+    fun `respuesta perdida deja el dialogo y reintenta con la misma clave`() {
+        getAnswer = { MockResponse().setBody(list(order("1", "2026-11-03T10:00:00Z", unit("a", "PENDING")))) }
+        loaded()
+        answers.add(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        answers.add(MockResponse().setBody(ok))
+        vm.startCancel(firstItem())
+        vm.setCancelReason("Error de captura")
+        cancelAndWait()
+        assertEquals(ApiFailure.Network, vm.state.value.cancelling!!.failure)
+        cancelAndWait()
+        assertEquals(posts[0].getHeader("Idempotency-Key"), posts[1].getHeader("Idempotency-Key"))
+        assertNull(vm.state.value.cancelling)
+    }
+
+    @Test
+    fun `cambiar el motivo tras perder la respuesta usa otra clave`() {
+        getAnswer = { MockResponse().setBody(list(order("1", "2026-11-03T10:00:00Z", unit("a", "PENDING")))) }
+        loaded()
+        answers.add(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        answers.add(MockResponse().setBody(ok))
+        vm.startCancel(firstItem())
+        vm.setCancelReason("Error de captura")
+        cancelAndWait()
+        vm.setCancelReason("El cliente se fue")
+        cancelAndWait()
+        assertNotEquals(posts[0].getHeader("Idempotency-Key"), posts[1].getHeader("Idempotency-Key"))
+    }
+
+    @Test
+    fun `si cocina ya empezo cierra el dialogo avisa y actualiza`() {
+        getAnswer = { MockResponse().setBody(list(order("1", "2026-11-03T10:00:00Z", unit("a", "PENDING")))) }
+        loaded()
+        answers.add(MockResponse().setResponseCode(409).setBody("""{"error":{"code":"ORDER_UNIT_INVALID_STATE","message":"m","requestId":"r"}}"""))
+        vm.startCancel(firstItem())
+        getAnswer = { MockResponse().setBody(list(order("1", "2026-11-03T10:00:00Z", unit("a", "PREPARING", 2)))) }
+        vm.setCancelReason("Error de captura")
+        cancelAndWait()
+        assertNull(vm.state.value.cancelling)
+        assertEquals("ORDER_UNIT_INVALID_STATE", (vm.state.value.actionFailure as ApiFailure.Server).code)
+        waitFor { vm.state.value.orders[0].items[0].units[0].status == "PREPARING" }
+    }
+
+    @Test
+    fun `mientras se cancela no se puede entregar`() {
+        getAnswer = { MockResponse().setBody(list(order("1", "2026-11-03T10:00:00Z", unit("a", "PENDING"), unit("b", "READY")))) }
+        loaded()
+        answers.add(MockResponse().setBody(ok).setBodyDelay(300, TimeUnit.MILLISECONDS))
+        vm.startCancel(firstItem())
+        vm.setCancelReason("Error de captura")
+        vm.confirmCancel()
+        vm.deliverAll()
+        waitFor { vm.state.value.cancelling == null }
+        assertEquals(1, posts.size)
+        assertTrue(bodies.single().contains("CANCEL"))
     }
 }
