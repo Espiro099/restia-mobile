@@ -1,7 +1,9 @@
 package com.restia.mobile.data.tables
 
+import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.ApiJson
 import com.restia.mobile.core.network.ApiResult
+import com.restia.mobile.core.network.CleaningConfirmationRequest
 import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.TableDto
 import com.restia.mobile.core.network.TableSessionDto
@@ -61,8 +63,37 @@ class TablesRepository(private val api: SessionApi, private val cache: BlobStore
         api.openTableSession(branchId, idempotencyKey, body).data
     }
 
-    private companion object {
-        const val PER_PAGE = 100
-        const val MAX_PAGES = 20
+    suspend fun session(branchId: String, sessionId: String): ApiResult<TableSessionDto> =
+        apiCall { api.getTableSession(branchId, sessionId).data }
+
+    /**
+     * Pide el cierre con la versión que tiene la sesión ahora. Las reglas que importan (platillos sin
+     * terminar, cuentas sin pagar) las valida el backend en la misma transacción.
+     */
+    suspend fun closeSession(branchId: String, sessionId: String): ApiResult<TableSessionDto> =
+        when (val current = session(branchId, sessionId)) {
+            is ApiResult.Failure -> current
+            is ApiResult.Success -> apiCall { api.closeTableSession(branchId, sessionId, "\"${current.value.version}\"").data }
+        }
+
+    /** La confirmación lleva la versión de membresía con la que la mesa entró a limpieza (T-3). */
+    suspend fun confirmCleaning(branchId: String, sessionId: String, tableId: String): ApiResult<TableSessionDto> =
+        when (val current = session(branchId, sessionId)) {
+            is ApiResult.Failure -> current
+            is ApiResult.Success -> {
+                val membership = current.value.tables.firstOrNull { it.tableId == tableId && it.phase == "CLEANING" }?.cleaningMembershipVersion
+                if (membership == null) {
+                    // Otro empleado ya la confirmó o la mesa salió de la sesión.
+                    ApiResult.Failure(ApiFailure.Server(409, CLEANING_STALE, null, null))
+                } else {
+                    apiCall { api.confirmCleaning(branchId, sessionId, tableId, CleaningConfirmationRequest(membership)).data }
+                }
+            }
+        }
+
+    companion object {
+        const val CLEANING_STALE = "CLEANING_CONFIRMATION_STALE"
+        private const val PER_PAGE = 100
+        private const val MAX_PAGES = 20
     }
 }

@@ -9,6 +9,7 @@ import com.restia.mobile.core.network.OrderDto
 import com.restia.mobile.core.network.OrderItemDto
 import com.restia.mobile.core.network.UnitVersion
 import com.restia.mobile.data.orders.OrderRepository
+import com.restia.mobile.data.tables.TablesRepository
 import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -81,6 +82,9 @@ data class VoidState(
     override fun toString(): String = "VoidState(item=${item.id}, count=$count, needsApproval=$needsApproval, approved=$approved)"
 }
 
+/** Confirmación de cierre (T-4): la mesa queda por limpiar. */
+data class CloseState(val submitting: Boolean = false, val failure: ApiFailure? = null)
+
 data class TableUiState(
     val orders: List<OrderDto> = emptyList(),
     val loaded: Boolean = false,
@@ -96,9 +100,12 @@ data class TableUiState(
     val voided: Int? = null,
     /** Acción de actionFailure: el mismo código se explica distinto al cancelar que al anular. */
     val failedAction: String? = null,
+    val closing: CloseState? = null,
+    /** La sesión se cerró: la pantalla vuelve a las mesas y lo consume. */
+    val closed: Boolean = false,
 ) {
     val readyCount: Int get() = orders.sumOf { order -> readyUnits(order.items).size }
-    val busy: Boolean get() = delivering || cancelling?.submitting == true || voiding?.submitting == true
+    val busy: Boolean get() = delivering || cancelling?.submitting == true || voiding?.submitting == true || closing?.submitting == true
 }
 
 class TableViewModel(
@@ -110,6 +117,7 @@ class TableViewModel(
     private val pollMillis: Long = POLL_MILLIS,
     private val newKey: () -> String = { UUID.randomUUID().toString() },
     private val now: () -> Long = { System.nanoTime() / 1_000_000 },
+    private val sessions: TablesRepository? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(TableUiState())
     val state: StateFlow<TableUiState> = _state
@@ -334,6 +342,42 @@ class TableViewModel(
         }
     }
 
+    fun startClose() {
+        if (sessions == null || _state.value.busy) return
+        _state.value = _state.value.copy(closing = CloseState(), actionFailure = null)
+    }
+
+    fun dismissClose() {
+        if (_state.value.closing?.submitting == true) return
+        _state.value = _state.value.copy(closing = null)
+    }
+
+    fun confirmClose() {
+        val repo = sessions ?: return
+        val current = _state.value.closing ?: return
+        if (current.submitting || _state.value.delivering) return
+        _state.value = _state.value.copy(closing = current.copy(submitting = true, failure = null))
+        viewModelScope.launch {
+            when (val r = repo.closeSession(branchId, sessionId)) {
+                is ApiResult.Success -> _state.value = _state.value.copy(closing = null, closed = true)
+                is ApiResult.Failure -> {
+                    // Ya cerrada por otro empleado: el resultado es el mismo que se buscaba.
+                    val alreadyClosed = (r.failure as? ApiFailure.Server)?.code == "SESSION_NOT_ACTIVE"
+                    _state.value = if (alreadyClosed) {
+                        _state.value.copy(closing = null, closed = true)
+                    } else {
+                        _state.value.copy(closing = current.copy(submitting = false, failure = r.failure))
+                    }
+                    if (!alreadyClosed) load()
+                }
+            }
+        }
+    }
+
+    fun consumeClosed() {
+        _state.value = _state.value.copy(closed = false)
+    }
+
     private fun isRetryable(failure: ApiFailure): Boolean =
         failure == ApiFailure.Network || (failure is ApiFailure.Server && failure.status >= 500)
 
@@ -342,9 +386,11 @@ class TableViewModel(
         private val branchId: String,
         private val sessionId: String,
         private val canVoidDirectly: Boolean,
+        private val sessions: TablesRepository,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = TableViewModel(repository, branchId, sessionId, canVoidDirectly) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T =
+            TableViewModel(repository, branchId, sessionId, canVoidDirectly, sessions = sessions) as T
     }
 
     private companion object {

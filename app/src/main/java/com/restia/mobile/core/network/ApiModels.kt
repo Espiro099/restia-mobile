@@ -83,7 +83,26 @@ data class TableSessionOpenRequest(
 )
 
 @Serializable
-data class TableSessionDto(val id: String, val status: String, val guestCount: Int, val version: Int)
+data class SessionTableDto(
+    val tableId: String,
+    val number: Int,
+    /** SEATED o CLEANING. */
+    val phase: String,
+    /** Versión que pide la confirmación de limpieza (T-3). */
+    val cleaningMembershipVersion: Int? = null,
+)
+
+@Serializable
+data class TableSessionDto(
+    val id: String,
+    val status: String,
+    val guestCount: Int,
+    val version: Int,
+    val tables: List<SessionTableDto> = emptyList(),
+)
+
+@Serializable
+data class CleaningConfirmationRequest(val membershipVersion: Int)
 
 @Serializable
 data class MoneyDto(val amount: String, val currency: String)
@@ -169,6 +188,31 @@ data class UnitTransitionRequest(
     val units: List<UnitVersion>,
     /** Obligatorio en CANCEL y VOID; con explicitNulls = false no se envía si es null. */
     val reason: String? = null,
+)
+
+@Serializable
+data class StationDto(val id: String, val code: String, val name: String, val status: String)
+
+/** Unidad en la cola de cocina, con lo que necesita la estación para prepararla. */
+@Serializable
+data class QueueUnitDto(
+    val id: String,
+    val orderId: String,
+    val orderItemId: String,
+    val unitNumber: Int,
+    val status: String,
+    val stationId: String,
+    val createdAt: String,
+    val version: Int,
+)
+
+@Serializable
+data class KitchenUnitDto(
+    val unit: QueueUnitDto,
+    val productName: String,
+    val modifiers: List<OrderModifierDto> = emptyList(),
+    val notes: String? = null,
+    val tableNumbers: List<Int> = emptyList(),
 )
 
 @Serializable

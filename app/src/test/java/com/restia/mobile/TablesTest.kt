@@ -145,22 +145,12 @@ class TablesViewModelTest {
 
         fun repository(): TablesRepository {
             val outer = this
-            return TablesRepository(object : SessionApi {
-                override suspend fun me() = error("sin uso")
-                override suspend fun logout() = error("sin uso")
-                override suspend fun getMenu(branchId: String, etag: String?) = error("sin uso")
-                override suspend fun createOrder(branchId: String, idempotencyKey: String, body: com.restia.mobile.core.network.OrderCreateRequest) = error("sin uso")
-                override suspend fun listOrders(branchId: String, sessionId: String, page: Int, perPage: Int, etag: String?) = error("sin uso")
-                override suspend fun transitionUnits(branchId: String, idempotencyKey: String, body: com.restia.mobile.core.network.UnitTransitionRequest, approvalToken: String?) = error("sin uso")
-                override suspend fun createApproval(branchId: String, body: com.restia.mobile.core.network.ApprovalRequest) = error("sin uso")
+            return TablesRepository(object : UnusedSessionApi() {
                 override suspend fun listTables(branchId: String, page: Int, perPage: Int) =
                     when (val r = outer.next()) {
                         is ApiResult.Success -> com.restia.mobile.core.network.PagedEnvelope(r.value)
                         is ApiResult.Failure -> throw java.io.IOException("sin red")
                     }
-
-                override suspend fun openTableSession(branchId: String, idempotencyKey: String, body: com.restia.mobile.core.network.TableSessionOpenRequest) =
-                    error("sin uso")
             })
         }
     }

@@ -7,6 +7,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.restia.mobile.Repositories
+import com.restia.mobile.ui.kitchen.KitchenScreen
+import com.restia.mobile.ui.kitchen.KitchenViewModel
 import com.restia.mobile.ui.orders.OrderScreen
 import com.restia.mobile.ui.orders.OrderViewModel
 import com.restia.mobile.ui.orders.TableScreen
@@ -14,7 +16,7 @@ import com.restia.mobile.ui.orders.TableViewModel
 import com.restia.mobile.ui.tables.TablesScreen
 import com.restia.mobile.ui.tables.TablesViewModel
 
-/** Mesas, vista de una mesa y comanda. Una navegación simple basta por ahora. */
+/** Mesas, vista de una mesa, comanda y cola de cocina. Una navegación simple basta por ahora. */
 @Composable
 fun BranchHome(
     repositories: Repositories,
@@ -30,6 +32,21 @@ fun BranchHome(
     var tableNumber by rememberSaveable { mutableStateOf(0) }
     var capturing by rememberSaveable { mutableStateOf(false) }
     val canOrder = "orders.create" in permissions
+    val canPrepare = "order_units.prepare" in permissions
+    // Quien prepara pero no toma comandas (cocina) empieza en la cola; el resto, en las mesas.
+    var inKitchen by rememberSaveable { mutableStateOf(canPrepare && !canOrder) }
+    if (inKitchen && "orders.read" in permissions) {
+        KitchenScreen(
+            viewModel = viewModel(key = "cocina-$userId-$branchId", factory = KitchenViewModel.Factory(repositories.kitchen, branchId)),
+            branchName = branchName,
+            canPrepare = canPrepare,
+            showTables = "tables.read" in permissions,
+            logoutEnabled = logoutEnabled,
+            onTables = { inKitchen = false },
+            onLogout = onLogout,
+        )
+        return
+    }
     // La clave incluye al usuario: otro inicio de sesión empieza sin la lista anterior.
     val tables: TablesViewModel = viewModel(
         key = "mesas-$userId-$branchId",
@@ -44,6 +61,8 @@ fun BranchHome(
             canOpenTables = "table_sessions.open" in permissions,
             canOrder = canOrder,
             canViewOrders = "orders.read" in permissions,
+            canClean = "tables.clean" in permissions,
+            showKitchen = "orders.read" in permissions && (canPrepare || "order_units.deliver" in permissions),
             logoutEnabled = logoutEnabled,
             onLogout = onLogout,
             onViewTable = { session, number ->
@@ -56,12 +75,19 @@ fun BranchHome(
                 tableNumber = number
                 capturing = canOrder
             },
+            onKitchen = { inKitchen = true },
         )
         return
     }
     val table: TableViewModel = viewModel(
         key = "mesa-$userId-$current",
-        factory = TableViewModel.Factory(repositories.orders, branchId, current, canVoidDirectly = "order_units.void" in permissions),
+        factory = TableViewModel.Factory(
+            repositories.orders,
+            branchId,
+            current,
+            canVoidDirectly = "order_units.void" in permissions,
+            sessions = repositories.tables,
+        ),
     )
     if (capturing) {
         OrderScreen(
@@ -95,6 +121,7 @@ fun BranchHome(
             canCancel = "order_units.cancel" in permissions,
             // Sin el permiso directo, igual puede anular con la autorización de un gerente (D-37).
             canVoid = "order_units.void" in permissions || "order_units.cancel" in permissions,
+            canClose = "table_sessions.close" in permissions,
             onBack = { sessionId = null },
             onAddOrder = { capturing = true },
         )

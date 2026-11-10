@@ -55,6 +55,23 @@ interface SessionApi {
         @Header("If-None-Match") etag: String?,
     ): Response<PagedEnvelope<OrderDto>>
 
+    @GET("branches/{branchId}/stations")
+    suspend fun listStations(
+        @Path("branchId") branchId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<StationDto>
+
+    /** Sin status, el backend devuelve PENDING, PREPARING y READY, de la más antigua a la más reciente. */
+    @GET("branches/{branchId}/order-units")
+    suspend fun listQueue(
+        @Path("branchId") branchId: String,
+        @Query("stationId") stationId: String?,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+        @Header("If-None-Match") etag: String?,
+    ): Response<PagedEnvelope<KitchenUnitDto>>
+
     @POST("branches/{branchId}/order-units/transitions")
     suspend fun transitionUnits(
         @Path("branchId") branchId: String,
@@ -83,5 +100,28 @@ interface SessionApi {
         @Path("branchId") branchId: String,
         @Header("Idempotency-Key") idempotencyKey: String,
         @Body body: TableSessionOpenRequest,
+    ): Envelope<TableSessionDto>
+
+    @GET("branches/{branchId}/table-sessions/{sessionId}")
+    suspend fun getTableSession(
+        @Path("branchId") branchId: String,
+        @Path("sessionId") sessionId: String,
+    ): Envelope<TableSessionDto>
+
+    /** T-4: sin cuerpo; las mesas quedan por limpiar y la sesión en PENDING_CLEANING. */
+    @POST("branches/{branchId}/table-sessions/{sessionId}/close")
+    suspend fun closeTableSession(
+        @Path("branchId") branchId: String,
+        @Path("sessionId") sessionId: String,
+        @Header("If-Match") ifMatch: String,
+    ): Envelope<TableSessionDto>
+
+    /** Sin If-Match: repetir una confirmación ya hecha responde igual. */
+    @POST("branches/{branchId}/table-sessions/{sessionId}/tables/{tableId}/cleaning-confirmation")
+    suspend fun confirmCleaning(
+        @Path("branchId") branchId: String,
+        @Path("sessionId") sessionId: String,
+        @Path("tableId") tableId: String,
+        @Body body: CleaningConfirmationRequest,
     ): Envelope<TableSessionDto>
 }
