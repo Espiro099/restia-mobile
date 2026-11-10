@@ -216,6 +216,90 @@ data class KitchenUnitDto(
 )
 
 @Serializable
+data class CheckAdjustmentDto(val id: String, val type: String, val amount: MoneyDto, val reason: String)
+
+@Serializable
+data class CheckUnitDto(
+    val unitId: String,
+    val orderId: String,
+    val productName: String,
+    val status: String,
+    val price: MoneyDto,
+    val tax: MoneyDto,
+    val adjustment: CheckAdjustmentDto? = null,
+)
+
+@Serializable
+data class CheckDto(
+    val id: String,
+    val sessionId: String,
+    val number: Int,
+    val label: String? = null,
+    val status: String,
+    val units: List<CheckUnitDto> = emptyList(),
+    val subtotal: MoneyDto,
+    val taxTotal: MoneyDto,
+    val adjustmentTotal: MoneyDto,
+    val total: MoneyDto,
+    val paidTotal: MoneyDto,
+    val pendingTotal: MoneyDto,
+    val tipTotal: MoneyDto,
+    val balance: MoneyDto,
+    val version: Int,
+)
+
+@Serializable
+data class CashShiftDto(val id: String, val cashRegisterId: String, val status: String, val openedAt: String? = null)
+
+@Serializable
+data class CashRegisterDto(val id: String, val code: String, val name: String, val status: String)
+
+@Serializable
+data class CardDto(val brand: String? = null, val last4: String? = null, val authCode: String? = null)
+
+@Serializable
+data class PaymentDto(
+    val id: String,
+    val checkId: String,
+    val cashShiftId: String,
+    val method: String,
+    val status: String,
+    val amount: MoneyDto,
+    val tip: MoneyDto,
+    val amountTendered: MoneyDto? = null,
+    val change: MoneyDto? = null,
+    val card: CardDto? = null,
+    val reference: String? = null,
+    val createdAt: String,
+    val version: Int,
+)
+
+/** Efectivo: lleva lo entregado y queda CONFIRMED al crear. Tarjeta y transferencia: PENDING hasta el resultado (P-2). */
+@Serializable
+data class PaymentCreateRequest(
+    val checkId: String,
+    val cashShiftId: String,
+    val method: String,
+    val amount: MoneyDto,
+    val tip: MoneyDto? = null,
+    val amountTendered: MoneyDto? = null,
+)
+
+/** Nunca el número completo de la tarjeta (P-10). */
+@Serializable
+data class PaymentResultRequest(
+    val outcome: String,
+    val reference: String? = null,
+    val card: CardDto? = null,
+)
+
+@Serializable
+data class PrintJobRequest(val type: String, val sourceId: String)
+
+@Serializable
+data class PrintJobDto(val id: String, val type: String, val status: String)
+
+@Serializable
 data class MeData(val user: UserDto, val memberships: List<MembershipDto>)
 
 /** D-37: el gerente escribe sus datos en este dispositivo. La contraseña nunca se guarda ni se registra. */

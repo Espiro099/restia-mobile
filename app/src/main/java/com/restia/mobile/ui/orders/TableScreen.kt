@@ -331,8 +331,10 @@ fun TableScreen(
     canCancel: Boolean,
     canVoid: Boolean,
     canClose: Boolean,
+    canViewCheck: Boolean,
     onBack: () -> Unit,
     onAddOrder: () -> Unit,
+    onCheck: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     BackHandler(onBack = onBack)
@@ -382,9 +384,14 @@ fun TableScreen(
             )
         },
         bottomBar = {
-            if (canOrder) {
-                Button(onClick = onAddOrder, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text(stringResource(R.string.table_add_order))
+            if (canOrder || canViewCheck) {
+                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (canViewCheck) {
+                        OutlinedButton(onClick = onCheck, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.table_check)) }
+                    }
+                    if (canOrder) {
+                        Button(onClick = onAddOrder, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.table_add_order)) }
+                    }
                 }
             }
         },
