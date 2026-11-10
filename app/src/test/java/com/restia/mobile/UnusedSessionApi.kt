@@ -4,6 +4,8 @@ import com.restia.mobile.core.network.ApprovalData
 import com.restia.mobile.core.network.ApprovalRequest
 import com.restia.mobile.core.network.CleaningConfirmationRequest
 import com.restia.mobile.core.network.Envelope
+import com.restia.mobile.core.network.KitchenUnitDto
+import com.restia.mobile.core.network.StationDto
 import com.restia.mobile.core.network.MeData
 import com.restia.mobile.core.network.MenuDto
 import com.restia.mobile.core.network.OrderCreateRequest
@@ -30,6 +32,9 @@ open class UnusedSessionApi : SessionApi {
     override suspend fun createApproval(branchId: String, body: ApprovalRequest): Envelope<ApprovalData> = error("sin uso")
     override suspend fun createOrder(branchId: String, idempotencyKey: String, body: OrderCreateRequest): Envelope<OrderDto> = error("sin uso")
     override suspend fun openTableSession(branchId: String, idempotencyKey: String, body: TableSessionOpenRequest): Envelope<TableSessionDto> =
+        error("sin uso")
+    override suspend fun listStations(branchId: String, page: Int, perPage: Int): PagedEnvelope<StationDto> = error("sin uso")
+    override suspend fun listQueue(branchId: String, stationId: String?, page: Int, perPage: Int, etag: String?): Response<PagedEnvelope<KitchenUnitDto>> =
         error("sin uso")
     override suspend fun getTableSession(branchId: String, sessionId: String): Envelope<TableSessionDto> = error("sin uso")
     override suspend fun closeTableSession(branchId: String, sessionId: String, ifMatch: String): Envelope<TableSessionDto> = error("sin uso")

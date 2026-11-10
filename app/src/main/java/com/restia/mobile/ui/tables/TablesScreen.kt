@@ -165,10 +165,12 @@ fun TablesScreen(
     canOrder: Boolean,
     canViewOrders: Boolean,
     canClean: Boolean,
+    showKitchen: Boolean,
     logoutEnabled: Boolean,
     onLogout: () -> Unit,
     onViewTable: (sessionId: String, tableNumber: Int) -> Unit,
     onOrder: (sessionId: String, tableNumber: Int) -> Unit,
+    onKitchen: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     LifecycleStartEffect(viewModel) {
@@ -200,6 +202,7 @@ fun TablesScreen(
                     }
                 },
                 actions = {
+                    if (showKitchen) TextButton(onClick = onKitchen) { Text(stringResource(R.string.kitchen_title)) }
                     TextButton(onClick = onLogout, enabled = logoutEnabled) { Text(stringResource(R.string.action_logout)) }
                 },
             )
