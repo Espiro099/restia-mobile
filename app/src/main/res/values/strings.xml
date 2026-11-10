@@ -158,4 +158,30 @@
     <string name="cleaning_body">Confirma cuando la mesa esté limpia y lista para recibir clientes.</string>
     <string name="cleaning_confirm">Ya está limpia</string>
     <string name="cleaning_done">La mesa %1$d quedó libre.</string>
+    <string name="kitchen_title">Cocina</string>
+    <string name="kitchen_all_stations">Todas</string>
+    <string name="kitchen_empty">No hay platillos por preparar.</string>
+    <string name="kitchen_not_loaded">No se pudo cargar la cola.</string>
+    <string name="kitchen_no_table">Sin mesa</string>
+    <plurals name="kitchen_tables">
+        <item quantity="one">Mesa %1$s</item>
+        <item quantity="other">Mesas %1$s</item>
+    </plurals>
+    <string name="kitchen_time">%1$s · hace %2$s</string>
+    <plurals name="kitchen_minutes">
+        <item quantity="one">%1$d minuto</item>
+        <item quantity="other">%1$d minutos</item>
+    </plurals>
+    <string name="kitchen_notes">Nota: %1$s</string>
+    <plurals name="kitchen_ready_waiting">
+        <item quantity="one">%1$d listo, esperando al mesero</item>
+        <item quantity="other">%1$d listos, esperando al mesero</item>
+    </plurals>
+    <string name="kitchen_start">Empezar</string>
+    <string name="kitchen_ready">Listo</string>
+    <string name="kitchen_start_all">Empezar todo</string>
+    <string name="kitchen_ready_all">Todo listo</string>
+    <string name="kitchen_conflict">Otro empleado ya cambió estos platillos. La cola se actualizó.</string>
+    <string name="kitchen_no_stock">No hay inventario suficiente para empezar este platillo.</string>
+    <string name="kitchen_blocked">Un ingrediente está bloqueado por seguridad alimentaria.</string>
 </resources>

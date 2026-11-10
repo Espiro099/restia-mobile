@@ -55,6 +55,23 @@ interface SessionApi {
         @Header("If-None-Match") etag: String?,
     ): Response<PagedEnvelope<OrderDto>>
 
+    @GET("branches/{branchId}/stations")
+    suspend fun listStations(
+        @Path("branchId") branchId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<StationDto>
+
+    /** Sin status, el backend devuelve PENDING, PREPARING y READY, de la más antigua a la más reciente. */
+    @GET("branches/{branchId}/order-units")
+    suspend fun listQueue(
+        @Path("branchId") branchId: String,
+        @Query("stationId") stationId: String?,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+        @Header("If-None-Match") etag: String?,
+    ): Response<PagedEnvelope<KitchenUnitDto>>
+
     @POST("branches/{branchId}/order-units/transitions")
     suspend fun transitionUnits(
         @Path("branchId") branchId: String,

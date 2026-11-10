@@ -191,6 +191,31 @@ data class UnitTransitionRequest(
 )
 
 @Serializable
+data class StationDto(val id: String, val code: String, val name: String, val status: String)
+
+/** Unidad en la cola de cocina, con lo que necesita la estación para prepararla. */
+@Serializable
+data class QueueUnitDto(
+    val id: String,
+    val orderId: String,
+    val orderItemId: String,
+    val unitNumber: Int,
+    val status: String,
+    val stationId: String,
+    val createdAt: String,
+    val version: Int,
+)
+
+@Serializable
+data class KitchenUnitDto(
+    val unit: QueueUnitDto,
+    val productName: String,
+    val modifiers: List<OrderModifierDto> = emptyList(),
+    val notes: String? = null,
+    val tableNumbers: List<Int> = emptyList(),
+)
+
+@Serializable
 data class MeData(val user: UserDto, val memberships: List<MembershipDto>)
 
 /** D-37: el gerente escribe sus datos en este dispositivo. La contraseña nunca se guarda ni se registra. */
