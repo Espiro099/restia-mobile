@@ -84,4 +84,27 @@ interface SessionApi {
         @Header("Idempotency-Key") idempotencyKey: String,
         @Body body: TableSessionOpenRequest,
     ): Envelope<TableSessionDto>
+
+    @GET("branches/{branchId}/table-sessions/{sessionId}")
+    suspend fun getTableSession(
+        @Path("branchId") branchId: String,
+        @Path("sessionId") sessionId: String,
+    ): Envelope<TableSessionDto>
+
+    /** T-4: sin cuerpo; las mesas quedan por limpiar y la sesión en PENDING_CLEANING. */
+    @POST("branches/{branchId}/table-sessions/{sessionId}/close")
+    suspend fun closeTableSession(
+        @Path("branchId") branchId: String,
+        @Path("sessionId") sessionId: String,
+        @Header("If-Match") ifMatch: String,
+    ): Envelope<TableSessionDto>
+
+    /** Sin If-Match: repetir una confirmación ya hecha responde igual. */
+    @POST("branches/{branchId}/table-sessions/{sessionId}/tables/{tableId}/cleaning-confirmation")
+    suspend fun confirmCleaning(
+        @Path("branchId") branchId: String,
+        @Path("sessionId") sessionId: String,
+        @Path("tableId") tableId: String,
+        @Body body: CleaningConfirmationRequest,
+    ): Envelope<TableSessionDto>
 }

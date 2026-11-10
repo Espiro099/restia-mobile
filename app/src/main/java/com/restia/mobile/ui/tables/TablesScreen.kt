@@ -41,6 +41,7 @@ import com.restia.mobile.core.network.TableDto
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.delay
 
 @StringRes
 fun tableStateLabel(table: TableDto): Int = when {
@@ -126,6 +127,26 @@ private fun OpenTableDialog(state: OpenTableState, viewModel: TablesViewModel) {
 }
 
 @Composable
+private fun CleaningDialog(state: CleaningState, viewModel: TablesViewModel) {
+    AlertDialog(
+        onDismissRequest = viewModel::dismissCleaning,
+        title = { Text(stringResource(R.string.cleaning_title, state.table.number)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.cleaning_body))
+                state.failure?.let { Text(failureText(it), color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = viewModel::confirmCleaning, enabled = !state.submitting) { Text(stringResource(R.string.cleaning_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = viewModel::dismissCleaning, enabled = !state.submitting) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
+}
+
+@Composable
 private fun failureText(failure: ApiFailure): String = when {
     failure == ApiFailure.Network -> stringResource(R.string.error_network)
     failure is ApiFailure.Server && failure.status == 403 -> failure.message ?: stringResource(R.string.error_forbidden)
@@ -143,6 +164,7 @@ fun TablesScreen(
     canOpenTables: Boolean,
     canOrder: Boolean,
     canViewOrders: Boolean,
+    canClean: Boolean,
     logoutEnabled: Boolean,
     onLogout: () -> Unit,
     onViewTable: (sessionId: String, tableNumber: Int) -> Unit,
@@ -154,6 +176,13 @@ fun TablesScreen(
         onStopOrDispose { viewModel.stopPolling() }
     }
     state.opening?.let { OpenTableDialog(it, viewModel) }
+    state.cleaning?.let { CleaningDialog(it, viewModel) }
+    LaunchedEffect(state.cleaned) {
+        if (state.cleaned != null) {
+            delay(5_000)
+            viewModel.clearCleaned()
+        }
+    }
     LaunchedEffect(state.opened) {
         state.opened?.let {
             viewModel.consumeOpened()
@@ -184,6 +213,9 @@ fun TablesScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
+            state.cleaned?.let {
+                Text(stringResource(R.string.cleaning_done, it), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
             state.pendingDrafts.forEach { draft ->
                 TextButton(
                     onClick = { onOrder(draft.sessionId, draft.tableNumber) },
@@ -212,6 +244,7 @@ fun TablesScreen(
                             when {
                                 canOpenTables && isOpenable(table) -> ({ viewModel.selectTable(table) })
                                 canViewOrders && session != null && hasSession(table) -> ({ onViewTable(session, table.number) })
+                                canClean && needsCleaning(table) -> ({ viewModel.selectCleaning(table) })
                                 else -> null
                             },
                         )

@@ -31,6 +31,12 @@ private val IN_SERVICE_STATES = setOf("OCUPADA_SIN_COMANDA", "ESPERANDO_COMIDA",
 fun hasSession(table: TableDto): Boolean =
     table.status == "ACTIVE" && table.currentSessionId != null && table.operationalState in IN_SERVICE_STATES
 
+/** Una mesa en limpieza tiene la sesión que la dejó así: se confirma contra ella (T-3). */
+fun needsCleaning(table: TableDto): Boolean =
+    table.status == "ACTIVE" && table.operationalState == "POR_LIMPIAR" && table.currentSessionId != null
+
+data class CleaningState(val table: TableDto, val submitting: Boolean = false, val failure: ApiFailure? = null)
+
 data class OpenedSession(val sessionId: String, val tableNumber: Int)
 
 data class OpenTableState(
@@ -53,6 +59,9 @@ data class TablesUiState(
     val opened: OpenedSession? = null,
     /** Comandas de este usuario sin enviar: nunca salen solas, el mesero decide. */
     val pendingDrafts: List<OrderDraft> = emptyList(),
+    val cleaning: CleaningState? = null,
+    /** Número de la mesa recién limpiada, para el aviso. */
+    val cleaned: Int? = null,
 )
 
 class TablesViewModel(
@@ -150,6 +159,37 @@ class TablesViewModel(
                     if ((r.failure as? ApiFailure.Server)?.status == 409) load()
                 }
             }
+        }
+    }
+
+    fun selectCleaning(table: TableDto) {
+        if (!needsCleaning(table) || _state.value.cleaning?.submitting == true) return
+        _state.value = _state.value.copy(cleaning = CleaningState(table), cleaned = null)
+    }
+
+    fun dismissCleaning() {
+        if (_state.value.cleaning?.submitting != true) _state.value = _state.value.copy(cleaning = null)
+    }
+
+    fun clearCleaned() {
+        _state.value = _state.value.copy(cleaned = null)
+    }
+
+    fun confirmCleaning() {
+        val cleaning = _state.value.cleaning ?: return
+        val sessionId = cleaning.table.currentSessionId ?: return
+        if (cleaning.submitting) return
+        _state.value = _state.value.copy(cleaning = cleaning.copy(submitting = true, failure = null))
+        viewModelScope.launch {
+            val r = repository.confirmCleaning(branchId, sessionId, cleaning.table.id)
+            val stale = r is ApiResult.Failure && (r.failure as? ApiFailure.Server)?.code == TablesRepository.CLEANING_STALE
+            _state.value = when {
+                r is ApiResult.Success -> _state.value.copy(cleaning = null, cleaned = cleaning.table.number)
+                // Otro empleado ya la limpió: se cierra el diálogo y la lista lo muestra.
+                stale -> _state.value.copy(cleaning = null)
+                else -> _state.value.copy(cleaning = cleaning.copy(submitting = false, failure = (r as ApiResult.Failure).failure))
+            }
+            load()
         }
     }
 

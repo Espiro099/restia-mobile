@@ -147,4 +147,15 @@
         <item quantity="one">Demasiados intentos. Espera %1$d segundo.</item>
         <item quantity="other">Demasiados intentos. Espera %1$d segundos.</item>
     </plurals>
+    <string name="close_action">Cerrar mesa</string>
+    <string name="close_title">¿Cerrar la mesa %1$d?</string>
+    <string name="close_body">Todos los platillos deben estar entregados o cancelados y las cuentas pagadas. La mesa quedará por limpiar.</string>
+    <string name="close_confirm">Cerrar mesa</string>
+    <string name="close_pending_units">Hay platillos sin entregar. Entrégalos o cancélalos antes de cerrar.</string>
+    <string name="close_open_checks">Hay cuentas sin pagar. Cóbralas antes de cerrar.</string>
+    <string name="close_conflict">Alguien más cambió la mesa. Inténtalo de nuevo.</string>
+    <string name="cleaning_title">Mesa %1$d por limpiar</string>
+    <string name="cleaning_body">Confirma cuando la mesa esté limpia y lista para recibir clientes.</string>
+    <string name="cleaning_confirm">Ya está limpia</string>
+    <string name="cleaning_done">La mesa %1$d quedó libre.</string>
 </resources>

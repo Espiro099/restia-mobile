@@ -112,6 +112,44 @@ private fun failureText(failure: ApiFailure, action: String? = "CANCEL"): String
         ?: stringResource(R.string.error_unexpected)
 }
 
+/** Texto de una falla al cerrar la mesa (T-4). */
+@StringRes
+fun closeFailureText(failure: ApiFailure): Int? = when {
+    failure == ApiFailure.Network -> R.string.error_network
+    failure !is ApiFailure.Server -> R.string.error_unexpected
+    failure.status >= 500 -> R.string.error_server
+    failure.code == "SESSION_HAS_PENDING_UNITS" -> R.string.close_pending_units
+    failure.code == "SESSION_HAS_OPEN_CHECKS" -> R.string.close_open_checks
+    failure.code == "VERSION_CONFLICT" -> R.string.close_conflict
+    failure.status == 403 -> R.string.error_action_forbidden
+    else -> null
+}
+
+@Composable
+private fun CloseDialog(state: CloseState, tableNumber: Int, viewModel: TableViewModel) {
+    AlertDialog(
+        onDismissRequest = viewModel::dismissClose,
+        title = { Text(stringResource(R.string.close_title, tableNumber)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.close_body))
+                state.failure?.let {
+                    Text(
+                        closeFailureText(it)?.let { id -> stringResource(id) } ?: (it as? ApiFailure.Server)?.message ?: stringResource(R.string.error_unexpected),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = viewModel::confirmClose, enabled = !state.submitting) { Text(stringResource(R.string.close_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = viewModel::dismissClose, enabled = !state.submitting) { Text(stringResource(R.string.cancel_back)) }
+        },
+    )
+}
+
 @Composable
 private fun ItemRow(
     item: OrderItemDto,
@@ -292,6 +330,7 @@ fun TableScreen(
     canDeliver: Boolean,
     canCancel: Boolean,
     canVoid: Boolean,
+    canClose: Boolean,
     onBack: () -> Unit,
     onAddOrder: () -> Unit,
 ) {
@@ -320,6 +359,13 @@ fun TableScreen(
             viewModel.clearVoided()
         }
     }
+    LaunchedEffect(state.closed) {
+        if (state.closed) {
+            viewModel.consumeClosed()
+            onBack()
+        }
+    }
+    state.closing?.let { CloseDialog(it, tableNumber, viewModel) }
     state.cancelling?.let { CancelDialog(it, viewModel) }
     state.voiding?.let { VoidDialog(it, viewModel) }
     Scaffold(
@@ -327,7 +373,12 @@ fun TableScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.table_title, tableNumber)) },
-                actions = { TextButton(onClick = onBack) { Text(stringResource(R.string.order_back)) } },
+                actions = {
+                    if (canClose) {
+                        TextButton(onClick = viewModel::startClose, enabled = !state.busy) { Text(stringResource(R.string.close_action)) }
+                    }
+                    TextButton(onClick = onBack) { Text(stringResource(R.string.order_back)) }
+                },
             )
         },
         bottomBar = {

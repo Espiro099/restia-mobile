@@ -83,7 +83,26 @@ data class TableSessionOpenRequest(
 )
 
 @Serializable
-data class TableSessionDto(val id: String, val status: String, val guestCount: Int, val version: Int)
+data class SessionTableDto(
+    val tableId: String,
+    val number: Int,
+    /** SEATED o CLEANING. */
+    val phase: String,
+    /** Versión que pide la confirmación de limpieza (T-3). */
+    val cleaningMembershipVersion: Int? = null,
+)
+
+@Serializable
+data class TableSessionDto(
+    val id: String,
+    val status: String,
+    val guestCount: Int,
+    val version: Int,
+    val tables: List<SessionTableDto> = emptyList(),
+)
+
+@Serializable
+data class CleaningConfirmationRequest(val membershipVersion: Int)
 
 @Serializable
 data class MoneyDto(val amount: String, val currency: String)
