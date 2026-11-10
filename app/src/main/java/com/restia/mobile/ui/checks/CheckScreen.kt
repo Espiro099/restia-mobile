@@ -6,6 +6,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -126,6 +128,7 @@ private fun PaymentRow(payment: PaymentDto, canRecord: Boolean, canPrint: Boolea
 
 data class CheckPermissions(val request: Boolean, val pay: Boolean, val record: Boolean, val print: Boolean)
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CheckCard(check: CheckDto, payments: List<PaymentDto>, can: CheckPermissions, busy: Boolean, viewModel: CheckViewModel) {
     Card {
@@ -155,15 +158,16 @@ private fun CheckCard(check: CheckDto, payments: List<PaymentDto>, can: CheckPer
                 HorizontalDivider()
                 payments.forEach { PaymentRow(it, can.record, can.print, busy, viewModel) }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+            // Cobrar es la acción principal: ancho completo, nunca cortada por las demás.
+            if (can.pay && isPayable(check)) {
+                Button(onClick = { viewModel.startPay(check) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.pay_action)) }
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (can.request && check.status == "OPEN" && billed.isNotEmpty()) {
                     OutlinedButton(onClick = { viewModel.requestCheck(check) }, enabled = !busy) { Text(stringResource(R.string.check_request)) }
                 }
                 if (can.print && check.status != "CANCELLED" && billed.isNotEmpty()) {
                     OutlinedButton(onClick = { viewModel.print(CheckViewModel.PRE_CHECK, check.id) }, enabled = !busy) { Text(stringResource(R.string.print_pre_check)) }
-                }
-                if (can.pay && isPayable(check)) {
-                    Button(onClick = { viewModel.startPay(check) }, enabled = !busy) { Text(stringResource(R.string.pay_action)) }
                 }
             }
         }
@@ -184,6 +188,7 @@ private fun AmountField(value: String, onChange: (String) -> Unit, @StringRes la
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PayDialog(state: PayState, shifts: List<com.restia.mobile.data.checks.ShiftOption>?, shiftsFailure: ApiFailure?, viewModel: CheckViewModel) {
     val currency = state.check.balance.currency
@@ -215,7 +220,8 @@ private fun PayDialog(state: PayState, shifts: List<com.restia.mobile.data.check
                         }
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                // Los cuatro métodos a la vista: en una fila desplazable, Transferencia quedaba fuera.
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     METHODS.forEach { m ->
                         FilterChip(selected = state.method == m, onClick = { viewModel.setMethod(m) }, enabled = enabled, label = { Text(stringResource(methodLabel(m))) })
                     }
