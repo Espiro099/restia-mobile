@@ -43,6 +43,16 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 
+/** Nombre del rol para el empleado; un rol nuevo del backend se muestra tal cual. */
+@StringRes
+fun roleLabel(role: String): Int? = when (role) {
+    "ADMIN" -> R.string.role_admin
+    "MANAGER" -> R.string.role_manager
+    "WAITER" -> R.string.role_waiter
+    "KITCHEN" -> R.string.role_kitchen
+    else -> null
+}
+
 @StringRes
 fun tableStateLabel(table: TableDto): Int = when {
     table.status == "INACTIVE" -> R.string.table_inactive
@@ -198,7 +208,7 @@ fun TablesScreen(
                 title = {
                     Column {
                         Text(branchName, style = MaterialTheme.typography.titleMedium)
-                        Text(role, style = MaterialTheme.typography.bodySmall)
+                        Text(roleLabel(role)?.let { stringResource(it) } ?: role, style = MaterialTheme.typography.bodySmall)
                     }
                 },
                 actions = {

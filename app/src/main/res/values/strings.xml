@@ -254,4 +254,8 @@
     <string name="result_failed_done">El pago quedó rechazado. Puedes cobrar de nuevo.</string>
     <string name="result_cancelled_done">El cobro se canceló.</string>
     <string name="result_unknown_done">El pago quedó sin confirmar. Un gerente debe resolverlo antes de cobrar de nuevo.</string>
+    <string name="role_admin">Administrador</string>
+    <string name="role_manager">Gerente</string>
+    <string name="role_waiter">Mesero</string>
+    <string name="role_kitchen">Cocina</string>
 </resources>
