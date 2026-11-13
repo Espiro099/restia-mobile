@@ -53,8 +53,8 @@ data class CustomerForm(
             name = name.trim().takeIf { it != o.name },
             phone = phone.trim().takeIf { it != o.phone },
             email = email.trim().takeIf { it.isNotEmpty() && it != o.email },
-            // El contrato no admite notas vacías: borrarlas del todo queda pendiente en el backend.
-            notes = notes.trim().takeIf { it.isNotEmpty() && it != (o.profile.notes ?: "") },
+            // Vacías se mandan como "": el backend lo toma como null y borra las notas.
+            notes = notes.trim().takeIf { it != (o.profile.notes ?: "") },
             preferences = prefs.takeIf { it != o.profile.preferences },
         )
     }

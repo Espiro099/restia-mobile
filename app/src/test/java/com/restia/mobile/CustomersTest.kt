@@ -65,8 +65,8 @@ class CustomersPureTest {
         assertFalse(form.canSubmit)
         assertEquals(CustomerUpdateRequest(notes = "Sin gluten"), form.copy(notes = "Sin gluten").changes())
         assertEquals(CustomerUpdateRequest(preferences = listOf("Terraza", "Ventana")), form.copy(preferences = "Terraza, Ventana").changes())
-        // Notas vacías no se mandan: el contrato no las admite.
-        assertEquals(CustomerUpdateRequest(), form.copy(notes = "  ").changes())
+        // Vaciar las notas las borra en el backend.
+        assertEquals(CustomerUpdateRequest(notes = ""), form.copy(notes = "  ").changes())
         assertFalse(form.copy(email = "no-es-correo").canSubmit)
     }
 }
