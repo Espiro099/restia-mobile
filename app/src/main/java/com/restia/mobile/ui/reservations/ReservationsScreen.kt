@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.LifecycleStartEffect
 import com.restia.mobile.R
 import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.ReservationDto
+import com.restia.mobile.ui.customers.CustomerSummary
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -63,6 +64,8 @@ import kotlinx.serialization.json.jsonPrimitive
 /** Lo que el rol puede hacer; el backend siempre lo valida (D-12). */
 data class ReservationPermissions(
     val create: Boolean,
+    val readCustomers: Boolean = false,
+    val createCustomers: Boolean = false,
     val confirm: Boolean,
     val arrive: Boolean,
     val seat: Boolean,
@@ -110,6 +113,7 @@ private fun ReservationCard(
     zone: ZoneId,
     position: Int?,
     viewModel: ReservationsViewModel,
+    onCustomer: (String) -> Unit,
 ) {
     val waiting = r.status == "ARRIVED_WAITING"
     val colors = if (waiting) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else CardDefaults.cardColors()
@@ -135,6 +139,8 @@ private fun ReservationCard(
                 if (can.confirm && canConfirm(r)) OutlinedButton(onClick = { viewModel.confirm(r) }, enabled = !busy) { Text(stringResource(R.string.reservation_confirm)) }
                 if (can.noShow && canMarkNoShow(r, Instant.now())) TextButton(onClick = { viewModel.markNoShow(r) }, enabled = !busy) { Text(stringResource(R.string.reservation_mark_no_show)) }
                 if (can.cancel && canCancel(r)) TextButton(onClick = { viewModel.startCancel(r) }, enabled = !busy) { Text(stringResource(R.string.reservation_cancel)) }
+                val customerId = r.customer.customerId
+                if (can.readCustomers && customerId != null) TextButton(onClick = { onCustomer(customerId) }) { Text(stringResource(R.string.reservation_view_customer)) }
             }
         }
     }
@@ -157,7 +163,7 @@ private fun Stepper(label: String, value: String, onMinus: () -> Unit, onPlus: (
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CreateDialog(c: CreateState, zone: ZoneId, viewModel: ReservationsViewModel) {
+private fun CreateDialog(c: CreateState, zone: ZoneId, canSearchCustomers: Boolean, canRegisterCustomers: Boolean, viewModel: ReservationsViewModel) {
     val enabled = !c.submitting
     val context = LocalContext.current
     AlertDialog(
@@ -183,6 +189,23 @@ private fun CreateDialog(c: CreateState, zone: ZoneId, viewModel: ReservationsVi
                     supportingText = { Text(stringResource(R.string.reservation_phone_hint)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth(),
                 )
+                if (canSearchCustomers) {
+                    when {
+                        c.lookingUp -> CircularProgressIndicator()
+                        c.customer != null -> Card { Column(Modifier.fillMaxWidth().padding(8.dp)) {
+                            Text(stringResource(R.string.reservation_customer_found), style = MaterialTheme.typography.labelMedium)
+                            CustomerSummary(c.customer)
+                        } }
+                        c.notACustomer -> Text(stringResource(R.string.reservation_not_a_customer), style = MaterialTheme.typography.bodySmall)
+                        else -> TextButton(onClick = viewModel::lookupCustomer, enabled = enabled && isValidPhone(c.phone)) { Text(stringResource(R.string.reservation_lookup_customer)) }
+                    }
+                    if (c.customer == null && canRegisterCustomers) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = c.registerCustomer, onCheckedChange = viewModel::setRegisterCustomer, enabled = enabled)
+                            Text(stringResource(R.string.reservation_register_customer))
+                        }
+                    }
+                }
                 OutlinedTextField(c.notes, viewModel::setNotes, label = { Text(stringResource(R.string.order_notes)) }, enabled = enabled, modifier = Modifier.fillMaxWidth())
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = c.confirmNow, onCheckedChange = viewModel::setConfirmNow, enabled = enabled)
@@ -275,6 +298,8 @@ fun ReservationsScreen(
     can: ReservationPermissions,
     onBack: () -> Unit,
     onSeated: (sessionId: String, tableNumber: Int) -> Unit,
+    onCustomers: () -> Unit = {},
+    onCustomer: (customerId: String) -> Unit = {},
     zone: ZoneId = ZoneId.systemDefault(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -295,7 +320,7 @@ fun ReservationsScreen(
             onSeated(it.sessionId, it.tableNumber)
         }
     }
-    state.creating?.let { CreateDialog(it, zone, viewModel) }
+    state.creating?.let { CreateDialog(it, zone, can.readCustomers, can.createCustomers, viewModel) }
     state.seating?.let { SeatDialog(it, state, can.overridePriority, viewModel) }
     state.cancelling?.let { CancelDialog(it, viewModel) }
     val today = LocalDate.now(zone)
@@ -304,7 +329,10 @@ fun ReservationsScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.reservations_title)) },
-                actions = { TextButton(onClick = onBack) { Text(stringResource(R.string.order_back)) } },
+                actions = {
+                    if (can.readCustomers) TextButton(onClick = onCustomers) { Text(stringResource(R.string.customers_title)) }
+                    TextButton(onClick = onBack) { Text(stringResource(R.string.order_back)) }
+                },
             )
         },
         bottomBar = {
@@ -343,7 +371,7 @@ fun ReservationsScreen(
                     if (state.queue.isNotEmpty()) {
                         item { Text(stringResource(R.string.reservation_queue, state.queue.size), style = MaterialTheme.typography.titleSmall) }
                         items(state.queue, key = { "fila-" + it.reservation.id }) { entry ->
-                            ReservationCard(entry.reservation, state, can, zone, entry.position, viewModel)
+                            ReservationCard(entry.reservation, state, can, zone, entry.position, viewModel, onCustomer)
                         }
                     }
                     val rest = state.reservations.filter { r -> state.queue.none { it.reservation.id == r.id } }
@@ -351,7 +379,7 @@ fun ReservationsScreen(
                     if (rest.isEmpty()) {
                         item { Text(stringResource(if (state.queue.isEmpty()) R.string.reservations_empty else R.string.reservations_only_waiting)) }
                     }
-                    items(rest, key = { it.id }) { r -> ReservationCard(r, state, can, zone, null, viewModel) }
+                    items(rest, key = { it.id }) { r -> ReservationCard(r, state, can, zone, null, viewModel, onCustomer) }
                 }
             }
         }

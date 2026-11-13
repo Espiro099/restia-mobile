@@ -10,6 +10,8 @@ import com.restia.mobile.Repositories
 import com.restia.mobile.ui.checks.CheckPermissions
 import com.restia.mobile.ui.checks.CheckScreen
 import com.restia.mobile.ui.checks.CheckViewModel
+import com.restia.mobile.ui.customers.CustomersScreen
+import com.restia.mobile.ui.customers.CustomersViewModel
 import com.restia.mobile.ui.kitchen.KitchenScreen
 import com.restia.mobile.ui.reservations.ReservationPermissions
 import com.restia.mobile.ui.reservations.ReservationsScreen
@@ -39,6 +41,22 @@ fun BranchHome(
     var capturing by rememberSaveable { mutableStateOf(false) }
     var viewingCheck by rememberSaveable { mutableStateOf(false) }
     var inReservations by rememberSaveable { mutableStateOf(false) }
+    var inCustomers by rememberSaveable { mutableStateOf(false) }
+    // Cliente abierto desde una reserva; null para la búsqueda.
+    var customerId by rememberSaveable { mutableStateOf<String?>(null) }
+    if (inCustomers && "customers.read" in permissions) {
+        CustomersScreen(
+            viewModel = viewModel(key = "clientes-$userId-$branchId-${customerId ?: "busqueda"}", factory = CustomersViewModel.Factory(repositories.customers, branchId)),
+            canCreate = "customers.create" in permissions,
+            canUpdate = "customers.update" in permissions,
+            openCustomerId = customerId,
+            onBack = {
+                inCustomers = false
+                customerId = null
+            },
+        )
+        return
+    }
     val canOrder = "orders.create" in permissions
     val canPrepare = "order_units.prepare" in permissions
     // Quien prepara pero no toma comandas (cocina) empieza en la cola; el resto, en las mesas.
@@ -65,10 +83,18 @@ fun BranchHome(
         ReservationsScreen(
             viewModel = viewModel(
                 key = "reservas-$userId-$branchId",
-                factory = ReservationsViewModel.Factory(repositories.reservations, repositories.tables, branchId),
+                factory = ReservationsViewModel.Factory(
+                    repositories.reservations,
+                    repositories.tables,
+                    branchId,
+                    repositories.customers,
+                    canRegisterCustomers = "customers.create" in permissions,
+                ),
             ),
             can = ReservationPermissions(
                 create = "reservations.create" in permissions,
+                readCustomers = "customers.read" in permissions,
+                createCustomers = "customers.create" in permissions,
                 confirm = "reservations.confirm" in permissions,
                 arrive = "reservations.arrive" in permissions,
                 seat = "reservations.check_in" in permissions,
@@ -77,6 +103,14 @@ fun BranchHome(
                 overridePriority = "reservations.override_priority" in permissions,
             ),
             onBack = { inReservations = false },
+            onCustomers = {
+                customerId = null
+                inCustomers = true
+            },
+            onCustomer = {
+                customerId = it
+                inCustomers = true
+            },
             // Al sentar, la mesa se abre: se pasa directo a su vista.
             onSeated = { session, number ->
                 inReservations = false

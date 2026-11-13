@@ -354,6 +354,49 @@ data class CheckInRequest(
 data class ReasonRequest(val reason: String)
 
 @Serializable
+data class CustomerProfileDto(
+    val notes: String? = null,
+    val preferences: List<String> = emptyList(),
+    val visitCount: Int = 0,
+    val lastVisitAt: String? = null,
+)
+
+/** Cliente de la sucursal (CU-1); cada sucursal solo ve los suyos (CU-2). */
+@Serializable
+data class CustomerDto(
+    val id: String,
+    val name: String,
+    val phone: String? = null,
+    val email: String? = null,
+    val anonymized: Boolean = false,
+    val profile: CustomerProfileDto = CustomerProfileDto(),
+    val version: Int,
+)
+
+@Serializable
+data class CustomerCreateRequest(
+    val name: String,
+    val phone: String,
+    val email: String? = null,
+    val notes: String? = null,
+    val preferences: List<String>? = null,
+)
+
+/** Solo los campos que cambian; con explicitNulls = false los null no se envían. */
+@Serializable
+data class CustomerUpdateRequest(
+    val name: String? = null,
+    val phone: String? = null,
+    val email: String? = null,
+    val notes: String? = null,
+    val preferences: List<String>? = null,
+)
+
+/** CU-3: por POST, para que el teléfono no viaje en la URL. */
+@Serializable
+data class CustomerSearchRequest(val phone: String? = null, val name: String? = null)
+
+@Serializable
 data class MeData(val user: UserDto, val memberships: List<MembershipDto>)
 
 /** D-37: el gerente escribe sus datos en este dispositivo. La contraseña nunca se guarda ni se registra. */

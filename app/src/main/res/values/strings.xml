@@ -306,4 +306,30 @@
     <string name="reservation_priority_override">Otra reserva llegó antes y cabe en estas mesas. Para sentar a esta primero, escribe el motivo.</string>
     <string name="reservation_priority_ask_manager">Otra reserva llegó antes y cabe en estas mesas. Elige otras o pide a un gerente que la pase primero.</string>
     <string name="reservation_cancel_title">Cancelar la reserva de %1$s</string>
+    <string name="customers_title">Clientes</string>
+    <string name="customer_search">Teléfono o nombre</string>
+    <string name="customer_search_hint">El teléfono con lada, por ejemplo +523312345678</string>
+    <string name="customer_search_action">Buscar</string>
+    <string name="customer_none">No se encontró ningún cliente.</string>
+    <string name="customer_new">Nuevo cliente</string>
+    <string name="customer_edit">Editar</string>
+    <string name="customer_save">Guardar</string>
+    <string name="customer_saved">Cliente guardado.</string>
+    <string name="customer_back_to_search">Buscar otro</string>
+    <string name="customer_email">Correo (opcional)</string>
+    <string name="customer_notes">Notas</string>
+    <string name="customer_notes_hint">Alergias o algo que el personal deba saber</string>
+    <string name="customer_preferences">Preferencias</string>
+    <string name="customer_preferences_hint">Separadas por coma, por ejemplo: Terraza, Sin picante</string>
+    <string name="customer_conflict">Alguien más cambió este cliente. Ábrelo de nuevo para ver lo actual.</string>
+    <plurals name="customer_visits">
+        <item quantity="one">%1$d visita</item>
+        <item quantity="other">%1$d visitas</item>
+    </plurals>
+    <string name="customer_last_visit">la última el %1$s</string>
+    <string name="reservation_lookup_customer">Buscar cliente por teléfono</string>
+    <string name="reservation_customer_found">Cliente registrado</string>
+    <string name="reservation_not_a_customer">Este teléfono todavía no es cliente.</string>
+    <string name="reservation_register_customer">Registrarlo como cliente</string>
+    <string name="reservation_view_customer">Ver cliente</string>
 </resources>
