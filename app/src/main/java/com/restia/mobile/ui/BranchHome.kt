@@ -11,6 +11,9 @@ import com.restia.mobile.ui.checks.CheckPermissions
 import com.restia.mobile.ui.checks.CheckScreen
 import com.restia.mobile.ui.checks.CheckViewModel
 import com.restia.mobile.ui.kitchen.KitchenScreen
+import com.restia.mobile.ui.reservations.ReservationPermissions
+import com.restia.mobile.ui.reservations.ReservationsScreen
+import com.restia.mobile.ui.reservations.ReservationsViewModel
 import com.restia.mobile.ui.kitchen.KitchenViewModel
 import com.restia.mobile.ui.orders.OrderScreen
 import com.restia.mobile.ui.orders.OrderViewModel
@@ -35,6 +38,7 @@ fun BranchHome(
     var tableNumber by rememberSaveable { mutableStateOf(0) }
     var capturing by rememberSaveable { mutableStateOf(false) }
     var viewingCheck by rememberSaveable { mutableStateOf(false) }
+    var inReservations by rememberSaveable { mutableStateOf(false) }
     val canOrder = "orders.create" in permissions
     val canPrepare = "order_units.prepare" in permissions
     // Quien prepara pero no toma comandas (cocina) empieza en la cola; el resto, en las mesas.
@@ -57,6 +61,33 @@ fun BranchHome(
         factory = TablesViewModel.Factory(repositories.tables, branchId, repositories.drafts, userId),
     )
     val current = sessionId
+    if (inReservations && current == null && "reservations.read" in permissions) {
+        ReservationsScreen(
+            viewModel = viewModel(
+                key = "reservas-$userId-$branchId",
+                factory = ReservationsViewModel.Factory(repositories.reservations, repositories.tables, branchId),
+            ),
+            can = ReservationPermissions(
+                create = "reservations.create" in permissions,
+                confirm = "reservations.confirm" in permissions,
+                arrive = "reservations.arrive" in permissions,
+                seat = "reservations.check_in" in permissions,
+                cancel = "reservations.cancel" in permissions,
+                noShow = "reservations.mark_no_show" in permissions,
+                overridePriority = "reservations.override_priority" in permissions,
+            ),
+            onBack = { inReservations = false },
+            // Al sentar, la mesa se abre: se pasa directo a su vista.
+            onSeated = { session, number ->
+                inReservations = false
+                sessionId = session
+                tableNumber = number
+                capturing = false
+                viewingCheck = false
+            },
+        )
+        return
+    }
     if (current == null) {
         TablesScreen(
             viewModel = tables,
@@ -82,6 +113,8 @@ fun BranchHome(
                 viewingCheck = false
             },
             onKitchen = { inKitchen = true },
+            showReservations = "reservations.read" in permissions,
+            onReservations = { inReservations = true },
         )
         return
     }

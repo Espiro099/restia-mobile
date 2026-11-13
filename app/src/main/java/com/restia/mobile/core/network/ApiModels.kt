@@ -299,6 +299,60 @@ data class PrintJobRequest(val type: String, val sourceId: String)
 @Serializable
 data class PrintJobDto(val id: String, val type: String, val status: String)
 
+/** Copia del cliente en la reserva (R-11). Sin teléfono una vez borrados los datos personales. */
+@Serializable
+data class ReservationCustomerDto(val customerId: String? = null, val name: String, val phone: String? = null)
+
+@Serializable
+data class ReservationDto(
+    val id: String,
+    val status: String,
+    val startAt: String,
+    val endAt: String,
+    val partySize: Int,
+    val customer: ReservationCustomerDto,
+    val notes: String? = null,
+    val confirmationCode: String,
+    val plannedTableIds: List<String> = emptyList(),
+    val planConflict: Boolean = false,
+    val arrivalRegisteredAt: String? = null,
+    val sessionId: String? = null,
+    val version: Int,
+)
+
+@Serializable
+data class TableOptionDto(val tableIds: List<String>, val totalCapacity: Int)
+
+@Serializable
+data class AvailabilityDto(
+    val available: Boolean,
+    val tableOptions: List<TableOptionDto> = emptyList(),
+    val alternativeStartTimes: List<String> = emptyList(),
+)
+
+@Serializable
+data class QueueEntryDto(val position: Int, val reservation: ReservationDto, val tableOptions: List<TableOptionDto> = emptyList())
+
+@Serializable
+data class ReservationCreateRequest(
+    val startAt: String,
+    val endAt: String,
+    val partySize: Int,
+    val customer: ReservationCustomerDto,
+    val notes: String? = null,
+)
+
+@Serializable
+data class CheckInRequest(
+    val tableIds: List<String>,
+    val guestCount: Int? = null,
+    val overridePriority: Boolean? = null,
+    val overrideReason: String? = null,
+)
+
+@Serializable
+data class ReasonRequest(val reason: String)
+
 @Serializable
 data class MeData(val user: UserDto, val memberships: List<MembershipDto>)
 

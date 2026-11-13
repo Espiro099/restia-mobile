@@ -1,5 +1,6 @@
 package com.restia.mobile.core.network
 
+import kotlinx.serialization.json.JsonObject
 import okhttp3.ResponseBody
 import retrofit2.Call
 import retrofit2.Response
@@ -164,6 +165,45 @@ interface SessionApi {
         @Header("Idempotency-Key") idempotencyKey: String,
         @Body body: PrintJobRequest,
     ): Envelope<PrintJobDto>
+
+    /** Reservas que se traslapan con el intervalo: terminan después de `from` y empiezan antes de `to`. */
+    @GET("branches/{branchId}/reservations")
+    suspend fun listReservations(
+        @Path("branchId") branchId: String,
+        @Query("from") from: String,
+        @Query("to") to: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<ReservationDto>
+
+    @GET("branches/{branchId}/reservations/waiting-queue")
+    suspend fun waitingQueue(@Path("branchId") branchId: String): Envelope<List<QueueEntryDto>>
+
+    @GET("branches/{branchId}/reservations/availability")
+    suspend fun reservationAvailability(
+        @Path("branchId") branchId: String,
+        @Query("startAt") startAt: String,
+        @Query("endAt") endAt: String,
+        @Query("partySize") partySize: Int,
+    ): Envelope<AvailabilityDto>
+
+    @POST("branches/{branchId}/reservations")
+    suspend fun createReservation(
+        @Path("branchId") branchId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: ReservationCreateRequest,
+    ): Envelope<ReservationDto>
+
+    /** confirm, arrive, check-in, cancel o no-show: todas con If-Match e Idempotency-Key (R-12). */
+    @POST("branches/{branchId}/reservations/{reservationId}/{action}")
+    suspend fun reservationAction(
+        @Path("branchId") branchId: String,
+        @Path("reservationId") reservationId: String,
+        @Path("action") action: String,
+        @Header("If-Match") ifMatch: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: JsonObject,
+    ): Envelope<ReservationDto>
 
     @GET("branches/{branchId}/table-sessions/{sessionId}")
     suspend fun getTableSession(
