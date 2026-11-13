@@ -7,6 +7,10 @@ import com.restia.mobile.core.network.CashRegisterDto
 import com.restia.mobile.core.network.CashShiftDto
 import com.restia.mobile.core.network.CheckDto
 import com.restia.mobile.core.network.AvailabilityDto
+import com.restia.mobile.core.network.CustomerCreateRequest
+import com.restia.mobile.core.network.CustomerDto
+import com.restia.mobile.core.network.CustomerSearchRequest
+import com.restia.mobile.core.network.CustomerUpdateRequest
 import com.restia.mobile.core.network.Envelope
 import com.restia.mobile.core.network.QueueEntryDto
 import com.restia.mobile.core.network.ReservationCreateRequest
@@ -78,6 +82,12 @@ open class UnusedSessionApi : SessionApi {
         idempotencyKey: String,
         body: JsonObject,
     ): Envelope<ReservationDto> = error("sin uso")
+    override suspend fun searchCustomers(branchId: String, page: Int, perPage: Int, body: CustomerSearchRequest): PagedEnvelope<CustomerDto> =
+        error("sin uso")
+    override suspend fun createCustomer(branchId: String, idempotencyKey: String, body: CustomerCreateRequest): Envelope<CustomerDto> = error("sin uso")
+    override suspend fun getCustomer(branchId: String, customerId: String): Envelope<CustomerDto> = error("sin uso")
+    override suspend fun updateCustomer(branchId: String, customerId: String, ifMatch: String, body: CustomerUpdateRequest): Envelope<CustomerDto> =
+        error("sin uso")
     override suspend fun getTableSession(branchId: String, sessionId: String): Envelope<TableSessionDto> = error("sin uso")
     override suspend fun closeTableSession(branchId: String, sessionId: String, ifMatch: String): Envelope<TableSessionDto> = error("sin uso")
     override suspend fun confirmCleaning(branchId: String, sessionId: String, tableId: String, body: CleaningConfirmationRequest): Envelope<TableSessionDto> =

@@ -19,6 +19,7 @@ import com.restia.mobile.data.auth.AuthStateHolder
 import com.restia.mobile.data.auth.TokenRefresher
 import com.restia.mobile.data.checks.CheckRepository
 import com.restia.mobile.data.kitchen.KitchenRepository
+import com.restia.mobile.data.customers.CustomersRepository
 import com.restia.mobile.data.orders.DraftRepository
 import com.restia.mobile.data.reservations.ReservationsRepository
 import com.restia.mobile.data.orders.MenuRepository
@@ -41,6 +42,7 @@ class Repositories(
     val kitchen: KitchenRepository,
     val checks: CheckRepository,
     val reservations: ReservationsRepository,
+    val customers: CustomersRepository,
 )
 
 fun buildRepositories(baseUrl: String, store: CredentialStore, blobs: BlobStore): Repositories {
@@ -73,6 +75,7 @@ fun buildRepositories(baseUrl: String, store: CredentialStore, blobs: BlobStore)
         KitchenRepository(sessionApi),
         CheckRepository(sessionApi),
         ReservationsRepository(sessionApi),
+        CustomersRepository(sessionApi),
     )
 }
 

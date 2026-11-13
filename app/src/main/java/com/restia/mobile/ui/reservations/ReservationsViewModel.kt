@@ -9,12 +9,15 @@ import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.ApiResult
 import com.restia.mobile.core.network.AvailabilityDto
 import com.restia.mobile.core.network.CheckInRequest
+import com.restia.mobile.core.network.CustomerCreateRequest
+import com.restia.mobile.core.network.CustomerDto
 import com.restia.mobile.core.network.QueueEntryDto
 import com.restia.mobile.core.network.ReservationCreateRequest
 import com.restia.mobile.core.network.ReservationCustomerDto
 import com.restia.mobile.core.network.ReservationDto
 import com.restia.mobile.core.network.TableDto
 import com.restia.mobile.core.network.TableOptionDto
+import com.restia.mobile.data.customers.CustomersRepository
 import com.restia.mobile.data.reservations.ReservationsRepository
 import com.restia.mobile.data.tables.TablesRepository
 import java.time.Instant
@@ -77,8 +80,15 @@ data class CreateState(
     val checking: Boolean = false,
     val submitting: Boolean = false,
     val failure: ApiFailure? = null,
+    /** Cliente registrado con este teléfono: la reserva se liga a él (R-11). */
+    val customer: CustomerDto? = null,
+    val lookingUp: Boolean = false,
+    /** Ya se buscó este teléfono y no es cliente. */
+    val notACustomer: Boolean = false,
+    /** Registrar como cliente al reservar, si todavía no lo es. */
+    val registerCustomer: Boolean = true,
 ) {
-    val canSubmit: Boolean get() = !submitting && name.isNotBlank() && isValidPhone(phone)
+    val canSubmit: Boolean get() = !submitting && !lookingUp && name.isNotBlank() && isValidPhone(phone)
 }
 
 data class SeatState(
@@ -134,8 +144,15 @@ class ReservationsViewModel(
     private val now: () -> Instant = { Instant.now() },
     private val pollMillis: Long = POLL_MILLIS,
     private val newKey: () -> String = { UUID.randomUUID().toString() },
+    private val customers: CustomersRepository? = null,
+    /** `customers.create`: puede registrar al cliente al reservar. */
+    private val canRegisterCustomers: Boolean = false,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ReservationsUiState(day = now().atZone(zone).toLocalDate()))
+
+    // Mismo alta de cliente, misma clave: reintentar la reserva no duplica al cliente.
+    private var customerIntent: CustomerCreateRequest? = null
+    private var customerKey = ""
     val state: StateFlow<ReservationsUiState> = _state
 
     private var polling: Job? = null
@@ -231,7 +248,28 @@ class ReservationsViewModel(
     fun shiftDuration(minutes: Int) = editCreate { it.copy(durationMinutes = (it.durationMinutes + minutes).coerceIn(30, 360)) }
     fun setParty(size: Int) = editCreate { it.copy(partySize = size.coerceIn(1, 200)) }
     fun setName(name: String) = editCreate { it.copy(name = name.take(120)) }
-    fun setPhone(phone: String) = editCreate { it.copy(phone = phone.filter { c -> c.isDigit() || c == '+' }.take(16)) }
+    // Otro teléfono ya no es el cliente que se había encontrado.
+    fun setPhone(phone: String) = editCreate { it.copy(phone = phone.filter { c -> c.isDigit() || c == '+' }.take(16), customer = null, notACustomer = false) }
+    fun setRegisterCustomer(value: Boolean) = editCreate { it.copy(registerCustomer = value) }
+
+    /** Busca el teléfono entre los clientes de la sucursal; si lo es, toma su nombre y muestra sus notas. */
+    fun lookupCustomer() {
+        val repo = customers ?: return
+        val current = _state.value.creating ?: return
+        if (!isValidPhone(current.phone) || current.lookingUp || current.submitting) return
+        _state.value = _state.value.copy(creating = current.copy(lookingUp = true, failure = null))
+        viewModelScope.launch {
+            val r = repo.byPhone(branchId, current.phone.trim())
+            val now = _state.value.creating ?: return@launch
+            _state.value = _state.value.copy(
+                creating = when (r) {
+                    is ApiResult.Success -> r.value?.let { now.copy(lookingUp = false, customer = it, name = it.name, notACustomer = false) }
+                        ?: now.copy(lookingUp = false, customer = null, notACustomer = true)
+                    is ApiResult.Failure -> now.copy(lookingUp = false, failure = r.failure)
+                },
+            )
+        }
+    }
     fun setNotes(notes: String) = editCreate { it.copy(notes = notes.take(500)) }
     fun setConfirmNow(value: Boolean) = editCreate { it.copy(confirmNow = value) }
 
@@ -259,20 +297,58 @@ class ReservationsViewModel(
         }
     }
 
+    /**
+     * Cliente al que se liga la reserva: el encontrado, o uno nuevo si se pidió registrarlo. Antes de
+     * crearlo se busca el teléfono, para no duplicar a quien ya es cliente.
+     */
+    private suspend fun resolveCustomer(c: CreateState): ApiResult<CustomerDto?> {
+        val repo = customers
+        if (c.customer != null) return ApiResult.Success(c.customer)
+        if (repo == null || !c.registerCustomer || !canRegisterCustomers) return ApiResult.Success(null)
+        if (!c.notACustomer) {
+            when (val found = repo.byPhone(branchId, c.phone.trim())) {
+                is ApiResult.Failure -> return found
+                is ApiResult.Success -> found.value?.let { return ApiResult.Success(it) }
+            }
+        }
+        val body = CustomerCreateRequest(name = c.name.trim(), phone = c.phone.trim())
+        if (customerIntent != body) {
+            customerIntent = body
+            customerKey = newKey()
+        }
+        return when (val created = repo.create(branchId, customerKey, body)) {
+            is ApiResult.Success -> {
+                customerIntent = null
+                ApiResult.Success(created.value)
+            }
+            is ApiResult.Failure -> created
+        }
+    }
+
     fun confirmCreate() {
         val current = _state.value.creating ?: return
         if (!current.canSubmit) return
         val (start, end) = interval(current)
-        val body = ReservationCreateRequest(
-            startAt = start,
-            endAt = end,
-            partySize = current.partySize,
-            customer = ReservationCustomerDto(name = current.name.trim(), phone = current.phone.trim()),
-            notes = current.notes.trim().ifEmpty { null },
-        )
-        val key = keyFor(body)
         _state.value = _state.value.copy(creating = current.copy(submitting = true, failure = null))
         viewModelScope.launch {
+            val customer = when (val r = resolveCustomer(current)) {
+                is ApiResult.Success -> r.value
+                is ApiResult.Failure -> {
+                    _state.value = _state.value.copy(creating = _state.value.creating?.copy(submitting = false, failure = r.failure))
+                    return@launch
+                }
+            }
+            if (customer != null) {
+                _state.value = _state.value.copy(creating = _state.value.creating?.copy(customer = customer))
+            }
+            val body = ReservationCreateRequest(
+                startAt = start,
+                endAt = end,
+                partySize = current.partySize,
+                customer = ReservationCustomerDto(customerId = customer?.id, name = current.name.trim(), phone = current.phone.trim()),
+                notes = current.notes.trim().ifEmpty { null },
+            )
+            val key = keyFor(body)
             when (val created = repository.create(branchId, key, body)) {
                 is ApiResult.Failure -> {
                     if (!isRetryable(created.failure)) intent = null
@@ -433,9 +509,12 @@ class ReservationsViewModel(
         private val repository: ReservationsRepository,
         private val tablesRepository: TablesRepository,
         private val branchId: String,
+        private val customers: CustomersRepository,
+        private val canRegisterCustomers: Boolean,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = ReservationsViewModel(repository, tablesRepository, branchId) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T =
+            ReservationsViewModel(repository, tablesRepository, branchId, customers = customers, canRegisterCustomers = canRegisterCustomers) as T
     }
 
     private companion object {

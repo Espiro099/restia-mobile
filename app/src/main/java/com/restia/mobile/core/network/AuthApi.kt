@@ -7,6 +7,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -204,6 +205,32 @@ interface SessionApi {
         @Header("Idempotency-Key") idempotencyKey: String,
         @Body body: JsonObject,
     ): Envelope<ReservationDto>
+
+    @POST("branches/{branchId}/customers/search")
+    suspend fun searchCustomers(
+        @Path("branchId") branchId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+        @Body body: CustomerSearchRequest,
+    ): PagedEnvelope<CustomerDto>
+
+    @POST("branches/{branchId}/customers")
+    suspend fun createCustomer(
+        @Path("branchId") branchId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: CustomerCreateRequest,
+    ): Envelope<CustomerDto>
+
+    @GET("branches/{branchId}/customers/{customerId}")
+    suspend fun getCustomer(@Path("branchId") branchId: String, @Path("customerId") customerId: String): Envelope<CustomerDto>
+
+    @PATCH("branches/{branchId}/customers/{customerId}")
+    suspend fun updateCustomer(
+        @Path("branchId") branchId: String,
+        @Path("customerId") customerId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: CustomerUpdateRequest,
+    ): Envelope<CustomerDto>
 
     @GET("branches/{branchId}/table-sessions/{sessionId}")
     suspend fun getTableSession(
