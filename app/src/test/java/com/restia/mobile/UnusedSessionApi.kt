@@ -3,7 +3,15 @@ package com.restia.mobile
 import com.restia.mobile.core.network.ApprovalData
 import com.restia.mobile.core.network.ApprovalRequest
 import com.restia.mobile.core.network.CleaningConfirmationRequest
+import com.restia.mobile.core.network.CashRegisterDto
+import com.restia.mobile.core.network.CashShiftDto
+import com.restia.mobile.core.network.CheckDto
 import com.restia.mobile.core.network.Envelope
+import com.restia.mobile.core.network.PaymentCreateRequest
+import com.restia.mobile.core.network.PaymentDto
+import com.restia.mobile.core.network.PaymentResultRequest
+import com.restia.mobile.core.network.PrintJobDto
+import com.restia.mobile.core.network.PrintJobRequest
 import com.restia.mobile.core.network.KitchenUnitDto
 import com.restia.mobile.core.network.StationDto
 import com.restia.mobile.core.network.MeData
@@ -36,6 +44,20 @@ open class UnusedSessionApi : SessionApi {
     override suspend fun listStations(branchId: String, page: Int, perPage: Int): PagedEnvelope<StationDto> = error("sin uso")
     override suspend fun listQueue(branchId: String, stationId: String?, page: Int, perPage: Int, etag: String?): Response<PagedEnvelope<KitchenUnitDto>> =
         error("sin uso")
+    override suspend fun listChecks(branchId: String, sessionId: String, page: Int, perPage: Int): PagedEnvelope<CheckDto> = error("sin uso")
+    override suspend fun requestCheck(branchId: String, checkId: String, ifMatch: String): Envelope<CheckDto> = error("sin uso")
+    override suspend fun listCashShifts(branchId: String, status: String, page: Int, perPage: Int): PagedEnvelope<CashShiftDto> = error("sin uso")
+    override suspend fun listCashRegisters(branchId: String, page: Int, perPage: Int): PagedEnvelope<CashRegisterDto> = error("sin uso")
+    override suspend fun listPayments(branchId: String, checkId: String, page: Int, perPage: Int): PagedEnvelope<PaymentDto> = error("sin uso")
+    override suspend fun createPayment(branchId: String, idempotencyKey: String, body: PaymentCreateRequest): Envelope<PaymentDto> = error("sin uso")
+    override suspend fun recordPaymentResult(
+        branchId: String,
+        paymentId: String,
+        ifMatch: String,
+        idempotencyKey: String,
+        body: PaymentResultRequest,
+    ): Envelope<PaymentDto> = error("sin uso")
+    override suspend fun createPrintJob(branchId: String, idempotencyKey: String, body: PrintJobRequest): Envelope<PrintJobDto> = error("sin uso")
     override suspend fun getTableSession(branchId: String, sessionId: String): Envelope<TableSessionDto> = error("sin uso")
     override suspend fun closeTableSession(branchId: String, sessionId: String, ifMatch: String): Envelope<TableSessionDto> = error("sin uso")
     override suspend fun confirmCleaning(branchId: String, sessionId: String, tableId: String, body: CleaningConfirmationRequest): Envelope<TableSessionDto> =

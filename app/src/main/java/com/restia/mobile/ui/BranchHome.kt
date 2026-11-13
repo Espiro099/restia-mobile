@@ -7,6 +7,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.restia.mobile.Repositories
+import com.restia.mobile.ui.checks.CheckPermissions
+import com.restia.mobile.ui.checks.CheckScreen
+import com.restia.mobile.ui.checks.CheckViewModel
 import com.restia.mobile.ui.kitchen.KitchenScreen
 import com.restia.mobile.ui.kitchen.KitchenViewModel
 import com.restia.mobile.ui.orders.OrderScreen
@@ -31,6 +34,7 @@ fun BranchHome(
     var sessionId by rememberSaveable { mutableStateOf<String?>(null) }
     var tableNumber by rememberSaveable { mutableStateOf(0) }
     var capturing by rememberSaveable { mutableStateOf(false) }
+    var viewingCheck by rememberSaveable { mutableStateOf(false) }
     val canOrder = "orders.create" in permissions
     val canPrepare = "order_units.prepare" in permissions
     // Quien prepara pero no toma comandas (cocina) empieza en la cola; el resto, en las mesas.
@@ -69,11 +73,13 @@ fun BranchHome(
                 sessionId = session
                 tableNumber = number
                 capturing = false
+                viewingCheck = false
             },
             onOrder = { session, number ->
                 sessionId = session
                 tableNumber = number
                 capturing = canOrder
+                viewingCheck = false
             },
             onKitchen = { inKitchen = true },
         )
@@ -89,6 +95,21 @@ fun BranchHome(
             sessions = repositories.tables,
         ),
     )
+    if (viewingCheck) {
+        CheckScreen(
+            viewModel = viewModel(key = "cuenta-$userId-$current", factory = CheckViewModel.Factory(repositories.checks, branchId, current)),
+            tableNumber = tableNumber,
+            can = CheckPermissions(
+                request = "checks.request" in permissions,
+                // Cobrar exige elegir un turno abierto: sin poder verlos, no hay dónde registrar el pago.
+                pay = "payments.create" in permissions && ("cash.read_open" in permissions || "cash.read" in permissions),
+                record = "payments.record_result" in permissions,
+                print = "printing.request" in permissions,
+            ),
+            onBack = { viewingCheck = false },
+        )
+        return
+    }
     if (capturing) {
         OrderScreen(
             // La comanda en captura sobrevive a ir y volver de la lista de mesas.
@@ -122,8 +143,10 @@ fun BranchHome(
             // Sin el permiso directo, igual puede anular con la autorización de un gerente (D-37).
             canVoid = "order_units.void" in permissions || "order_units.cancel" in permissions,
             canClose = "table_sessions.close" in permissions,
+            canViewCheck = "checks.read" in permissions,
             onBack = { sessionId = null },
             onAddOrder = { capturing = true },
+            onCheck = { viewingCheck = true },
         )
     }
 }

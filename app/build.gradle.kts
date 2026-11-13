@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -22,8 +24,9 @@ android {
 
     buildTypes {
         debug {
-            // Servidor simulado, por adb reverse. 10.0.2.2 requeriría ACCESS_LOCAL_NETWORK en Android 17.
-            buildConfigField("String", "API_BASE_URL", "\"http://127.0.0.1:4010/\"")
+            // restia-api local por adb reverse. 10.0.2.2 requeriría ACCESS_LOCAL_NETWORK en Android 17.
+            // Para el servidor simulado: restia.apiBaseUrl=http://127.0.0.1:4010/ en local.properties.
+            buildConfigField("String", "API_BASE_URL", "\"${localProperty("restia.apiBaseUrl") ?: "http://127.0.0.1:8000/api/v1/"}\"")
         }
         release {
             buildConfigField("String", "API_BASE_URL", "\"https://api.restia.com/api/v1/\"")
@@ -61,4 +64,10 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
+}
+
+fun localProperty(name: String): String? {
+    val file = rootProject.file("local.properties")
+    if (!file.exists()) return null
+    return Properties().apply { file.inputStream().use { load(it) } }.getProperty(name)?.takeIf { it.isNotBlank() }
 }

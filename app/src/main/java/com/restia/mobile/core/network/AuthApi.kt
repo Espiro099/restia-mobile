@@ -102,6 +102,69 @@ interface SessionApi {
         @Body body: TableSessionOpenRequest,
     ): Envelope<TableSessionDto>
 
+    @GET("branches/{branchId}/checks")
+    suspend fun listChecks(
+        @Path("branchId") branchId: String,
+        @Query("sessionId") sessionId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<CheckDto>
+
+    /** Marca la cuenta como solicitada; la mesa pasa a CUENTA_SOLICITADA. */
+    @POST("branches/{branchId}/checks/{checkId}/request")
+    suspend fun requestCheck(
+        @Path("branchId") branchId: String,
+        @Path("checkId") checkId: String,
+        @Header("If-Match") ifMatch: String,
+    ): Envelope<CheckDto>
+
+    /** Con solo cash.read_open, el backend devuelve los turnos abiertos sin montos. */
+    @GET("branches/{branchId}/cash-shifts")
+    suspend fun listCashShifts(
+        @Path("branchId") branchId: String,
+        @Query("status") status: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<CashShiftDto>
+
+    @GET("branches/{branchId}/cash-registers")
+    suspend fun listCashRegisters(
+        @Path("branchId") branchId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<CashRegisterDto>
+
+    @GET("branches/{branchId}/payments")
+    suspend fun listPayments(
+        @Path("branchId") branchId: String,
+        @Query("checkId") checkId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<PaymentDto>
+
+    @POST("branches/{branchId}/payments")
+    suspend fun createPayment(
+        @Path("branchId") branchId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: PaymentCreateRequest,
+    ): Envelope<PaymentDto>
+
+    @POST("branches/{branchId}/payments/{paymentId}/result")
+    suspend fun recordPaymentResult(
+        @Path("branchId") branchId: String,
+        @Path("paymentId") paymentId: String,
+        @Header("If-Match") ifMatch: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: PaymentResultRequest,
+    ): Envelope<PaymentDto>
+
+    @POST("branches/{branchId}/print-jobs")
+    suspend fun createPrintJob(
+        @Path("branchId") branchId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: PrintJobRequest,
+    ): Envelope<PrintJobDto>
+
     @GET("branches/{branchId}/table-sessions/{sessionId}")
     suspend fun getTableSession(
         @Path("branchId") branchId: String,
