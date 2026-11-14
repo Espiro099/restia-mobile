@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleStartEffect
 import com.restia.mobile.R
+import com.restia.mobile.ui.account.AccountMenu
 import com.restia.mobile.core.network.ApiFailure
 import java.time.Duration
 import java.time.OffsetDateTime
@@ -124,6 +125,9 @@ fun KitchenScreen(
     logoutEnabled: Boolean,
     onTables: () -> Unit,
     onLogout: () -> Unit,
+    showStaff: Boolean,
+    onStaff: () -> Unit,
+    onChangePassword: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     LifecycleStartEffect(viewModel) {
@@ -142,7 +146,7 @@ fun KitchenScreen(
                 },
                 actions = {
                     if (showTables) TextButton(onClick = onTables) { Text(stringResource(R.string.order_back)) }
-                    TextButton(onClick = onLogout, enabled = logoutEnabled) { Text(stringResource(R.string.action_logout)) }
+                    AccountMenu(showStaff, logoutEnabled, onStaff, onChangePassword, onLogout)
                 },
             )
         },

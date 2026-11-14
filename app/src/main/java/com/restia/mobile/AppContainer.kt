@@ -14,12 +14,14 @@ import com.restia.mobile.core.security.EncryptedFileStore
 import com.restia.mobile.core.security.KeystoreCredentialStore
 import com.restia.mobile.core.storage.BlobStore
 import com.restia.mobile.core.storage.ContactTracker
+import com.restia.mobile.data.account.PasswordRepository
 import com.restia.mobile.data.auth.AuthRepository
 import com.restia.mobile.data.auth.AuthStateHolder
 import com.restia.mobile.data.auth.TokenRefresher
 import com.restia.mobile.data.checks.CheckRepository
 import com.restia.mobile.data.kitchen.KitchenRepository
 import com.restia.mobile.data.customers.CustomersRepository
+import com.restia.mobile.data.members.MembersRepository
 import com.restia.mobile.data.orders.DraftRepository
 import com.restia.mobile.data.reservations.ReservationsRepository
 import com.restia.mobile.data.orders.MenuRepository
@@ -43,6 +45,8 @@ class Repositories(
     val checks: CheckRepository,
     val reservations: ReservationsRepository,
     val customers: CustomersRepository,
+    val members: MembersRepository,
+    val passwords: PasswordRepository,
 )
 
 fun buildRepositories(baseUrl: String, store: CredentialStore, blobs: BlobStore): Repositories {
@@ -76,6 +80,8 @@ fun buildRepositories(baseUrl: String, store: CredentialStore, blobs: BlobStore)
         CheckRepository(sessionApi),
         ReservationsRepository(sessionApi),
         CustomersRepository(sessionApi),
+        MembersRepository(sessionApi),
+        PasswordRepository(publicApi, sessionApi),
     )
 }
 

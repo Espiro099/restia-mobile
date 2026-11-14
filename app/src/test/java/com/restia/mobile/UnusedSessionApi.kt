@@ -12,6 +12,13 @@ import com.restia.mobile.core.network.CustomerDto
 import com.restia.mobile.core.network.CustomerSearchRequest
 import com.restia.mobile.core.network.CustomerUpdateRequest
 import com.restia.mobile.core.network.Envelope
+import com.restia.mobile.core.network.MemberCreateRequest
+import com.restia.mobile.core.network.MemberCreatedDto
+import com.restia.mobile.core.network.MemberDto
+import com.restia.mobile.core.network.MemberRoleRequest
+import com.restia.mobile.core.network.PasswordChangeRequest
+import com.restia.mobile.core.network.PasswordSetupLinkDto
+import com.restia.mobile.core.network.ReasonRequest
 import com.restia.mobile.core.network.QueueEntryDto
 import com.restia.mobile.core.network.ReservationCreateRequest
 import com.restia.mobile.core.network.ReservationDto
@@ -92,4 +99,11 @@ open class UnusedSessionApi : SessionApi {
     override suspend fun closeTableSession(branchId: String, sessionId: String, ifMatch: String): Envelope<TableSessionDto> = error("sin uso")
     override suspend fun confirmCleaning(branchId: String, sessionId: String, tableId: String, body: CleaningConfirmationRequest): Envelope<TableSessionDto> =
         error("sin uso")
+    override suspend fun changePassword(body: PasswordChangeRequest): Response<Unit> = error("sin uso")
+    override suspend fun listMembers(branchId: String, page: Int, perPage: Int): PagedEnvelope<MemberDto> = error("sin uso")
+    override suspend fun createMember(branchId: String, body: MemberCreateRequest): Envelope<MemberCreatedDto> = error("sin uso")
+    override suspend fun changeMemberRole(branchId: String, userId: String, ifMatch: String, body: MemberRoleRequest): Envelope<MemberDto> =
+        error("sin uso")
+    override suspend fun revokeMember(branchId: String, userId: String, ifMatch: String, body: ReasonRequest): Envelope<MemberDto> = error("sin uso")
+    override suspend fun passwordSetupLink(userId: String): Envelope<PasswordSetupLinkDto> = error("sin uso")
 }

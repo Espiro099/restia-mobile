@@ -413,3 +413,33 @@ data class ApprovalRequest(
 
 @Serializable
 data class ApprovalData(val approvalToken: String, val expiresIn: Int)
+
+/** Usuario global; INVITED mientras no define su contraseña (U-2). */
+@Serializable
+data class MemberUserDto(val id: String, val email: String, val name: String, val status: String, val version: Int)
+
+/** Empleado de una sucursal: usuario más su membresía (U-1, U-4). */
+@Serializable
+data class MemberDto(val user: MemberUserDto, val branchId: String, val role: String, val active: Boolean, val version: Int)
+
+@Serializable
+data class MemberCreateRequest(val email: String, val name: String, val role: String)
+
+/** El enlace solo llega si esta alta creó al usuario, y se muestra una sola vez. */
+@Serializable
+data class MemberCreatedDto(val member: MemberDto, val setupUrl: String? = null, val setupExpiresAt: String? = null)
+
+@Serializable
+data class MemberRoleRequest(val role: String)
+
+@Serializable
+data class PasswordSetupLinkDto(val setupUrl: String, val expiresAt: String)
+
+@Serializable
+data class PasswordForgotRequest(val email: String)
+
+/** Las contraseñas nunca se registran. */
+@Serializable
+data class PasswordChangeRequest(val currentPassword: String, val newPassword: String) {
+    override fun toString(): String = "PasswordChangeRequest(***)"
+}

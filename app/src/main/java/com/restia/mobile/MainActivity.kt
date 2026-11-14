@@ -9,6 +9,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.restia.mobile.data.auth.AuthState
 import com.restia.mobile.ui.BranchHome
+import com.restia.mobile.ui.account.ForgotPasswordDialog
+import com.restia.mobile.ui.account.ForgotPasswordViewModel
 import com.restia.mobile.ui.auth.AuthViewModel
 import com.restia.mobile.ui.auth.EnrollScreen
 import com.restia.mobile.ui.auth.LoadingScreen
@@ -23,6 +25,10 @@ class MainActivity : ComponentActivity() {
         AuthViewModel.Factory(repositories.auth)
     }
 
+    private val forgot: ForgotPasswordViewModel by viewModels {
+        ForgotPasswordViewModel.Factory(repositories.passwords)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -35,7 +41,11 @@ class MainActivity : ComponentActivity() {
                     AuthState.Loading -> LoadingScreen()
                     AuthState.Offline -> OfflineScreen(viewModel::start)
                     AuthState.NeedsEnrollment -> EnrollScreen(form, notice, viewModel::enroll)
-                    AuthState.NeedsLogin -> LoginScreen(form, notice, viewModel::login)
+                    AuthState.NeedsLogin -> {
+                        LoginScreen(form, notice, viewModel::login, forgot::open)
+                        val forgotState by forgot.state.collectAsState()
+                        if (forgotState.open) ForgotPasswordDialog(forgotState, forgot::setEmail, forgot::submit, forgot::dismiss)
+                    }
                     is AuthState.Authenticated -> {
                         val membership = current.me.memberships.firstOrNull { it.branch.id == current.branchId }
                         BranchHome(
