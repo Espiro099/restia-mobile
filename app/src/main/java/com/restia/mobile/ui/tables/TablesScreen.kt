@@ -38,6 +38,7 @@ import androidx.lifecycle.compose.LifecycleStartEffect
 import com.restia.mobile.R
 import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.TableDto
+import com.restia.mobile.ui.account.AccountMenu
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -179,6 +180,9 @@ fun TablesScreen(
     showReservations: Boolean,
     logoutEnabled: Boolean,
     onLogout: () -> Unit,
+    showStaff: Boolean,
+    onStaff: () -> Unit,
+    onChangePassword: () -> Unit,
     onViewTable: (sessionId: String, tableNumber: Int) -> Unit,
     onOrder: (sessionId: String, tableNumber: Int) -> Unit,
     onKitchen: () -> Unit,
@@ -216,7 +220,7 @@ fun TablesScreen(
                 actions = {
                     if (showReservations) TextButton(onClick = onReservations) { Text(stringResource(R.string.reservations_title)) }
                     if (showKitchen) TextButton(onClick = onKitchen) { Text(stringResource(R.string.kitchen_title)) }
-                    TextButton(onClick = onLogout, enabled = logoutEnabled) { Text(stringResource(R.string.action_logout)) }
+                    AccountMenu(showStaff, logoutEnabled, onStaff, onChangePassword, onLogout)
                 },
             )
         },

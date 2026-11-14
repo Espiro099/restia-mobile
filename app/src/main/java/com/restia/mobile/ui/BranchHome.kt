@@ -7,12 +7,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.restia.mobile.Repositories
+import com.restia.mobile.ui.account.ChangePasswordScreen
+import com.restia.mobile.ui.account.ChangePasswordViewModel
 import com.restia.mobile.ui.checks.CheckPermissions
 import com.restia.mobile.ui.checks.CheckScreen
 import com.restia.mobile.ui.checks.CheckViewModel
 import com.restia.mobile.ui.customers.CustomersScreen
 import com.restia.mobile.ui.customers.CustomersViewModel
 import com.restia.mobile.ui.kitchen.KitchenScreen
+import com.restia.mobile.ui.members.MembersScreen
+import com.restia.mobile.ui.members.MembersViewModel
 import com.restia.mobile.ui.reservations.ReservationPermissions
 import com.restia.mobile.ui.reservations.ReservationsScreen
 import com.restia.mobile.ui.reservations.ReservationsViewModel
@@ -44,6 +48,29 @@ fun BranchHome(
     var inCustomers by rememberSaveable { mutableStateOf(false) }
     // Cliente abierto desde una reserva; null para la búsqueda.
     var customerId by rememberSaveable { mutableStateOf<String?>(null) }
+    var inStaff by rememberSaveable { mutableStateOf(false) }
+    var changingPassword by rememberSaveable { mutableStateOf(false) }
+    val showStaff = "members.read" in permissions
+    if (changingPassword) {
+        val passwords: ChangePasswordViewModel = viewModel(key = "contrasena-$userId", factory = ChangePasswordViewModel.Factory(repositories.passwords))
+        ChangePasswordScreen(
+            viewModel = passwords,
+            onBack = {
+                // Al salir se borra lo escrito: la siguiente visita empieza en blanco.
+                passwords.reset()
+                changingPassword = false
+            },
+        )
+        return
+    }
+    if (inStaff && showStaff) {
+        MembersScreen(
+            viewModel = viewModel(key = "personal-$userId-$branchId", factory = MembersViewModel.Factory(repositories.members, branchId, userId, role)),
+            canResendLink = "users.manage" in permissions,
+            onBack = { inStaff = false },
+        )
+        return
+    }
     if (inCustomers && "customers.read" in permissions) {
         CustomersScreen(
             viewModel = viewModel(key = "clientes-$userId-$branchId-${customerId ?: "busqueda"}", factory = CustomersViewModel.Factory(repositories.customers, branchId)),
@@ -70,6 +97,9 @@ fun BranchHome(
             logoutEnabled = logoutEnabled,
             onTables = { inKitchen = false },
             onLogout = onLogout,
+            showStaff = showStaff,
+            onStaff = { inStaff = true },
+            onChangePassword = { changingPassword = true },
         )
         return
     }
@@ -134,6 +164,9 @@ fun BranchHome(
             showKitchen = "orders.read" in permissions && (canPrepare || "order_units.deliver" in permissions),
             logoutEnabled = logoutEnabled,
             onLogout = onLogout,
+            showStaff = showStaff,
+            onStaff = { inStaff = true },
+            onChangePassword = { changingPassword = true },
             onViewTable = { session, number ->
                 sessionId = session
                 tableNumber = number

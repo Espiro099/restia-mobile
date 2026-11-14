@@ -23,6 +23,10 @@ interface PublicAuthApi {
     @POST("auth/mobile/refresh")
     fun refresh(@Body body: MobileRefreshRequest): Call<Envelope<TokenData>>
 
+    /** Siempre 204, exista o no el correo. */
+    @POST("auth/password/forgot")
+    suspend fun forgotPassword(@Body body: PasswordForgotRequest): Response<Unit>
+
     @POST("auth/logout")
     suspend fun logoutWith(@Header("Authorization") bearer: String): Response<Unit>
 }
@@ -34,6 +38,10 @@ interface SessionApi {
 
     @POST("auth/logout")
     suspend fun logout(): Response<Unit>
+
+    /** Cierra las demás sesiones del usuario; esta sigue abierta. */
+    @POST("auth/password/change")
+    suspend fun changePassword(@Body body: PasswordChangeRequest): Response<Unit>
 
     @GET("branches/{branchId}/tables")
     suspend fun listTables(
@@ -254,4 +262,35 @@ interface SessionApi {
         @Path("tableId") tableId: String,
         @Body body: CleaningConfirmationRequest,
     ): Envelope<TableSessionDto>
+
+    @GET("branches/{branchId}/members")
+    suspend fun listMembers(
+        @Path("branchId") branchId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<MemberDto>
+
+    /** Sin Idempotency-Key: el backend rechaza un alta repetida con MEMBERSHIP_ALREADY_EXISTS. */
+    @POST("branches/{branchId}/members")
+    suspend fun createMember(@Path("branchId") branchId: String, @Body body: MemberCreateRequest): Envelope<MemberCreatedDto>
+
+    @PATCH("branches/{branchId}/members/{userId}")
+    suspend fun changeMemberRole(
+        @Path("branchId") branchId: String,
+        @Path("userId") userId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: MemberRoleRequest,
+    ): Envelope<MemberDto>
+
+    @POST("branches/{branchId}/members/{userId}/revoke")
+    suspend fun revokeMember(
+        @Path("branchId") branchId: String,
+        @Path("userId") userId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: ReasonRequest,
+    ): Envelope<MemberDto>
+
+    /** Solo un ADMIN de todas las sucursales del usuario; invalida el enlace anterior. */
+    @POST("users/{userId}/password-setup-link")
+    suspend fun passwordSetupLink(@Path("userId") userId: String): Envelope<PasswordSetupLinkDto>
 }

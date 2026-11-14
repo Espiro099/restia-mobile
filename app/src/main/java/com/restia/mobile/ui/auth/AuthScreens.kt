@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -118,7 +119,7 @@ fun EnrollScreen(form: FormState, notice: SessionNotice?, onEnroll: (String, Str
 }
 
 @Composable
-fun LoginScreen(form: FormState, notice: SessionNotice?, onLogin: (String, String) -> Unit) {
+fun LoginScreen(form: FormState, notice: SessionNotice?, onLogin: (String, String) -> Unit, onForgot: (email: String) -> Unit) {
     var email by rememberSaveable { mutableStateOf("") }
     // Sin rememberSaveable: la contraseña no debe sobrevivir en el estado guardado.
     var password by remember { mutableStateOf("") }
@@ -147,5 +148,6 @@ fun LoginScreen(form: FormState, notice: SessionNotice?, onLogin: (String, Strin
             enabled = !form.busy && email.contains('@') && password.isNotEmpty(),
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.action_login)) }
+        TextButton(onClick = { onForgot(email) }, enabled = !form.busy) { Text(stringResource(R.string.password_forgot)) }
     }
 }
