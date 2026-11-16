@@ -565,3 +565,15 @@ data class PrintJobRetryRequest(val printerId: String? = null)
 /** Un trabajo UNKNOWN: ¿salió impreso o no? */
 @Serializable
 data class PrintJobResolveRequest(val outcome: String, val reason: String)
+
+/** Cuenta vacía en la sesión, para dividir (C-1, C-4). */
+@Serializable
+data class CheckCreateRequest(val sessionId: String, val label: String? = null)
+
+/** C-5: misma sesión; la versión del destino va en el cuerpo y la del origen en If-Match. */
+@Serializable
+data class CheckMoveUnitsRequest(val unitIds: List<String>, val targetCheckId: String, val targetCheckVersion: Int)
+
+/** C-7: solo cortesía de la unidad completa. Sin valor por omisión: el serializador no enviaría `type`. */
+@Serializable
+data class CheckAdjustmentRequest(val unitId: String, val type: String, val reason: String)
