@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Release (Actividad 3.2, OWASP Mobile M5): solo HTTPS y solo las CA del sistema. No se confía en
+    certificados que el usuario instale (un proxy de intercepción) ni se permite tráfico en claro.
+    El anclaje de la llave pública lo hace OkHttp (CertificatePinning) con las huellas de restia.releaseApiPins.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
