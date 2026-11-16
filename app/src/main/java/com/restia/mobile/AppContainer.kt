@@ -18,6 +18,7 @@ import com.restia.mobile.data.account.PasswordRepository
 import com.restia.mobile.data.auth.AuthRepository
 import com.restia.mobile.data.auth.AuthStateHolder
 import com.restia.mobile.data.auth.TokenRefresher
+import com.restia.mobile.data.cash.CashRepository
 import com.restia.mobile.data.checks.CheckRepository
 import com.restia.mobile.data.kitchen.KitchenRepository
 import com.restia.mobile.data.customers.CustomersRepository
@@ -47,6 +48,7 @@ class Repositories(
     val customers: CustomersRepository,
     val members: MembersRepository,
     val passwords: PasswordRepository,
+    val cash: CashRepository,
 )
 
 fun buildRepositories(baseUrl: String, store: CredentialStore, blobs: BlobStore): Repositories {
@@ -82,6 +84,7 @@ fun buildRepositories(baseUrl: String, store: CredentialStore, blobs: BlobStore)
         CustomersRepository(sessionApi),
         MembersRepository(sessionApi),
         PasswordRepository(publicApi, sessionApi),
+        CashRepository(sessionApi),
     )
 }
 

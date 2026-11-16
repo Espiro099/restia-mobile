@@ -58,11 +58,22 @@ private fun failureText(failure: ApiFailure): String = when {
 
 /** Menú de la barra superior: personal (si puede verlo), cambiar contraseña y cerrar sesión. */
 @Composable
-fun AccountMenu(showStaff: Boolean, logoutEnabled: Boolean, onStaff: () -> Unit, onChangePassword: () -> Unit, onLogout: () -> Unit) {
+fun AccountMenu(
+    showStaff: Boolean,
+    logoutEnabled: Boolean,
+    onStaff: () -> Unit,
+    onChangePassword: () -> Unit,
+    onLogout: () -> Unit,
+    showCash: Boolean = false,
+    onCash: () -> Unit = {},
+) {
     var open by remember { mutableStateOf(false) }
     Box {
         TextButton(onClick = { open = true }) { Text(stringResource(R.string.account_menu)) }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (showCash) {
+                DropdownMenuItem(text = { Text(stringResource(R.string.cash_title)) }, onClick = { open = false; onCash() })
+            }
             if (showStaff) {
                 DropdownMenuItem(text = { Text(stringResource(R.string.staff_title)) }, onClick = { open = false; onStaff() })
             }

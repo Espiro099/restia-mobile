@@ -5,6 +5,11 @@ import com.restia.mobile.core.network.ApprovalRequest
 import com.restia.mobile.core.network.CleaningConfirmationRequest
 import com.restia.mobile.core.network.CashRegisterDto
 import com.restia.mobile.core.network.CashShiftDto
+import com.restia.mobile.core.network.CashMovementCreateRequest
+import com.restia.mobile.core.network.CashMovementDto
+import com.restia.mobile.core.network.CashShiftCloseRequest
+import com.restia.mobile.core.network.CashShiftOpenRequest
+import com.restia.mobile.core.network.CashShiftSummaryDto
 import com.restia.mobile.core.network.CheckDto
 import com.restia.mobile.core.network.AvailabilityDto
 import com.restia.mobile.core.network.CustomerCreateRequest
@@ -64,6 +69,27 @@ open class UnusedSessionApi : SessionApi {
     override suspend fun requestCheck(branchId: String, checkId: String, ifMatch: String): Envelope<CheckDto> = error("sin uso")
     override suspend fun listCashShifts(branchId: String, status: String, page: Int, perPage: Int): PagedEnvelope<CashShiftDto> = error("sin uso")
     override suspend fun listCashRegisters(branchId: String, page: Int, perPage: Int): PagedEnvelope<CashRegisterDto> = error("sin uso")
+    override suspend fun openCashShift(branchId: String, idempotencyKey: String, body: CashShiftOpenRequest): Envelope<CashShiftDto> = error("sin uso")
+    override suspend fun getCashShift(branchId: String, cashShiftId: String): Envelope<CashShiftDto> = error("sin uso")
+    override suspend fun cashShiftSummary(branchId: String, cashShiftId: String): Envelope<CashShiftSummaryDto> = error("sin uso")
+    override suspend fun listCashMovements(branchId: String, cashShiftId: String, page: Int, perPage: Int): PagedEnvelope<CashMovementDto> =
+        error("sin uso")
+    override suspend fun createCashMovement(
+        branchId: String,
+        cashShiftId: String,
+        idempotencyKey: String,
+        body: CashMovementCreateRequest,
+    ): Envelope<CashMovementDto> = error("sin uso")
+    override suspend fun startCashShiftClosing(branchId: String, cashShiftId: String, ifMatch: String): Envelope<CashShiftDto> = error("sin uso")
+    override suspend fun cancelCashShiftClosing(branchId: String, cashShiftId: String, ifMatch: String, body: ReasonRequest): Envelope<CashShiftDto> =
+        error("sin uso")
+    override suspend fun closeCashShift(
+        branchId: String,
+        cashShiftId: String,
+        ifMatch: String,
+        idempotencyKey: String,
+        body: CashShiftCloseRequest,
+    ): Envelope<CashShiftDto> = error("sin uso")
     override suspend fun listPayments(branchId: String, checkId: String, page: Int, perPage: Int): PagedEnvelope<PaymentDto> = error("sin uso")
     override suspend fun createPayment(branchId: String, idempotencyKey: String, body: PaymentCreateRequest): Envelope<PaymentDto> = error("sin uso")
     override suspend fun recordPaymentResult(

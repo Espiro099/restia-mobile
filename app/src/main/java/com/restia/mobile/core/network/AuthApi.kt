@@ -144,6 +144,60 @@ interface SessionApi {
         @Query("perPage") perPage: Int,
     ): PagedEnvelope<CashRegisterDto>
 
+    @POST("branches/{branchId}/cash-shifts")
+    suspend fun openCashShift(
+        @Path("branchId") branchId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: CashShiftOpenRequest,
+    ): Envelope<CashShiftDto>
+
+    @GET("branches/{branchId}/cash-shifts/{cashShiftId}")
+    suspend fun getCashShift(@Path("branchId") branchId: String, @Path("cashShiftId") cashShiftId: String): Envelope<CashShiftDto>
+
+    @GET("branches/{branchId}/cash-shifts/{cashShiftId}/summary")
+    suspend fun cashShiftSummary(@Path("branchId") branchId: String, @Path("cashShiftId") cashShiftId: String): Envelope<CashShiftSummaryDto>
+
+    @GET("branches/{branchId}/cash-shifts/{cashShiftId}/movements")
+    suspend fun listCashMovements(
+        @Path("branchId") branchId: String,
+        @Path("cashShiftId") cashShiftId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<CashMovementDto>
+
+    @POST("branches/{branchId}/cash-shifts/{cashShiftId}/movements")
+    suspend fun createCashMovement(
+        @Path("branchId") branchId: String,
+        @Path("cashShiftId") cashShiftId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: CashMovementCreateRequest,
+    ): Envelope<CashMovementDto>
+
+    /** Frena cobros, depósitos y retiros nuevos; sin cuerpo. */
+    @POST("branches/{branchId}/cash-shifts/{cashShiftId}/start-closing")
+    suspend fun startCashShiftClosing(
+        @Path("branchId") branchId: String,
+        @Path("cashShiftId") cashShiftId: String,
+        @Header("If-Match") ifMatch: String,
+    ): Envelope<CashShiftDto>
+
+    @POST("branches/{branchId}/cash-shifts/{cashShiftId}/cancel-closing")
+    suspend fun cancelCashShiftClosing(
+        @Path("branchId") branchId: String,
+        @Path("cashShiftId") cashShiftId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: ReasonRequest,
+    ): Envelope<CashShiftDto>
+
+    @POST("branches/{branchId}/cash-shifts/{cashShiftId}/close")
+    suspend fun closeCashShift(
+        @Path("branchId") branchId: String,
+        @Path("cashShiftId") cashShiftId: String,
+        @Header("If-Match") ifMatch: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: CashShiftCloseRequest,
+    ): Envelope<CashShiftDto>
+
     @GET("branches/{branchId}/payments")
     suspend fun listPayments(
         @Path("branchId") branchId: String,
