@@ -25,6 +25,9 @@ import com.restia.mobile.ui.reservations.ReservationsScreen
 import com.restia.mobile.ui.reservations.ReservationsViewModel
 import com.restia.mobile.ui.kitchen.KitchenViewModel
 import com.restia.mobile.ui.orders.OrderScreen
+import com.restia.mobile.ui.printing.PrintJobsScreen
+import com.restia.mobile.ui.printing.PrintJobsViewModel
+import com.restia.mobile.ui.printing.PrintPermissions
 import com.restia.mobile.ui.orders.OrderViewModel
 import com.restia.mobile.ui.orders.TableScreen
 import com.restia.mobile.ui.orders.TableViewModel
@@ -57,6 +60,22 @@ fun BranchHome(
     var inCash by rememberSaveable { mutableStateOf(false) }
     // Ver montos y movimientos exige cash.read; quien solo tiene cash.read_open (mesero) no entra.
     val showCash = "cash.read" in permissions
+    var inPrinting by rememberSaveable { mutableStateOf(false) }
+    val showPrinting = "printing.read" in permissions
+    if (inPrinting && showPrinting) {
+        PrintJobsScreen(
+            viewModel = viewModel(
+                key = "impresiones-$userId-$branchId",
+                factory = PrintJobsViewModel.Factory(
+                    repositories.printing,
+                    branchId,
+                    PrintPermissions(resolve = "printing.resolve" in permissions, reprint = "printing.reprint" in permissions),
+                ),
+            ),
+            onBack = { inPrinting = false },
+        )
+        return
+    }
     if (changingPassword) {
         val passwords: ChangePasswordViewModel = viewModel(key = "contrasena-$userId", factory = ChangePasswordViewModel.Factory(repositories.passwords))
         ChangePasswordScreen(
@@ -132,6 +151,8 @@ fun BranchHome(
             onChangePassword = { changingPassword = true },
             showCash = showCash,
             onCash = { inCash = true },
+            showPrinting = showPrinting,
+            onPrinting = { inPrinting = true },
         )
         return
     }
@@ -201,6 +222,8 @@ fun BranchHome(
             onChangePassword = { changingPassword = true },
             showCash = showCash,
             onCash = { inCash = true },
+            showPrinting = showPrinting,
+            onPrinting = { inPrinting = true },
             onViewTable = { session, number ->
                 sessionId = session
                 tableNumber = number
