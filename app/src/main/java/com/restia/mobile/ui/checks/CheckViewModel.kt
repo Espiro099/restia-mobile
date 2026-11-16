@@ -101,11 +101,14 @@ data class CheckUiState(
     val shiftsFailure: ApiFailure? = null,
     val paying: PayState? = null,
     val recording: ResultState? = null,
+    val moving: MoveUnitsState? = null,
+    val action: CheckAction? = null,
     val working: Boolean = false,
     val actionFailure: ApiFailure? = null,
     val notice: Notice? = null,
 ) {
-    val busy: Boolean get() = working || paying?.submitting == true || recording?.submitting == true
+    val busy: Boolean
+        get() = working || paying?.submitting == true || recording?.submitting == true || moving?.submitting == true || action?.submitting == true
 }
 
 class CheckViewModel(
@@ -114,6 +117,10 @@ class CheckViewModel(
     private val sessionId: String,
     private val pollMillis: Long = POLL_MILLIS,
     private val newKey: () -> String = { UUID.randomUUID().toString() },
+    /** checks.reopen y checks.adjust: sin ellos, un gerente autoriza en el dispositivo (C-9). */
+    private val canReopenDirectly: Boolean = false,
+    private val canAdjustDirectly: Boolean = false,
+    private val now: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     private val _state = MutableStateFlow(CheckUiState())
     val state: StateFlow<CheckUiState> = _state
@@ -361,6 +368,167 @@ class CheckViewModel(
         }
     }
 
+    // --- Mover unidades y dividir ---
+
+    /** La versión más reciente que se tiene de una cuenta: el sondeo pudo actualizarla. */
+    private fun latest(check: CheckDto): CheckDto = _state.value.checks.firstOrNull { it.id == check.id } ?: check
+
+    fun startMove(check: CheckDto) {
+        if (!canMoveFrom(check) || _state.value.busy) return
+        // Si ya hay otra cuenta abierta, es el destino más probable; si no, una nueva.
+        val target = moveTargets(_state.value.checks, check).lastOrNull()?.id
+        _state.value = _state.value.copy(moving = MoveUnitsState(check, targetId = target), actionFailure = null, notice = null)
+    }
+
+    private fun editMove(change: (MoveUnitsState) -> MoveUnitsState) {
+        val current = _state.value.moving ?: return
+        if (current.submitting) return
+        _state.value = _state.value.copy(moving = change(current).copy(failure = null))
+    }
+
+    fun toggleUnit(unitId: String) = editMove { it.copy(selected = if (unitId in it.selected) it.selected - unitId else it.selected + unitId) }
+
+    /** null: cuenta nueva. */
+    fun chooseTarget(checkId: String?) = editMove { it.copy(targetId = checkId) }
+
+    fun setNewLabel(text: String) = editMove { it.copy(label = text.take(60)) }
+
+    fun dismissMove() {
+        if (_state.value.moving?.submitting == true) return
+        _state.value = _state.value.copy(moving = null)
+    }
+
+    fun confirmMove() {
+        val current = _state.value.moving ?: return
+        if (!current.canSubmit) return
+        _state.value = _state.value.copy(moving = current.copy(submitting = true, failure = null))
+        viewModelScope.launch {
+            var target = current.targetId?.let { id -> _state.value.checks.firstOrNull { it.id == id } } ?: current.created
+            if (target == null) {
+                // La cuenta nueva se crea una sola vez: un reintento usa la misma clave y la misma cuenta.
+                val key = keyFor(Pair("NEW_CHECK", current.source.id))
+                when (val r = repository.create(branchId, key, sessionId, current.label.trim().ifEmpty { null })) {
+                    is ApiResult.Success -> {
+                        intent = null
+                        target = r.value
+                        _state.value = _state.value.copy(moving = _state.value.moving?.copy(created = r.value))
+                    }
+                    is ApiResult.Failure -> {
+                        _state.value = _state.value.copy(moving = _state.value.moving?.copy(submitting = false, failure = r.failure))
+                        return@launch
+                    }
+                }
+            }
+            val source = latest(current.source)
+            when (val r = repository.move(branchId, source, current.selected.toList(), latest(target))) {
+                is ApiResult.Success -> _state.value = _state.value.copy(moving = null, notice = Notice(R.string.move_done))
+                is ApiResult.Failure -> {
+                    // La cuenta nueva ya existe: el reintento la usa como destino.
+                    val created = _state.value.moving?.created
+                    _state.value = _state.value.copy(
+                        moving = _state.value.moving?.copy(submitting = false, failure = r.failure, targetId = created?.id ?: current.targetId),
+                    )
+                }
+            }
+            load()
+        }
+    }
+
+    // --- Reabrir, cancelar y cortesías ---
+
+    fun startAction(kind: CheckActionKind, check: CheckDto, unit: com.restia.mobile.core.network.CheckUnitDto? = null) {
+        if (_state.value.busy) return
+        val allowed = when (kind) {
+            CheckActionKind.REOPEN -> canReopen(check)
+            CheckActionKind.CANCEL -> canCancelCheck(check)
+            // Sin unidad, el diálogo la pide; con unidad, debe poder recibir cortesía.
+            CheckActionKind.COURTESY -> canAdjust(check) && (if (unit == null) courtesyCandidates(check).isNotEmpty() else unit in courtesyCandidates(check))
+            CheckActionKind.REVERT -> canAdjust(check) && unit?.adjustment != null
+        }
+        if (!allowed) return
+        val needsApproval = when (kind) {
+            CheckActionKind.REOPEN -> !canReopenDirectly
+            CheckActionKind.COURTESY, CheckActionKind.REVERT -> !canAdjustDirectly
+            CheckActionKind.CANCEL -> false
+        }
+        _state.value = _state.value.copy(action = CheckAction(kind, check, unit, needsApproval), actionFailure = null, notice = null)
+    }
+
+    private fun editAction(change: (CheckAction) -> CheckAction) {
+        val current = _state.value.action ?: return
+        if (current.submitting) return
+        _state.value = _state.value.copy(action = change(current).copy(failure = null))
+    }
+
+    fun setActionReason(text: String) = editAction { it.copy(reason = text.take(500)) }
+
+    /** Cortesía: el platillo; un token ya pedido era para otro, así que deja de servir. */
+    fun chooseCourtesyUnit(unit: com.restia.mobile.core.network.CheckUnitDto) = editAction { it.copy(unit = unit) }
+
+    fun setApproverEmail(text: String) = editAction { it.copy(approver = it.approver.copy(email = text.take(254))) }
+
+    fun setApproverPassword(text: String) = editAction { it.copy(approver = it.approver.copy(password = text.take(1024))) }
+
+    fun dismissAction() {
+        if (_state.value.action?.submitting == true) return
+        _state.value = _state.value.copy(action = null)
+    }
+
+    fun confirmAction() {
+        val current = _state.value.action ?: return
+        if (!current.canSubmit) return
+        val reason = current.reason.trim()
+        _state.value = _state.value.copy(action = current.copy(submitting = true, failure = null))
+        viewModelScope.launch {
+            var approval = current.approval?.takeIf { current.approved && now() < it.validUntil }
+            if (current.needsApproval && approval == null) {
+                val r = repository.approve(branchId, current.kind.approvalAction!!, current.resourceIds, reason, current.approver.email.trim(), current.approver.password)
+                when (r) {
+                    is ApiResult.Success -> {
+                        val margin = minOf(5, r.value.expiresIn / 2) * 1000L
+                        approval = GrantedApproval(r.value.approvalToken, current.resourceIds, reason, now() + r.value.expiresIn * 1000L - margin)
+                        // Con el token ya no hace falta la contraseña en memoria.
+                        _state.value = _state.value.copy(action = current.copy(submitting = true, approval = approval, approver = current.approver.copy(password = "")))
+                    }
+                    is ApiResult.Failure -> {
+                        val keep = if (isRetryable(r.failure)) current.approver.password else ""
+                        _state.value = _state.value.copy(action = current.copy(approver = current.approver.copy(password = keep), failure = r.failure))
+                        return@launch
+                    }
+                }
+            }
+            val check = latest(current.check)
+            val token = approval?.token
+            val r = when (current.kind) {
+                CheckActionKind.REOPEN -> repository.reopen(branchId, check, reason, token)
+                CheckActionKind.CANCEL -> repository.cancel(branchId, check, reason)
+                CheckActionKind.COURTESY -> repository.courtesy(branchId, check, current.unit!!.unitId, reason, token)
+                CheckActionKind.REVERT -> repository.revertCourtesy(branchId, check, current.unit!!.adjustment!!.id, reason, token)
+            }
+            val sent = _state.value.action ?: current
+            when (r) {
+                is ApiResult.Success -> _state.value = _state.value.copy(action = null, notice = Notice(actionNotice(current.kind)))
+                is ApiResult.Failure -> {
+                    val code = (r.failure as? ApiFailure.Server)?.code
+                    // Un token vencido o ya usado no sirve otra vez; con la red caída se conserva para reintentar.
+                    val keepApproval = isRetryable(r.failure) && code != "APPROVAL_INVALID"
+                    _state.value = _state.value.copy(
+                        action = sent.copy(submitting = false, failure = r.failure, approval = if (keepApproval) sent.approval else null),
+                    )
+                }
+            }
+            load()
+        }
+    }
+
+    @StringRes
+    private fun actionNotice(kind: CheckActionKind): Int = when (kind) {
+        CheckActionKind.REOPEN -> R.string.check_reopened
+        CheckActionKind.CANCEL -> R.string.check_cancelled_done
+        CheckActionKind.COURTESY -> R.string.courtesy_done
+        CheckActionKind.REVERT -> R.string.courtesy_reverted
+    }
+
     @StringRes
     private fun resultNotice(outcome: String): Int = when (outcome) {
         "CONFIRMED" -> R.string.pay_done
@@ -372,9 +540,16 @@ class CheckViewModel(
     private fun isRetryable(failure: ApiFailure): Boolean =
         failure == ApiFailure.Network || (failure is ApiFailure.Server && failure.status >= 500)
 
-    class Factory(private val repository: CheckRepository, private val branchId: String, private val sessionId: String) : ViewModelProvider.Factory {
+    class Factory(
+        private val repository: CheckRepository,
+        private val branchId: String,
+        private val sessionId: String,
+        private val canReopenDirectly: Boolean = false,
+        private val canAdjustDirectly: Boolean = false,
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = CheckViewModel(repository, branchId, sessionId) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T =
+            CheckViewModel(repository, branchId, sessionId, canReopenDirectly = canReopenDirectly, canAdjustDirectly = canAdjustDirectly) as T
     }
 
     companion object {

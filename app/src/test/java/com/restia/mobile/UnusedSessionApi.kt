@@ -10,7 +10,10 @@ import com.restia.mobile.core.network.CashMovementDto
 import com.restia.mobile.core.network.CashShiftCloseRequest
 import com.restia.mobile.core.network.CashShiftOpenRequest
 import com.restia.mobile.core.network.CashShiftSummaryDto
+import com.restia.mobile.core.network.CheckAdjustmentRequest
+import com.restia.mobile.core.network.CheckCreateRequest
 import com.restia.mobile.core.network.CheckDto
+import com.restia.mobile.core.network.CheckMoveUnitsRequest
 import com.restia.mobile.core.network.AvailabilityDto
 import com.restia.mobile.core.network.CustomerCreateRequest
 import com.restia.mobile.core.network.CustomerDto
@@ -73,6 +76,26 @@ open class UnusedSessionApi : SessionApi {
     override suspend fun listQueue(branchId: String, stationId: String?, page: Int, perPage: Int, etag: String?): Response<PagedEnvelope<KitchenUnitDto>> =
         error("sin uso")
     override suspend fun listChecks(branchId: String, sessionId: String, page: Int, perPage: Int): PagedEnvelope<CheckDto> = error("sin uso")
+    override suspend fun createCheck(branchId: String, idempotencyKey: String, body: CheckCreateRequest): Envelope<CheckDto> = error("sin uso")
+    override suspend fun moveCheckUnits(branchId: String, checkId: String, ifMatch: String, body: CheckMoveUnitsRequest): Envelope<CheckDto> = error("sin uso")
+    override suspend fun reopenCheck(branchId: String, checkId: String, ifMatch: String, body: ReasonRequest, approvalToken: String?): Envelope<CheckDto> =
+        error("sin uso")
+    override suspend fun cancelCheck(branchId: String, checkId: String, ifMatch: String, body: ReasonRequest): Envelope<CheckDto> = error("sin uso")
+    override suspend fun createCheckAdjustment(
+        branchId: String,
+        checkId: String,
+        ifMatch: String,
+        body: CheckAdjustmentRequest,
+        approvalToken: String?,
+    ): Envelope<CheckDto> = error("sin uso")
+    override suspend fun revertCheckAdjustment(
+        branchId: String,
+        checkId: String,
+        adjustmentId: String,
+        ifMatch: String,
+        body: ReasonRequest,
+        approvalToken: String?,
+    ): Envelope<CheckDto> = error("sin uso")
     override suspend fun requestCheck(branchId: String, checkId: String, ifMatch: String): Envelope<CheckDto> = error("sin uso")
     override suspend fun listCashShifts(branchId: String, status: String, page: Int, perPage: Int): PagedEnvelope<CashShiftDto> = error("sin uso")
     override suspend fun listCashRegisters(branchId: String, page: Int, perPage: Int): PagedEnvelope<CashRegisterDto> = error("sin uso")

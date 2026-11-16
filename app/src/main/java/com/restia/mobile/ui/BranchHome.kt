@@ -254,7 +254,17 @@ fun BranchHome(
     )
     if (viewingCheck) {
         CheckScreen(
-            viewModel = viewModel(key = "cuenta-$userId-$current", factory = CheckViewModel.Factory(repositories.checks, branchId, current)),
+            viewModel = viewModel(
+                key = "cuenta-$userId-$current",
+                factory = CheckViewModel.Factory(
+                    repositories.checks,
+                    branchId,
+                    current,
+                    // Sin estos permisos, reabrir y las cortesías piden la autorización de un gerente (C-9).
+                    canReopenDirectly = "checks.reopen" in permissions,
+                    canAdjustDirectly = "checks.adjust" in permissions,
+                ),
+            ),
             tableNumber = tableNumber,
             can = CheckPermissions(
                 request = "checks.request" in permissions,
@@ -262,6 +272,9 @@ fun BranchHome(
                 pay = "payments.create" in permissions && ("cash.read_open" in permissions || "cash.read" in permissions),
                 record = "payments.record_result" in permissions,
                 print = "printing.request" in permissions,
+                move = "checks.move_units" in permissions,
+                create = "checks.create" in permissions,
+                cancel = "checks.cancel" in permissions,
             ),
             onBack = { viewingCheck = false },
         )

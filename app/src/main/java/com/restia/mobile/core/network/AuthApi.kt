@@ -120,6 +120,62 @@ interface SessionApi {
         @Query("perPage") perPage: Int,
     ): PagedEnvelope<CheckDto>
 
+    @POST("branches/{branchId}/checks")
+    suspend fun createCheck(
+        @Path("branchId") branchId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: CheckCreateRequest,
+    ): Envelope<CheckDto>
+
+    /** Devuelve la cuenta de origen. */
+    @POST("branches/{branchId}/checks/{checkId}/units/move")
+    suspend fun moveCheckUnits(
+        @Path("branchId") branchId: String,
+        @Path("checkId") checkId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: CheckMoveUnitsRequest,
+    ): Envelope<CheckDto>
+
+    /** REQUESTED → OPEN; sin checks.reopen, con el token CHECK_REOPEN de un gerente (C-9). */
+    @POST("branches/{branchId}/checks/{checkId}/reopen")
+    suspend fun reopenCheck(
+        @Path("branchId") branchId: String,
+        @Path("checkId") checkId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: ReasonRequest,
+        @Header("X-Approval-Token") approvalToken: String? = null,
+    ): Envelope<CheckDto>
+
+    /** Solo sin unidades válidas ni pagos. */
+    @POST("branches/{branchId}/checks/{checkId}/cancel")
+    suspend fun cancelCheck(
+        @Path("branchId") branchId: String,
+        @Path("checkId") checkId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: ReasonRequest,
+    ): Envelope<CheckDto>
+
+    /** Sin checks.adjust, con el token CHECK_ADJUSTMENT ligado a la unidad. */
+    @POST("branches/{branchId}/checks/{checkId}/adjustments")
+    suspend fun createCheckAdjustment(
+        @Path("branchId") branchId: String,
+        @Path("checkId") checkId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: CheckAdjustmentRequest,
+        @Header("X-Approval-Token") approvalToken: String? = null,
+    ): Envelope<CheckDto>
+
+    /** Sin checks.adjust, con el token CHECK_ADJUSTMENT ligado a la cortesía. */
+    @POST("branches/{branchId}/checks/{checkId}/adjustments/{adjustmentId}/revert")
+    suspend fun revertCheckAdjustment(
+        @Path("branchId") branchId: String,
+        @Path("checkId") checkId: String,
+        @Path("adjustmentId") adjustmentId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: ReasonRequest,
+        @Header("X-Approval-Token") approvalToken: String? = null,
+    ): Envelope<CheckDto>
+
     /** Marca la cuenta como solicitada; la mesa pasa a CUENTA_SOLICITADA. */
     @POST("branches/{branchId}/checks/{checkId}/request")
     suspend fun requestCheck(

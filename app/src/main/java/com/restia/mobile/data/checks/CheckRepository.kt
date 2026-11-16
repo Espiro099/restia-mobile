@@ -1,14 +1,20 @@
 package com.restia.mobile.data.checks
 
 import com.restia.mobile.core.network.ApiResult
+import com.restia.mobile.core.network.ApprovalData
+import com.restia.mobile.core.network.ApprovalRequest
 import com.restia.mobile.core.network.CardDto
+import com.restia.mobile.core.network.CheckAdjustmentRequest
+import com.restia.mobile.core.network.CheckCreateRequest
 import com.restia.mobile.core.network.CheckDto
+import com.restia.mobile.core.network.CheckMoveUnitsRequest
 import com.restia.mobile.core.network.PagedEnvelope
 import com.restia.mobile.core.network.PaymentCreateRequest
 import com.restia.mobile.core.network.PaymentDto
 import com.restia.mobile.core.network.PaymentResultRequest
 import com.restia.mobile.core.network.PrintJobDto
 import com.restia.mobile.core.network.PrintJobRequest
+import com.restia.mobile.core.network.ReasonRequest
 import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.apiCall
 
@@ -27,6 +33,29 @@ class CheckRepository(private val api: SessionApi) {
 
     suspend fun request(branchId: String, check: CheckDto): ApiResult<CheckDto> =
         apiCall { api.requestCheck(branchId, check.id, "\"${check.version}\"").data }
+
+    suspend fun create(branchId: String, idempotencyKey: String, sessionId: String, label: String?): ApiResult<CheckDto> =
+        apiCall { api.createCheck(branchId, idempotencyKey, CheckCreateRequest(sessionId, label)).data }
+
+    suspend fun move(branchId: String, source: CheckDto, unitIds: List<String>, target: CheckDto): ApiResult<CheckDto> = apiCall {
+        api.moveCheckUnits(branchId, source.id, "\"${source.version}\"", CheckMoveUnitsRequest(unitIds, target.id, target.version)).data
+    }
+
+    suspend fun reopen(branchId: String, check: CheckDto, reason: String, approvalToken: String?): ApiResult<CheckDto> =
+        apiCall { api.reopenCheck(branchId, check.id, "\"${check.version}\"", ReasonRequest(reason), approvalToken).data }
+
+    suspend fun cancel(branchId: String, check: CheckDto, reason: String): ApiResult<CheckDto> =
+        apiCall { api.cancelCheck(branchId, check.id, "\"${check.version}\"", ReasonRequest(reason)).data }
+
+    suspend fun courtesy(branchId: String, check: CheckDto, unitId: String, reason: String, approvalToken: String?): ApiResult<CheckDto> =
+        apiCall { api.createCheckAdjustment(branchId, check.id, "\"${check.version}\"", CheckAdjustmentRequest(unitId, "COURTESY", reason), approvalToken).data }
+
+    suspend fun revertCourtesy(branchId: String, check: CheckDto, adjustmentId: String, reason: String, approvalToken: String?): ApiResult<CheckDto> =
+        apiCall { api.revertCheckAdjustment(branchId, check.id, adjustmentId, "\"${check.version}\"", ReasonRequest(reason), approvalToken).data }
+
+    /** D-37: el gerente escribe sus datos aquí; el token sirve una vez, para estos recursos y este motivo. */
+    suspend fun approve(branchId: String, action: String, resourceIds: List<String>, reason: String, email: String, password: String): ApiResult<ApprovalData> =
+        apiCall { api.createApproval(branchId, ApprovalRequest(email, password, action, resourceIds, reason)).data }
 
     /** Turnos OPEN, cada uno con el nombre de su caja; sin nombre conocido, el código de la caja no se adivina. */
     suspend fun openShifts(branchId: String): ApiResult<List<ShiftOption>> = apiCall {
