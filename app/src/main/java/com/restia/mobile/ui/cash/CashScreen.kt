@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -24,6 +25,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -43,10 +46,13 @@ import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.CashMovementDto
 import com.restia.mobile.core.network.CashShiftSummaryDto
 import com.restia.mobile.core.network.MoneyDto
+import com.restia.mobile.core.network.PaymentDto
+import com.restia.mobile.core.network.RefundDto
 import com.restia.mobile.data.cash.CASH_CURRENCY
 import com.restia.mobile.data.cash.RegisterShift
 import com.restia.mobile.ui.checks.amountOf
 import com.restia.mobile.ui.checks.methodLabel
+import com.restia.mobile.ui.checks.paymentStatusLabel
 import com.restia.mobile.ui.orders.moneyText
 import com.restia.mobile.ui.reservations.fieldMessage
 import java.math.BigDecimal
@@ -216,6 +222,113 @@ private fun StartClosingDialog(state: CashUiState, viewModel: CashViewModel) {
 }
 
 @Composable
+private fun OutcomeChoice(selected: String, enabled: Boolean, onSelect: (String) -> Unit) {
+    Column {
+        listOf("CONFIRMED" to R.string.cash_outcome_confirmed, "FAILED" to R.string.cash_outcome_failed).forEach { (value, label) ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().selectable(selected = value == selected, enabled = enabled, role = Role.RadioButton) { onSelect(value) },
+            ) {
+                RadioButton(selected = value == selected, onClick = null, enabled = enabled)
+                Text(stringResource(label), modifier = Modifier.padding(start = 8.dp, top = 10.dp, bottom = 10.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResolveDialog(form: ResolveForm, viewModel: CashViewModel) {
+    val title = when (form.kind) {
+        ResolveKind.RECONCILE_PAYMENT -> R.string.cash_reconcile_payment_title
+        ResolveKind.REFUND -> R.string.cash_refund_title
+        ResolveKind.REFUND_RESULT -> R.string.cash_refund_result_title
+        ResolveKind.RECONCILE_REFUND -> R.string.cash_reconcile_refund_title
+    }
+    val amount = form.payment?.let { money(it.amount) + tipSuffix(it.tip) } ?: form.refund?.let { money(it.amount) + tipSuffix(it.tip) } ?: ""
+    val method = form.payment?.method
+    AlertDialog(
+        onDismissRequest = viewModel::dismissResolve,
+        title = { Text(stringResource(title)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text((method?.let { stringResource(methodLabel(it)) + " · " } ?: "") + amount, fontWeight = FontWeight.SemiBold)
+                when (form.kind) {
+                    ResolveKind.REFUND -> Text(stringResource(R.string.cash_refund_body))
+                    ResolveKind.RECONCILE_PAYMENT -> Text(stringResource(R.string.cash_reconcile_payment_body))
+                    else -> Text(stringResource(R.string.cash_refund_resolution_body))
+                }
+                if (form.asksOutcome) OutcomeChoice(form.outcome, !form.submitting) { o -> viewModel.editResolve { it.copy(outcome = o) } }
+                if (form.needsReference) {
+                    OutlinedTextField(
+                        value = form.reference,
+                        onValueChange = { v -> viewModel.editResolve { it.copy(reference = v.take(120)) } },
+                        label = { Text(stringResource(R.string.cash_reference)) },
+                        singleLine = true,
+                        enabled = !form.submitting,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (form.asksReason) ReasonField(form.reason, R.string.cash_reason, !form.submitting) { v -> viewModel.editResolve { it.copy(reason = v) } }
+                form.failure?.let { Text(failureText(it), color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            SubmitButton(form.canSubmit, form.submitting, if (form.kind == ResolveKind.REFUND) R.string.cash_refund_confirm else R.string.cash_resolve_confirm, viewModel::submitResolve)
+        },
+        dismissButton = { TextButton(onClick = viewModel::dismissResolve, enabled = !form.submitting) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}
+
+@Composable
+private fun tipSuffix(tip: MoneyDto): String = if (amountOf(tip).signum() > 0) " " + stringResource(R.string.cash_plus_tip, money(tip)) else ""
+
+@Composable
+private fun PaymentRow(payment: PaymentDto, shiftOpen: Boolean, viewModel: CashViewModel) {
+    val can = viewModel.can
+    val alert = payment.status == "UNKNOWN" || payment.status == "PENDING"
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(stringResource(methodLabel(payment.method)) + " · " + money(payment.amount) + tipSuffix(payment.tip), fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(paymentStatusLabel(payment.status)) + (if (payment.refundId != null) " · " + stringResource(R.string.cash_has_refund) else ""),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (alert) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (payment.status == "PENDING") Text(stringResource(R.string.cash_pending_from_check), style = MaterialTheme.typography.bodySmall)
+            localTime(payment.createdAt)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        }
+        when {
+            payment.status == "UNKNOWN" && can.reconcilePayments ->
+                TextButton(onClick = { viewModel.startReconcilePayment(payment) }) { Text(stringResource(R.string.cash_reconcile)) }
+            isRefundable(payment) && shiftOpen && can.refund ->
+                TextButton(onClick = { viewModel.startRefund(payment) }) { Text(stringResource(R.string.cash_refund)) }
+        }
+    }
+}
+
+@Composable
+private fun RefundRow(refund: RefundDto, viewModel: CashViewModel) {
+    val can = viewModel.can
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(stringResource(R.string.cash_refund_of, money(refund.amount) + tipSuffix(refund.tip)), fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(if (refund.status == "PENDING") R.string.cash_refund_status_pending else R.string.cash_refund_status_unknown),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Text(refund.reason, style = MaterialTheme.typography.bodySmall)
+        }
+        val allowed = (refund.status == "PENDING" && can.refundResult) || (refund.status == "UNKNOWN" && can.reconcileRefunds)
+        if (allowed) {
+            TextButton(onClick = { viewModel.startRefundResolution(refund) }) {
+                Text(stringResource(if (refund.status == "PENDING") R.string.cash_record_result else R.string.cash_reconcile))
+            }
+        }
+    }
+}
+
+@Composable
 private fun SummaryLine(label: String, value: String, bold: Boolean = false) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, fontWeight = if (bold) FontWeight.SemiBold else null)
@@ -327,6 +440,17 @@ private fun ShiftDetailScreen(state: CashUiState, detail: ShiftDetail, viewModel
                     }
                 }
             }
+            if (detail.refunds.isNotEmpty()) {
+                item { Text(stringResource(R.string.cash_refunds_to_resolve), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
+                items(detail.refunds, key = { "r-" + it.id }) { RefundRow(it, viewModel) }
+            }
+            if (can.readPayments) {
+                // Lo que traba el corte, primero.
+                val payments = detail.payments.sortedBy { if (it.status == "UNKNOWN" || it.status == "PENDING") 0 else 1 }
+                item { Text(stringResource(R.string.cash_payments), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
+                if (payments.isEmpty() && !detail.loading) item { Text(stringResource(R.string.cash_no_payments), style = MaterialTheme.typography.bodySmall) }
+                items(payments, key = { "p-" + it.id }) { PaymentRow(it, open, viewModel) }
+            }
             item { Text(stringResource(R.string.cash_movements), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
             if (detail.movements.isEmpty() && !detail.loading) item { Text(stringResource(R.string.cash_no_movements), style = MaterialTheme.typography.bodySmall) }
             items(detail.movements, key = { it.id }) { MovementRow(it) }
@@ -367,6 +491,7 @@ fun CashScreen(viewModel: CashViewModel, onBack: () -> Unit) {
     state.moving?.let { MoveDialog(it, viewModel) }
     state.closing?.let { CloseDialog(it, viewModel) }
     state.cancelling?.let { CancelDialog(it, viewModel) }
+    state.resolving?.let { ResolveDialog(it, viewModel) }
     if (state.confirmingStart) StartClosingDialog(state, viewModel)
     val detail = state.detail
     if (detail != null) {

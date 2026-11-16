@@ -10,7 +10,12 @@ import com.restia.mobile.core.network.CashShiftOpenRequest
 import com.restia.mobile.core.network.CashShiftSummaryDto
 import com.restia.mobile.core.network.MoneyDto
 import com.restia.mobile.core.network.PagedEnvelope
+import com.restia.mobile.core.network.PaymentDto
 import com.restia.mobile.core.network.ReasonRequest
+import com.restia.mobile.core.network.ReconcileRequest
+import com.restia.mobile.core.network.RefundCreateRequest
+import com.restia.mobile.core.network.RefundDto
+import com.restia.mobile.core.network.RefundResultRequest
 import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.apiCall
 import java.math.BigDecimal
@@ -67,6 +72,32 @@ class CashRepository(private val api: SessionApi) {
         api.closeCashShift(branchId, shift.id, "\"${shift.version}\"", idempotencyKey, CashShiftCloseRequest(money(counted), money(leftInDrawer), reason)).data
     }
 
+    // --- Pagos y reembolsos del turno: lo que impide cerrarlo ---
+
+    /** Pagos registrados en el turno, del más reciente al más antiguo. */
+    suspend fun payments(branchId: String, shiftId: String): ApiResult<List<PaymentDto>> = apiCall {
+        all { page -> api.listShiftPayments(branchId, shiftId, page, PER_PAGE) }.sortedByDescending { it.createdAt }
+    }
+
+    /** Reembolsos PENDING o UNKNOWN del turno. El contrato no filtra por turno: se filtra aquí. */
+    suspend fun unresolvedRefunds(branchId: String, shiftId: String): ApiResult<List<RefundDto>> = apiCall {
+        UNRESOLVED.flatMap { status -> all { page -> api.listRefunds(branchId, status, page, PER_PAGE) } }
+            .filter { it.cashShiftId == shiftId && it.status in UNRESOLVED }
+            .sortedBy { it.createdAt }
+    }
+
+    suspend fun reconcilePayment(branchId: String, payment: PaymentDto, idempotencyKey: String, body: ReconcileRequest): ApiResult<PaymentDto> =
+        apiCall { api.reconcilePayment(branchId, payment.id, "\"${payment.version}\"", idempotencyKey, body).data }
+
+    suspend fun refund(branchId: String, payment: PaymentDto, idempotencyKey: String, shiftId: String, reason: String): ApiResult<RefundDto> =
+        apiCall { api.createRefund(branchId, payment.id, idempotencyKey, RefundCreateRequest(shiftId, reason)).data }
+
+    suspend fun refundResult(branchId: String, refund: RefundDto, idempotencyKey: String, body: RefundResultRequest): ApiResult<RefundDto> =
+        apiCall { api.recordRefundResult(branchId, refund.id, "\"${refund.version}\"", idempotencyKey, body).data }
+
+    suspend fun reconcileRefund(branchId: String, refund: RefundDto, idempotencyKey: String, body: ReconcileRequest): ApiResult<RefundDto> =
+        apiCall { api.reconcileRefund(branchId, refund.id, "\"${refund.version}\"", idempotencyKey, body).data }
+
     private suspend fun <T> all(fetch: suspend (Int) -> PagedEnvelope<T>): List<T> {
         val rows = mutableListOf<T>()
         var page = 1
@@ -81,6 +112,7 @@ class CashRepository(private val api: SessionApi) {
 
     private companion object {
         val ACTIVE_STATUSES = listOf("OPEN", "CLOSING")
+        val UNRESOLVED = listOf("PENDING", "UNKNOWN")
         const val PER_PAGE = 100
         const val MAX_PAGES = 20
     }
