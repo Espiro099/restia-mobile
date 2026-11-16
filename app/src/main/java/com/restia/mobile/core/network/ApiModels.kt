@@ -249,10 +249,27 @@ data class CheckDto(
 )
 
 @Serializable
-data class CashShiftDto(val id: String, val cashRegisterId: String, val status: String, val openedAt: String? = null)
+data class CashShiftDto(
+    val id: String,
+    val cashRegisterId: String,
+    val status: String,
+    val openedAt: String? = null,
+    val businessDate: String? = null,
+    // Los montos y motivos solo llegan con cash.read; con cash.read_open, el turno viene sin ellos.
+    val openingAmount: MoneyDto? = null,
+    val openingDifference: MoneyDto? = null,
+    val closingStartedAt: String? = null,
+    val closedAt: String? = null,
+    val expectedCash: MoneyDto? = null,
+    val countedCash: MoneyDto? = null,
+    val difference: MoneyDto? = null,
+    val cashLeftInDrawer: MoneyDto? = null,
+    val reviewRequired: Boolean = false,
+    val version: Int = 1,
+)
 
 @Serializable
-data class CashRegisterDto(val id: String, val code: String, val name: String, val status: String)
+data class CashRegisterDto(val id: String, val code: String, val name: String, val status: String, val version: Int = 1)
 
 @Serializable
 data class CardDto(val brand: String? = null, val last4: String? = null, val authCode: String? = null)
@@ -443,3 +460,50 @@ data class PasswordForgotRequest(val email: String)
 data class PasswordChangeRequest(val currentPassword: String, val newPassword: String) {
     override fun toString(): String = "PasswordChangeRequest(***)"
 }
+
+/** Fondo inicial; el motivo solo si difiere de lo que dejó el turno anterior (CASH_SHIFT_REASON_REQUIRED). */
+@Serializable
+data class CashShiftOpenRequest(val cashRegisterId: String, val openingAmount: MoneyDto, val openingDifferenceReason: String? = null)
+
+@Serializable
+data class CashMovementDto(
+    val id: String,
+    val cashShiftId: String,
+    val type: String,
+    val amount: MoneyDto,
+    val reason: String,
+    val createdAt: String,
+)
+
+/** DEPOSIT o WITHDRAWAL, mayor que 0. */
+@Serializable
+data class CashMovementCreateRequest(val type: String, val amount: MoneyDto, val reason: String)
+
+/** Lo dejado en el cajón no puede superar lo contado; el motivo, obligatorio si hay diferencia. */
+@Serializable
+data class CashShiftCloseRequest(val countedCash: MoneyDto, val cashLeftInDrawer: MoneyDto, val differenceReason: String? = null)
+
+@Serializable
+data class CashMethodTotalDto(val method: String, val sales: MoneyDto, val tips: MoneyDto, val refunds: MoneyDto, val tipsRefunded: MoneyDto)
+
+/** Pagos y reembolsos sin resolver: impiden cerrar el turno. */
+@Serializable
+data class CashUnresolvedDto(val pendingPayments: Int = 0, val unknownPayments: Int = 0, val pendingRefunds: Int = 0, val unknownRefunds: Int = 0) {
+    val total: Int get() = pendingPayments + unknownPayments + pendingRefunds + unknownRefunds
+}
+
+/** `frozen` es true solo con el turno cerrado; en CLOSING el esperado aún cambia si se resuelve un pago pendiente. */
+@Serializable
+data class CashShiftSummaryDto(
+    val cashShiftId: String,
+    val status: String,
+    val openingAmount: MoneyDto,
+    val deposits: MoneyDto,
+    val withdrawals: MoneyDto,
+    val expectedCash: MoneyDto,
+    val countedCash: MoneyDto? = null,
+    val difference: MoneyDto? = null,
+    val byMethod: List<CashMethodTotalDto> = emptyList(),
+    val unresolved: CashUnresolvedDto = CashUnresolvedDto(),
+    val frozen: Boolean = false,
+)

@@ -128,6 +128,8 @@ fun KitchenScreen(
     showStaff: Boolean,
     onStaff: () -> Unit,
     onChangePassword: () -> Unit,
+    showCash: Boolean = false,
+    onCash: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     LifecycleStartEffect(viewModel) {
@@ -146,7 +148,7 @@ fun KitchenScreen(
                 },
                 actions = {
                     if (showTables) TextButton(onClick = onTables) { Text(stringResource(R.string.order_back)) }
-                    AccountMenu(showStaff, logoutEnabled, onStaff, onChangePassword, onLogout)
+                    AccountMenu(showStaff, logoutEnabled, onStaff, onChangePassword, onLogout, showCash, onCash)
                 },
             )
         },

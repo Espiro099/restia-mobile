@@ -9,6 +9,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.restia.mobile.Repositories
 import com.restia.mobile.ui.account.ChangePasswordScreen
 import com.restia.mobile.ui.account.ChangePasswordViewModel
+import com.restia.mobile.ui.cash.CashPermissions
+import com.restia.mobile.ui.cash.CashScreen
+import com.restia.mobile.ui.cash.CashViewModel
 import com.restia.mobile.ui.checks.CheckPermissions
 import com.restia.mobile.ui.checks.CheckScreen
 import com.restia.mobile.ui.checks.CheckViewModel
@@ -51,6 +54,9 @@ fun BranchHome(
     var inStaff by rememberSaveable { mutableStateOf(false) }
     var changingPassword by rememberSaveable { mutableStateOf(false) }
     val showStaff = "members.read" in permissions
+    var inCash by rememberSaveable { mutableStateOf(false) }
+    // Ver montos y movimientos exige cash.read; quien solo tiene cash.read_open (mesero) no entra.
+    val showCash = "cash.read" in permissions
     if (changingPassword) {
         val passwords: ChangePasswordViewModel = viewModel(key = "contrasena-$userId", factory = ChangePasswordViewModel.Factory(repositories.passwords))
         ChangePasswordScreen(
@@ -60,6 +66,20 @@ fun BranchHome(
                 passwords.reset()
                 changingPassword = false
             },
+        )
+        return
+    }
+    if (inCash && showCash) {
+        CashScreen(
+            viewModel = viewModel(
+                key = "caja-$userId-$branchId",
+                factory = CashViewModel.Factory(
+                    repositories.cash,
+                    branchId,
+                    CashPermissions(open = "cash.open" in permissions, move = "cash.move" in permissions, close = "cash.close" in permissions),
+                ),
+            ),
+            onBack = { inCash = false },
         )
         return
     }
@@ -100,6 +120,8 @@ fun BranchHome(
             showStaff = showStaff,
             onStaff = { inStaff = true },
             onChangePassword = { changingPassword = true },
+            showCash = showCash,
+            onCash = { inCash = true },
         )
         return
     }
@@ -167,6 +189,8 @@ fun BranchHome(
             showStaff = showStaff,
             onStaff = { inStaff = true },
             onChangePassword = { changingPassword = true },
+            showCash = showCash,
+            onCash = { inCash = true },
             onViewTable = { session, number ->
                 sessionId = session
                 tableNumber = number
