@@ -11,6 +11,10 @@ import com.restia.mobile.core.network.CashMovementDto
 import com.restia.mobile.core.network.CashRegisterDto
 import com.restia.mobile.core.network.CashShiftDto
 import com.restia.mobile.core.network.CashShiftSummaryDto
+import com.restia.mobile.core.network.PaymentDto
+import com.restia.mobile.core.network.ReconcileRequest
+import com.restia.mobile.core.network.RefundDto
+import com.restia.mobile.core.network.RefundResultRequest
 import com.restia.mobile.data.cash.CASH_CURRENCY
 import com.restia.mobile.data.cash.CashRepository
 import com.restia.mobile.data.cash.RegisterShift
@@ -25,10 +29,47 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
-/** Permisos de caja del empleado; ver la pantalla exige cash.read. */
-data class CashPermissions(val open: Boolean, val move: Boolean, val close: Boolean)
+/** Permisos de caja del empleado; ver la pantalla exige cash.read. Los de pagos y reembolsos, para resolver lo que traba el corte. */
+data class CashPermissions(
+    val open: Boolean,
+    val move: Boolean,
+    val close: Boolean,
+    val readPayments: Boolean = false,
+    val reconcilePayments: Boolean = false,
+    val readRefunds: Boolean = false,
+    val refund: Boolean = false,
+    val refundResult: Boolean = false,
+    val reconcileRefunds: Boolean = false,
+)
 
 private fun validReason(text: String) = text.trim().length >= 3
+
+/** Qué se resuelve: conciliar un pago UNKNOWN, reembolsar un pago, o el resultado o la conciliación de un reembolso. */
+enum class ResolveKind { RECONCILE_PAYMENT, REFUND, REFUND_RESULT, RECONCILE_REFUND }
+
+/** Un pago confirmado sin reembolso se puede reembolsar completo, con su propina (P-7). */
+fun isRefundable(payment: PaymentDto): Boolean = payment.status == "CONFIRMED" && payment.refundId == null
+
+/**
+ * Formulario único para resolver un pago o un reembolso. CONFIRMED exige la referencia de la terminal o
+ * la transferencia; conciliar y reembolsar exigen motivo. Registrar el resultado de un reembolso no lo pide.
+ */
+data class ResolveForm(
+    val kind: ResolveKind,
+    val payment: PaymentDto? = null,
+    val refund: RefundDto? = null,
+    val outcome: String = "CONFIRMED",
+    val reference: String = "",
+    val reason: String = "",
+    val submitting: Boolean = false,
+    val failure: ApiFailure? = null,
+) {
+    val asksOutcome: Boolean get() = kind != ResolveKind.REFUND
+    val asksReason: Boolean get() = kind != ResolveKind.REFUND_RESULT
+    val needsReference: Boolean get() = asksOutcome && outcome == "CONFIRMED"
+    val canSubmit: Boolean
+        get() = !submitting && (!needsReference || reference.isNotBlank()) && (!asksReason || validReason(reason))
+}
 
 /** Diferencia del corte: lo contado menos lo esperado. Positiva sobra; negativa falta. */
 fun closingDifference(counted: BigDecimal, expected: BigDecimal): BigDecimal = counted.subtract(expected)
@@ -88,6 +129,9 @@ data class ShiftDetail(
     val shift: CashShiftDto,
     val summary: CashShiftSummaryDto? = null,
     val movements: List<CashMovementDto> = emptyList(),
+    val payments: List<PaymentDto> = emptyList(),
+    /** Reembolsos PENDING o UNKNOWN registrados en este turno. */
+    val refunds: List<RefundDto> = emptyList(),
     val loading: Boolean = false,
     val failure: ApiFailure? = null,
 ) {
@@ -108,6 +152,7 @@ data class CashUiState(
     val confirmingStart: Boolean = false,
     val closing: CloseForm? = null,
     val cancelling: CancelForm? = null,
+    val resolving: ResolveForm? = null,
     val working: Boolean = false,
     val actionFailure: ApiFailure? = null,
     val notice: Notice? = null,
@@ -214,7 +259,9 @@ class CashViewModel(
 
     fun closeDetail() {
         if (_state.value.working) return
-        _state.value = _state.value.copy(detail = null, moving = null, closing = null, cancelling = null, confirmingStart = false, actionFailure = null)
+        _state.value = _state.value.copy(
+            detail = null, moving = null, closing = null, cancelling = null, resolving = null, confirmingStart = false, actionFailure = null,
+        )
         refresh()
     }
 
@@ -225,17 +272,89 @@ class CashViewModel(
             val shift = repository.shift(branchId, detail.shift.id)
             val summary = repository.summary(branchId, detail.shift.id)
             val movements = repository.movements(branchId, detail.shift.id)
+            val payments = if (can.readPayments) repository.payments(branchId, detail.shift.id) else ApiResult.Success(emptyList())
+            val refunds = if (can.readRefunds) repository.unresolvedRefunds(branchId, detail.shift.id) else ApiResult.Success(emptyList())
             val current = _state.value.detail ?: return@launch
-            val failure = listOf(shift, summary, movements).filterIsInstance<ApiResult.Failure>().firstOrNull()?.failure
+            val failure = listOf(shift, summary, movements, payments, refunds).filterIsInstance<ApiResult.Failure>().firstOrNull()?.failure
             _state.value = _state.value.copy(
                 detail = current.copy(
                     shift = (shift as? ApiResult.Success)?.value ?: current.shift,
                     summary = (summary as? ApiResult.Success)?.value ?: current.summary,
                     movements = (movements as? ApiResult.Success)?.value ?: current.movements,
+                    payments = (payments as? ApiResult.Success)?.value ?: current.payments,
+                    refunds = (refunds as? ApiResult.Success)?.value ?: current.refunds,
                     loading = false,
                     failure = failure,
                 ),
             )
+        }
+    }
+
+    // --- Resolver pagos y reembolsos ---
+
+    fun startReconcilePayment(payment: PaymentDto) {
+        if (!can.reconcilePayments || payment.status != "UNKNOWN") return
+        _state.value = _state.value.copy(resolving = ResolveForm(ResolveKind.RECONCILE_PAYMENT, payment = payment), notice = null)
+    }
+
+    /** El reembolso va al turno que se está viendo, que debe estar OPEN. */
+    fun startRefund(payment: PaymentDto) {
+        if (!can.refund || !isRefundable(payment) || _state.value.detail?.shift?.status != "OPEN") return
+        _state.value = _state.value.copy(resolving = ResolveForm(ResolveKind.REFUND, payment = payment), notice = null)
+    }
+
+    fun startRefundResolution(refund: RefundDto) {
+        val form = when {
+            refund.status == "PENDING" && can.refundResult -> ResolveForm(ResolveKind.REFUND_RESULT, refund = refund)
+            refund.status == "UNKNOWN" && can.reconcileRefunds -> ResolveForm(ResolveKind.RECONCILE_REFUND, refund = refund)
+            else -> return
+        }
+        _state.value = _state.value.copy(resolving = form, notice = null)
+    }
+
+    fun editResolve(transform: (ResolveForm) -> ResolveForm) {
+        val form = _state.value.resolving ?: return
+        if (form.submitting) return
+        _state.value = _state.value.copy(resolving = transform(form).copy(failure = null))
+    }
+
+    fun dismissResolve() {
+        if (_state.value.resolving?.submitting == true) return
+        _state.value = _state.value.copy(resolving = null)
+    }
+
+    fun submitResolve() {
+        val form = _state.value.resolving ?: return
+        val detail = _state.value.detail ?: return
+        if (!form.canSubmit) return
+        val reference = form.reference.trim().takeIf { form.needsReference }
+        val reason = form.reason.trim()
+        val target = form.payment?.let { it.id to it.version } ?: form.refund?.let { it.id to it.version }
+        val key = keyFor(listOf(form.kind, target, form.outcome, reference, reason))
+        _state.value = _state.value.copy(resolving = form.copy(submitting = true, failure = null))
+        viewModelScope.launch {
+            val r: ApiResult<Any> = when (form.kind) {
+                ResolveKind.RECONCILE_PAYMENT -> repository.reconcilePayment(branchId, form.payment!!, key, ReconcileRequest(form.outcome, reference, reason))
+                ResolveKind.REFUND -> repository.refund(branchId, form.payment!!, key, detail.shift.id, reason)
+                ResolveKind.REFUND_RESULT -> repository.refundResult(branchId, form.refund!!, key, RefundResultRequest(form.outcome, reference))
+                ResolveKind.RECONCILE_REFUND -> repository.reconcileRefund(branchId, form.refund!!, key, ReconcileRequest(form.outcome, reference, reason))
+            }
+            when (r) {
+                is ApiResult.Success -> {
+                    val notice = when (form.kind) {
+                        ResolveKind.REFUND -> if ((r.value as RefundDto).status == "PENDING") R.string.cash_refund_pending else R.string.cash_refund_done
+                        else -> if (form.outcome == "CONFIRMED") R.string.cash_resolved_confirmed else R.string.cash_resolved_failed
+                    }
+                    _state.value = _state.value.copy(resolving = null, notice = Notice(notice))
+                    loadDetail()
+                }
+                is ApiResult.Failure -> {
+                    _state.value = _state.value.copy(resolving = form.copy(submitting = false, failure = r.failure))
+                    // Lo resolvió otro dispositivo o cambió de estado: se muestra lo vigente.
+                    val code = (r.failure as? ApiFailure.Server)?.code
+                    if (code in setOf("VERSION_CONFLICT", "PAYMENT_INVALID_STATE", "REFUND_INVALID_STATE", "REFUND_ALREADY_EXISTS", "PAYMENT_NOT_REFUNDABLE")) loadDetail()
+                }
+            }
         }
     }
 

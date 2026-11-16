@@ -24,6 +24,10 @@ import com.restia.mobile.core.network.MemberRoleRequest
 import com.restia.mobile.core.network.PasswordChangeRequest
 import com.restia.mobile.core.network.PasswordSetupLinkDto
 import com.restia.mobile.core.network.ReasonRequest
+import com.restia.mobile.core.network.ReconcileRequest
+import com.restia.mobile.core.network.RefundCreateRequest
+import com.restia.mobile.core.network.RefundDto
+import com.restia.mobile.core.network.RefundResultRequest
 import com.restia.mobile.core.network.QueueEntryDto
 import com.restia.mobile.core.network.ReservationCreateRequest
 import com.restia.mobile.core.network.ReservationDto
@@ -90,6 +94,15 @@ open class UnusedSessionApi : SessionApi {
         idempotencyKey: String,
         body: CashShiftCloseRequest,
     ): Envelope<CashShiftDto> = error("sin uso")
+    override suspend fun listShiftPayments(branchId: String, cashShiftId: String, page: Int, perPage: Int): PagedEnvelope<PaymentDto> = error("sin uso")
+    override suspend fun reconcilePayment(branchId: String, paymentId: String, ifMatch: String, idempotencyKey: String, body: ReconcileRequest): Envelope<PaymentDto> =
+        error("sin uso")
+    override suspend fun createRefund(branchId: String, paymentId: String, idempotencyKey: String, body: RefundCreateRequest): Envelope<RefundDto> = error("sin uso")
+    override suspend fun listRefunds(branchId: String, status: String, page: Int, perPage: Int): PagedEnvelope<RefundDto> = error("sin uso")
+    override suspend fun recordRefundResult(branchId: String, refundId: String, ifMatch: String, idempotencyKey: String, body: RefundResultRequest): Envelope<RefundDto> =
+        error("sin uso")
+    override suspend fun reconcileRefund(branchId: String, refundId: String, ifMatch: String, idempotencyKey: String, body: ReconcileRequest): Envelope<RefundDto> =
+        error("sin uso")
     override suspend fun listPayments(branchId: String, checkId: String, page: Int, perPage: Int): PagedEnvelope<PaymentDto> = error("sin uso")
     override suspend fun createPayment(branchId: String, idempotencyKey: String, body: PaymentCreateRequest): Envelope<PaymentDto> = error("sin uso")
     override suspend fun recordPaymentResult(

@@ -76,7 +76,17 @@ fun BranchHome(
                 factory = CashViewModel.Factory(
                     repositories.cash,
                     branchId,
-                    CashPermissions(open = "cash.open" in permissions, move = "cash.move" in permissions, close = "cash.close" in permissions),
+                    CashPermissions(
+                        open = "cash.open" in permissions,
+                        move = "cash.move" in permissions,
+                        close = "cash.close" in permissions,
+                        readPayments = "payments.read" in permissions,
+                        reconcilePayments = "payments.reconcile" in permissions,
+                        readRefunds = "refunds.read" in permissions,
+                        refund = "refunds.create" in permissions,
+                        refundResult = "refunds.record_result" in permissions,
+                        reconcileRefunds = "refunds.reconcile" in permissions,
+                    ),
                 ),
             ),
             onBack = { inCash = false },

@@ -199,6 +199,58 @@ interface SessionApi {
     ): Envelope<CashShiftDto>
 
     @GET("branches/{branchId}/payments")
+    suspend fun listShiftPayments(
+        @Path("branchId") branchId: String,
+        @Query("cashShiftId") cashShiftId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<PaymentDto>
+
+    @POST("branches/{branchId}/payments/{paymentId}/reconcile")
+    suspend fun reconcilePayment(
+        @Path("branchId") branchId: String,
+        @Path("paymentId") paymentId: String,
+        @Header("If-Match") ifMatch: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: ReconcileRequest,
+    ): Envelope<PaymentDto>
+
+    @POST("branches/{branchId}/payments/{paymentId}/refunds")
+    suspend fun createRefund(
+        @Path("branchId") branchId: String,
+        @Path("paymentId") paymentId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: RefundCreateRequest,
+    ): Envelope<RefundDto>
+
+    /** Sin filtro por turno en el contrato: se filtra por estado y la app separa los del turno. */
+    @GET("branches/{branchId}/refunds")
+    suspend fun listRefunds(
+        @Path("branchId") branchId: String,
+        @Query("status") status: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<RefundDto>
+
+    @POST("branches/{branchId}/refunds/{refundId}/result")
+    suspend fun recordRefundResult(
+        @Path("branchId") branchId: String,
+        @Path("refundId") refundId: String,
+        @Header("If-Match") ifMatch: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: RefundResultRequest,
+    ): Envelope<RefundDto>
+
+    @POST("branches/{branchId}/refunds/{refundId}/reconcile")
+    suspend fun reconcileRefund(
+        @Path("branchId") branchId: String,
+        @Path("refundId") refundId: String,
+        @Header("If-Match") ifMatch: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: ReconcileRequest,
+    ): Envelope<RefundDto>
+
+    @GET("branches/{branchId}/payments")
     suspend fun listPayments(
         @Path("branchId") branchId: String,
         @Query("checkId") checkId: String,

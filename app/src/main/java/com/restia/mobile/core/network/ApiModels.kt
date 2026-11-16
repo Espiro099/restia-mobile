@@ -287,6 +287,8 @@ data class PaymentDto(
     val change: MoneyDto? = null,
     val card: CardDto? = null,
     val reference: String? = null,
+    /** Reembolso activo del pago, si lo tiene (uno por pago). */
+    val refundId: String? = null,
     val createdAt: String,
     val version: Int,
 )
@@ -507,3 +509,31 @@ data class CashShiftSummaryDto(
     val unresolved: CashUnresolvedDto = CashUnresolvedDto(),
     val frozen: Boolean = false,
 )
+
+/** Reembolso del pago completo, con su propina; el efectivo queda CONFIRMED al crear (P-7). */
+@Serializable
+data class RefundDto(
+    val id: String,
+    val paymentId: String,
+    val checkId: String,
+    val cashShiftId: String,
+    val status: String,
+    val amount: MoneyDto,
+    val tip: MoneyDto,
+    val reference: String? = null,
+    val reason: String,
+    val createdAt: String,
+    val version: Int,
+)
+
+/** El reembolso se registra en un turno OPEN, no necesariamente el del pago. */
+@Serializable
+data class RefundCreateRequest(val cashShiftId: String, val reason: String)
+
+/** Resultado de un reembolso PENDING; la referencia es obligatoria en CONFIRMED. */
+@Serializable
+data class RefundResultRequest(val outcome: String, val reference: String? = null)
+
+/** Resolver un pago o reembolso UNKNOWN: CONFIRMED (con referencia) o FAILED, siempre con motivo. */
+@Serializable
+data class ReconcileRequest(val outcome: String, val reference: String? = null, val reason: String)
