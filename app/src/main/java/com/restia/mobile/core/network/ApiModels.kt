@@ -316,7 +316,24 @@ data class PaymentResultRequest(
 data class PrintJobRequest(val type: String, val sourceId: String)
 
 @Serializable
-data class PrintJobDto(val id: String, val type: String, val status: String)
+data class PrintJobDto(
+    val id: String,
+    val type: String,
+    val status: String,
+    val printerId: String? = null,
+    val sourceId: String? = null,
+    /** Trabajo original de una reimpresión. */
+    val originalJobId: String? = null,
+    val reason: String? = null,
+    val attempts: Int = 0,
+    val lastError: PrintErrorDto? = null,
+    val createdAt: String? = null,
+    val printedAt: String? = null,
+    val version: Int = 1,
+)
+
+@Serializable
+data class PrintErrorDto(val code: String, val message: String)
 
 /** Copia del cliente en la reserva (R-11). Sin teléfono una vez borrados los datos personales. */
 @Serializable
@@ -537,3 +554,14 @@ data class RefundResultRequest(val outcome: String, val reference: String? = nul
 /** Resolver un pago o reembolso UNKNOWN: CONFIRMED (con referencia) o FAILED, siempre con motivo. */
 @Serializable
 data class ReconcileRequest(val outcome: String, val reference: String? = null, val reason: String)
+
+@Serializable
+data class PrinterDto(val id: String, val code: String, val name: String, val status: String)
+
+/** Otra impresora si la original no funciona; sin ella, se reintenta en la misma. */
+@Serializable
+data class PrintJobRetryRequest(val printerId: String? = null)
+
+/** Un trabajo UNKNOWN: ¿salió impreso o no? */
+@Serializable
+data class PrintJobResolveRequest(val outcome: String, val reason: String)

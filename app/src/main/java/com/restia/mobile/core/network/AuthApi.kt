@@ -274,6 +274,56 @@ interface SessionApi {
         @Body body: PaymentResultRequest,
     ): Envelope<PaymentDto>
 
+    /** Del más reciente al más antiguo. */
+    @GET("branches/{branchId}/print-jobs")
+    suspend fun listPrintJobs(
+        @Path("branchId") branchId: String,
+        @Query("status") status: String?,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<PrintJobDto>
+
+    @GET("branches/{branchId}/printers")
+    suspend fun listPrinters(
+        @Path("branchId") branchId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<PrinterDto>
+
+    /** Solo FAILED; un UNKNOWN primero se resuelve (PRINT_JOB_UNKNOWN). */
+    @POST("branches/{branchId}/print-jobs/{printJobId}/retry")
+    suspend fun retryPrintJob(
+        @Path("branchId") branchId: String,
+        @Path("printJobId") printJobId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: PrintJobRetryRequest,
+    ): Envelope<PrintJobDto>
+
+    @POST("branches/{branchId}/print-jobs/{printJobId}/resolve")
+    suspend fun resolvePrintJob(
+        @Path("branchId") branchId: String,
+        @Path("printJobId") printJobId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: PrintJobResolveRequest,
+    ): Envelope<PrintJobDto>
+
+    @POST("branches/{branchId}/print-jobs/{printJobId}/cancel")
+    suspend fun cancelPrintJob(
+        @Path("branchId") branchId: String,
+        @Path("printJobId") printJobId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: ReasonRequest,
+    ): Envelope<PrintJobDto>
+
+    /** Crea un trabajo nuevo con el contenido original, marcado como REIMPRESIÓN. */
+    @POST("branches/{branchId}/print-jobs/{printJobId}/reprint")
+    suspend fun reprintPrintJob(
+        @Path("branchId") branchId: String,
+        @Path("printJobId") printJobId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: ReasonRequest,
+    ): Envelope<PrintJobDto>
+
     @POST("branches/{branchId}/print-jobs")
     suspend fun createPrintJob(
         @Path("branchId") branchId: String,

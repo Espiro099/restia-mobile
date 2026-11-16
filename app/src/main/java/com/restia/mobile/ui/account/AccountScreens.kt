@@ -66,11 +66,16 @@ fun AccountMenu(
     onLogout: () -> Unit,
     showCash: Boolean = false,
     onCash: () -> Unit = {},
+    showPrinting: Boolean = false,
+    onPrinting: () -> Unit = {},
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
         TextButton(onClick = { open = true }) { Text(stringResource(R.string.account_menu)) }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (showPrinting) {
+                DropdownMenuItem(text = { Text(stringResource(R.string.print_title)) }, onClick = { open = false; onPrinting() })
+            }
             if (showCash) {
                 DropdownMenuItem(text = { Text(stringResource(R.string.cash_title)) }, onClick = { open = false; onCash() })
             }

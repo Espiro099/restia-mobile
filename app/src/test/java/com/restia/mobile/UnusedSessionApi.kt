@@ -37,6 +37,9 @@ import com.restia.mobile.core.network.PaymentDto
 import com.restia.mobile.core.network.PaymentResultRequest
 import com.restia.mobile.core.network.PrintJobDto
 import com.restia.mobile.core.network.PrintJobRequest
+import com.restia.mobile.core.network.PrintJobResolveRequest
+import com.restia.mobile.core.network.PrintJobRetryRequest
+import com.restia.mobile.core.network.PrinterDto
 import com.restia.mobile.core.network.KitchenUnitDto
 import com.restia.mobile.core.network.StationDto
 import com.restia.mobile.core.network.MeData
@@ -112,6 +115,14 @@ open class UnusedSessionApi : SessionApi {
         idempotencyKey: String,
         body: PaymentResultRequest,
     ): Envelope<PaymentDto> = error("sin uso")
+    override suspend fun listPrintJobs(branchId: String, status: String?, page: Int, perPage: Int): PagedEnvelope<PrintJobDto> = error("sin uso")
+    override suspend fun listPrinters(branchId: String, page: Int, perPage: Int): PagedEnvelope<PrinterDto> = error("sin uso")
+    override suspend fun retryPrintJob(branchId: String, printJobId: String, ifMatch: String, body: PrintJobRetryRequest): Envelope<PrintJobDto> = error("sin uso")
+    override suspend fun resolvePrintJob(branchId: String, printJobId: String, ifMatch: String, body: PrintJobResolveRequest): Envelope<PrintJobDto> =
+        error("sin uso")
+    override suspend fun cancelPrintJob(branchId: String, printJobId: String, ifMatch: String, body: ReasonRequest): Envelope<PrintJobDto> = error("sin uso")
+    override suspend fun reprintPrintJob(branchId: String, printJobId: String, idempotencyKey: String, body: ReasonRequest): Envelope<PrintJobDto> =
+        error("sin uso")
     override suspend fun createPrintJob(branchId: String, idempotencyKey: String, body: PrintJobRequest): Envelope<PrintJobDto> = error("sin uso")
     override suspend fun listReservations(branchId: String, from: String, to: String, page: Int, perPage: Int): PagedEnvelope<ReservationDto> =
         error("sin uso")
