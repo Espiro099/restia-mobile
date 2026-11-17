@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <application android:networkSecurityConfig="@xml/network_security_config" />
-
-</manifest>
+<!-- La configuración de red de debug está en src/debug/res/xml/network_security_config.xml, que
+     sustituye a la de release con el mismo nombre de recurso. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

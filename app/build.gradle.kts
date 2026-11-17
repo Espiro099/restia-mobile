@@ -27,9 +27,14 @@ android {
             // restia-api local por adb reverse. 10.0.2.2 requeriría ACCESS_LOCAL_NETWORK en Android 17.
             // Para el servidor simulado: restia.apiBaseUrl=http://127.0.0.1:4010/ en local.properties.
             buildConfigField("String", "API_BASE_URL", "\"${localProperty("restia.apiBaseUrl") ?: "http://127.0.0.1:8000/api/v1/"}\"")
+            // Anclaje opcional en debug: con el proxy TLS local (restia-api/deploy/apache) se pone
+            // restia.apiBaseUrl=https://127.0.0.1:8443/api/v1/ y restia.apiPins=<huella SPKI>.
+            buildConfigField("String", "API_CERT_PINS", "\"${localProperty("restia.apiPins") ?: ""}\"")
         }
         release {
             buildConfigField("String", "API_BASE_URL", "\"https://api.restia.com/api/v1/\"")
+            // Obligatorio en release: huella actual y de respaldo del certificado de api.restia.com.
+            buildConfigField("String", "API_CERT_PINS", "\"${localProperty("restia.releaseApiPins") ?: providers.gradleProperty("restia.releaseApiPins").orNull ?: ""}\"")
         }
     }
 
@@ -63,6 +68,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.okhttp.tls)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)

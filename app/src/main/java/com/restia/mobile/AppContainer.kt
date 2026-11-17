@@ -2,6 +2,7 @@ package com.restia.mobile
 
 import android.content.Context
 import com.restia.mobile.core.network.BearerInterceptor
+import com.restia.mobile.core.network.CertificatePinning
 import com.restia.mobile.core.network.ContactInterceptor
 import com.restia.mobile.core.network.PublicAuthApi
 import com.restia.mobile.core.network.RequestIdInterceptor
@@ -53,11 +54,18 @@ class Repositories(
     val printing: PrintingRepository,
 )
 
-fun buildRepositories(baseUrl: String, store: CredentialStore, blobs: BlobStore): Repositories {
+fun buildRepositories(
+    baseUrl: String,
+    store: CredentialStore,
+    blobs: BlobStore,
+    certificatePins: List<String> = emptyList(),
+    pinsRequired: Boolean = false,
+): Repositories {
     val accessToken = AccessTokenHolder()
     val state = AuthStateHolder()
     val converter = ApiJson.asConverterFactory("application/json".toMediaType())
-    val base = OkHttpClient.Builder()
+    // Todas las llamadas (públicas y con sesión) salen de este cliente, así que todas llevan el anclaje.
+    val base = CertificatePinning.apply(OkHttpClient.Builder(), baseUrl, certificatePins, pinsRequired)
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .addInterceptor(RequestIdInterceptor())
@@ -93,5 +101,12 @@ fun buildRepositories(baseUrl: String, store: CredentialStore, blobs: BlobStore)
 
 class AppContainer(context: Context) {
     private val blobs = EncryptedFileStore(context.applicationContext)
-    val repositories = buildRepositories(BuildConfig.API_BASE_URL, KeystoreCredentialStore(context.applicationContext, blobs), blobs)
+    val repositories = buildRepositories(
+        BuildConfig.API_BASE_URL,
+        KeystoreCredentialStore(context.applicationContext, blobs),
+        blobs,
+        certificatePins = CertificatePinning.parse(BuildConfig.API_CERT_PINS),
+        // En release, sin HTTPS o sin huellas la app no se conecta (falla cerrado).
+        pinsRequired = !BuildConfig.DEBUG,
+    )
 }
