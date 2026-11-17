@@ -185,6 +185,8 @@ fun TablesScreen(
     onChangePassword: () -> Unit,
     showCash: Boolean = false,
     onCash: () -> Unit = {},
+    showPrinting: Boolean = false,
+    onPrinting: () -> Unit = {},
     onViewTable: (sessionId: String, tableNumber: Int) -> Unit,
     onOrder: (sessionId: String, tableNumber: Int) -> Unit,
     onKitchen: () -> Unit,
@@ -222,7 +224,7 @@ fun TablesScreen(
                 actions = {
                     if (showReservations) TextButton(onClick = onReservations) { Text(stringResource(R.string.reservations_title)) }
                     if (showKitchen) TextButton(onClick = onKitchen) { Text(stringResource(R.string.kitchen_title)) }
-                    AccountMenu(showStaff, logoutEnabled, onStaff, onChangePassword, onLogout, showCash, onCash)
+                    AccountMenu(showStaff, logoutEnabled, onStaff, onChangePassword, onLogout, showCash, onCash, showPrinting, onPrinting)
                 },
             )
         },

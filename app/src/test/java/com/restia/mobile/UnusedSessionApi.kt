@@ -10,7 +10,10 @@ import com.restia.mobile.core.network.CashMovementDto
 import com.restia.mobile.core.network.CashShiftCloseRequest
 import com.restia.mobile.core.network.CashShiftOpenRequest
 import com.restia.mobile.core.network.CashShiftSummaryDto
+import com.restia.mobile.core.network.CheckAdjustmentRequest
+import com.restia.mobile.core.network.CheckCreateRequest
 import com.restia.mobile.core.network.CheckDto
+import com.restia.mobile.core.network.CheckMoveUnitsRequest
 import com.restia.mobile.core.network.AvailabilityDto
 import com.restia.mobile.core.network.CustomerCreateRequest
 import com.restia.mobile.core.network.CustomerDto
@@ -24,6 +27,10 @@ import com.restia.mobile.core.network.MemberRoleRequest
 import com.restia.mobile.core.network.PasswordChangeRequest
 import com.restia.mobile.core.network.PasswordSetupLinkDto
 import com.restia.mobile.core.network.ReasonRequest
+import com.restia.mobile.core.network.ReconcileRequest
+import com.restia.mobile.core.network.RefundCreateRequest
+import com.restia.mobile.core.network.RefundDto
+import com.restia.mobile.core.network.RefundResultRequest
 import com.restia.mobile.core.network.QueueEntryDto
 import com.restia.mobile.core.network.ReservationCreateRequest
 import com.restia.mobile.core.network.ReservationDto
@@ -33,6 +40,9 @@ import com.restia.mobile.core.network.PaymentDto
 import com.restia.mobile.core.network.PaymentResultRequest
 import com.restia.mobile.core.network.PrintJobDto
 import com.restia.mobile.core.network.PrintJobRequest
+import com.restia.mobile.core.network.PrintJobResolveRequest
+import com.restia.mobile.core.network.PrintJobRetryRequest
+import com.restia.mobile.core.network.PrinterDto
 import com.restia.mobile.core.network.KitchenUnitDto
 import com.restia.mobile.core.network.StationDto
 import com.restia.mobile.core.network.MeData
@@ -66,6 +76,26 @@ open class UnusedSessionApi : SessionApi {
     override suspend fun listQueue(branchId: String, stationId: String?, page: Int, perPage: Int, etag: String?): Response<PagedEnvelope<KitchenUnitDto>> =
         error("sin uso")
     override suspend fun listChecks(branchId: String, sessionId: String, page: Int, perPage: Int): PagedEnvelope<CheckDto> = error("sin uso")
+    override suspend fun createCheck(branchId: String, idempotencyKey: String, body: CheckCreateRequest): Envelope<CheckDto> = error("sin uso")
+    override suspend fun moveCheckUnits(branchId: String, checkId: String, ifMatch: String, body: CheckMoveUnitsRequest): Envelope<CheckDto> = error("sin uso")
+    override suspend fun reopenCheck(branchId: String, checkId: String, ifMatch: String, body: ReasonRequest, approvalToken: String?): Envelope<CheckDto> =
+        error("sin uso")
+    override suspend fun cancelCheck(branchId: String, checkId: String, ifMatch: String, body: ReasonRequest): Envelope<CheckDto> = error("sin uso")
+    override suspend fun createCheckAdjustment(
+        branchId: String,
+        checkId: String,
+        ifMatch: String,
+        body: CheckAdjustmentRequest,
+        approvalToken: String?,
+    ): Envelope<CheckDto> = error("sin uso")
+    override suspend fun revertCheckAdjustment(
+        branchId: String,
+        checkId: String,
+        adjustmentId: String,
+        ifMatch: String,
+        body: ReasonRequest,
+        approvalToken: String?,
+    ): Envelope<CheckDto> = error("sin uso")
     override suspend fun requestCheck(branchId: String, checkId: String, ifMatch: String): Envelope<CheckDto> = error("sin uso")
     override suspend fun listCashShifts(branchId: String, status: String, page: Int, perPage: Int): PagedEnvelope<CashShiftDto> = error("sin uso")
     override suspend fun listCashRegisters(branchId: String, page: Int, perPage: Int): PagedEnvelope<CashRegisterDto> = error("sin uso")
@@ -90,6 +120,15 @@ open class UnusedSessionApi : SessionApi {
         idempotencyKey: String,
         body: CashShiftCloseRequest,
     ): Envelope<CashShiftDto> = error("sin uso")
+    override suspend fun listShiftPayments(branchId: String, cashShiftId: String, page: Int, perPage: Int): PagedEnvelope<PaymentDto> = error("sin uso")
+    override suspend fun reconcilePayment(branchId: String, paymentId: String, ifMatch: String, idempotencyKey: String, body: ReconcileRequest): Envelope<PaymentDto> =
+        error("sin uso")
+    override suspend fun createRefund(branchId: String, paymentId: String, idempotencyKey: String, body: RefundCreateRequest): Envelope<RefundDto> = error("sin uso")
+    override suspend fun listRefunds(branchId: String, status: String, page: Int, perPage: Int): PagedEnvelope<RefundDto> = error("sin uso")
+    override suspend fun recordRefundResult(branchId: String, refundId: String, ifMatch: String, idempotencyKey: String, body: RefundResultRequest): Envelope<RefundDto> =
+        error("sin uso")
+    override suspend fun reconcileRefund(branchId: String, refundId: String, ifMatch: String, idempotencyKey: String, body: ReconcileRequest): Envelope<RefundDto> =
+        error("sin uso")
     override suspend fun listPayments(branchId: String, checkId: String, page: Int, perPage: Int): PagedEnvelope<PaymentDto> = error("sin uso")
     override suspend fun createPayment(branchId: String, idempotencyKey: String, body: PaymentCreateRequest): Envelope<PaymentDto> = error("sin uso")
     override suspend fun recordPaymentResult(
@@ -99,6 +138,14 @@ open class UnusedSessionApi : SessionApi {
         idempotencyKey: String,
         body: PaymentResultRequest,
     ): Envelope<PaymentDto> = error("sin uso")
+    override suspend fun listPrintJobs(branchId: String, status: String?, page: Int, perPage: Int): PagedEnvelope<PrintJobDto> = error("sin uso")
+    override suspend fun listPrinters(branchId: String, page: Int, perPage: Int): PagedEnvelope<PrinterDto> = error("sin uso")
+    override suspend fun retryPrintJob(branchId: String, printJobId: String, ifMatch: String, body: PrintJobRetryRequest): Envelope<PrintJobDto> = error("sin uso")
+    override suspend fun resolvePrintJob(branchId: String, printJobId: String, ifMatch: String, body: PrintJobResolveRequest): Envelope<PrintJobDto> =
+        error("sin uso")
+    override suspend fun cancelPrintJob(branchId: String, printJobId: String, ifMatch: String, body: ReasonRequest): Envelope<PrintJobDto> = error("sin uso")
+    override suspend fun reprintPrintJob(branchId: String, printJobId: String, idempotencyKey: String, body: ReasonRequest): Envelope<PrintJobDto> =
+        error("sin uso")
     override suspend fun createPrintJob(branchId: String, idempotencyKey: String, body: PrintJobRequest): Envelope<PrintJobDto> = error("sin uso")
     override suspend fun listReservations(branchId: String, from: String, to: String, page: Int, perPage: Int): PagedEnvelope<ReservationDto> =
         error("sin uso")

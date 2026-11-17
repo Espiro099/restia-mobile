@@ -13,14 +13,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -28,6 +32,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,8 +44,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleStartEffect
 import com.restia.mobile.R
@@ -112,7 +120,7 @@ private fun PaymentRow(payment: PaymentDto, canRecord: Boolean, canPrint: Boolea
             Text(stringResource(methodLabel(payment.method)) + brand + " · " + money(payment.amount))
             if (amountOf(payment.tip).signum() > 0) Text(stringResource(R.string.payment_tip, money(payment.tip)), style = MaterialTheme.typography.bodySmall)
             Text(
-                stringResource(paymentStatusLabel(payment.status)),
+                stringResource(paymentStatusLabel(payment.status)) + if (payment.refundId != null) " · " + stringResource(R.string.payment_refunded) else "",
                 style = MaterialTheme.typography.bodySmall,
                 color = if (payment.status == "UNKNOWN" || payment.status == "PENDING") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -126,7 +134,16 @@ private fun PaymentRow(payment: PaymentDto, canRecord: Boolean, canPrint: Boolea
     }
 }
 
-data class CheckPermissions(val request: Boolean, val pay: Boolean, val record: Boolean, val print: Boolean)
+data class CheckPermissions(
+    val request: Boolean,
+    val pay: Boolean,
+    val record: Boolean,
+    val print: Boolean,
+    /** checks.move_units y checks.create: separar platillos, a otra cuenta o a una nueva. */
+    val move: Boolean = false,
+    val create: Boolean = false,
+    val cancel: Boolean = false,
+)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -142,8 +159,16 @@ private fun CheckCard(check: CheckDto, payments: List<PaymentDto>, can: CheckPer
                 val total = amountOf(rows.first().price).multiply(BigDecimal(rows.size))
                 AmountRow(rows.size.toString() + " × " + key.first, money(total, rows.first().price.currency))
             }
-            billed.mapNotNull { u -> u.adjustment?.let { u.productName to it } }.forEach { (name, adj) ->
-                AmountRow(stringResource(R.string.check_courtesy, name), "-" + money(adj.amount))
+            billed.filter { it.adjustment != null }.forEach { u ->
+                val adj = u.adjustment!!
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.check_courtesy, u.productName), modifier = Modifier.weight(1f))
+                    // Quitar la cortesía: con checks.adjust o con autorización de un gerente.
+                    if (canAdjust(check)) {
+                        TextButton(onClick = { viewModel.startAction(CheckActionKind.REVERT, check, u) }, enabled = !busy) { Text(stringResource(R.string.courtesy_revert)) }
+                    }
+                    Text("-" + money(adj.amount))
+                }
             }
             if (billed.isEmpty()) Text(stringResource(R.string.check_empty), style = MaterialTheme.typography.bodySmall)
             HorizontalDivider()
@@ -153,7 +178,11 @@ private fun CheckCard(check: CheckDto, payments: List<PaymentDto>, can: CheckPer
             AmountRow(stringResource(R.string.check_total), money(check.total), strong = true)
             if (amountOf(check.paidTotal).signum() != 0) AmountRow(stringResource(R.string.check_paid_total), money(check.paidTotal))
             if (amountOf(check.pendingTotal).signum() != 0) AmountRow(stringResource(R.string.check_pending_total), money(check.pendingTotal))
-            AmountRow(stringResource(R.string.check_balance), money(check.balance), strong = true)
+            check.refundedTotal?.takeIf { amountOf(it).signum() != 0 }?.let { AmountRow(stringResource(R.string.check_refunded_total), "-" + money(it)) }
+            // Reembolsada o cancelada ya no se cobra: su saldo (que puede ser negativo) no significa nada para el mesero.
+            if (check.status !in setOf("REFUNDED", "CANCELLED")) {
+                AmountRow(stringResource(R.string.check_balance), money(check.balance), strong = true)
+            }
             if (payments.isNotEmpty()) {
                 HorizontalDivider()
                 payments.forEach { PaymentRow(it, can.record, can.print, busy, viewModel) }
@@ -168,6 +197,20 @@ private fun CheckCard(check: CheckDto, payments: List<PaymentDto>, can: CheckPer
                 }
                 if (can.print && check.status != "CANCELLED" && billed.isNotEmpty()) {
                     OutlinedButton(onClick = { viewModel.print(CheckViewModel.PRE_CHECK, check.id) }, enabled = !busy) { Text(stringResource(R.string.print_pre_check)) }
+                }
+                if (can.move && canMoveFrom(check)) {
+                    OutlinedButton(onClick = { viewModel.startMove(check) }, enabled = !busy) { Text(stringResource(R.string.move_action)) }
+                }
+                if (canAdjust(check) && courtesyCandidates(check).isNotEmpty()) {
+                    OutlinedButton(onClick = { viewModel.startAction(CheckActionKind.COURTESY, check) }, enabled = !busy) { Text(stringResource(R.string.courtesy_action)) }
+                }
+                if (canReopen(check)) {
+                    OutlinedButton(onClick = { viewModel.startAction(CheckActionKind.REOPEN, check) }, enabled = !busy) { Text(stringResource(R.string.check_reopen)) }
+                }
+                if (can.cancel && canCancelCheck(check)) {
+                    TextButton(onClick = { viewModel.startAction(CheckActionKind.CANCEL, check) }, enabled = !busy) {
+                        Text(stringResource(R.string.check_cancel_empty), color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
         }
@@ -302,6 +345,149 @@ private fun ResultDialog(state: ResultState, viewModel: CheckViewModel) {
     )
 }
 
+@Composable
+private fun Choice(selected: Boolean, enabled: Boolean, onClick: () -> Unit, content: @Composable () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick),
+    ) {
+        RadioButton(selected = selected, onClick = null, enabled = enabled)
+        Box(Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp)) { content() }
+    }
+}
+
+@Composable
+private fun MoveDialog(state: MoveUnitsState, checks: List<CheckDto>, canCreate: Boolean, viewModel: CheckViewModel) {
+    val enabled = !state.submitting
+    val targets = moveTargets(checks, state.source).filter { it.id != state.created?.id }
+    AlertDialog(
+        onDismissRequest = viewModel::dismissMove,
+        title = { Text(stringResource(R.string.move_title, state.source.number)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.move_units), style = MaterialTheme.typography.labelLarge)
+                billedUnits(state.source).forEach { u ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().toggleable(value = u.unitId in state.selected, enabled = enabled, role = Role.Checkbox) { viewModel.toggleUnit(u.unitId) },
+                    ) {
+                        Checkbox(checked = u.unitId in state.selected, onCheckedChange = null, enabled = enabled)
+                        Text(
+                            u.productName + " · " + money(u.price) + (if (u.adjustment != null) " · " + stringResource(R.string.move_with_courtesy) else ""),
+                            modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp),
+                        )
+                    }
+                }
+                HorizontalDivider()
+                Text(stringResource(R.string.move_to), style = MaterialTheme.typography.labelLarge)
+                targets.forEach { t ->
+                    Choice(state.targetId == t.id, enabled, { viewModel.chooseTarget(t.id) }) {
+                        Text(stringResource(R.string.check_title, t.number) + (t.label?.let { " · $it" } ?: ""))
+                    }
+                }
+                state.created?.let { c ->
+                    Choice(state.targetId == null || state.targetId == c.id, enabled, { viewModel.chooseTarget(c.id) }) {
+                        Text(stringResource(R.string.check_title, c.number) + " · " + stringResource(R.string.move_just_created))
+                    }
+                }
+                if (canCreate && state.created == null) {
+                    Choice(state.targetId == null, enabled, { viewModel.chooseTarget(null) }) { Text(stringResource(R.string.move_new_check)) }
+                    if (state.targetId == null) {
+                        OutlinedTextField(
+                            value = state.label,
+                            onValueChange = viewModel::setNewLabel,
+                            label = { Text(stringResource(R.string.move_new_label)) },
+                            singleLine = true,
+                            enabled = enabled,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+                Text(stringResource(R.string.move_hint), style = MaterialTheme.typography.bodySmall)
+                state.failure?.let { Text(failureText(it), color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            val ready = state.canSubmit && (state.targetId != null || canCreate || state.created != null)
+            TextButton(onClick = viewModel::confirmMove, enabled = ready) {
+                if (state.submitting) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                else Text(pluralStringResource(R.plurals.move_confirm, state.selected.size, state.selected.size))
+            }
+        },
+        dismissButton = { TextButton(onClick = viewModel::dismissMove, enabled = enabled) { Text(stringResource(R.string.cancel_back)) } },
+    )
+}
+
+@Composable
+private fun ActionDialog(state: CheckAction, viewModel: CheckViewModel) {
+    val enabled = !state.submitting
+    val title = when (state.kind) {
+        CheckActionKind.REOPEN -> R.string.check_reopen_title
+        CheckActionKind.CANCEL -> R.string.check_cancel_title
+        CheckActionKind.COURTESY -> R.string.courtesy_title
+        CheckActionKind.REVERT -> R.string.courtesy_revert_title
+    }
+    val body = when (state.kind) {
+        CheckActionKind.REOPEN -> R.string.check_reopen_body
+        CheckActionKind.CANCEL -> R.string.check_cancel_body
+        CheckActionKind.COURTESY -> R.string.courtesy_body
+        CheckActionKind.REVERT -> R.string.courtesy_revert_body
+    }
+    AlertDialog(
+        onDismissRequest = viewModel::dismissAction,
+        title = { Text(stringResource(title, state.check.number)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(body))
+                if (state.kind == CheckActionKind.COURTESY) {
+                    courtesyCandidates(state.check).forEach { u ->
+                        Choice(state.unit?.unitId == u.unitId, enabled, { viewModel.chooseCourtesyUnit(u) }) { Text(u.productName + " · " + money(u.price)) }
+                    }
+                }
+                if (state.kind == CheckActionKind.REVERT) state.unit?.let { Text(it.productName + " · " + money(it.price), fontWeight = FontWeight.SemiBold) }
+                OutlinedTextField(
+                    value = state.reason,
+                    onValueChange = viewModel::setActionReason,
+                    label = { Text(stringResource(R.string.check_action_reason)) },
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (state.showsApprover) {
+                    Text(stringResource(R.string.void_approver_title), style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.check_approver_body), style = MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(
+                        value = state.approver.email,
+                        onValueChange = viewModel::setApproverEmail,
+                        label = { Text(stringResource(R.string.void_approver_email)) },
+                        singleLine = true,
+                        enabled = enabled,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = state.approver.password,
+                        onValueChange = viewModel::setApproverPassword,
+                        label = { Text(stringResource(R.string.void_approver_password)) },
+                        singleLine = true,
+                        enabled = enabled,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                state.failure?.let { Text(failureText(it), color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = viewModel::confirmAction, enabled = state.canSubmit) {
+                if (state.submitting) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                else Text(stringResource(R.string.check_action_confirm))
+            }
+        },
+        dismissButton = { TextButton(onClick = viewModel::dismissAction, enabled = enabled) { Text(stringResource(R.string.cancel_back)) } },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CheckScreen(viewModel: CheckViewModel, tableNumber: Int, can: CheckPermissions, onBack: () -> Unit) {
@@ -319,6 +505,8 @@ fun CheckScreen(viewModel: CheckViewModel, tableNumber: Int, can: CheckPermissio
     }
     state.paying?.let { PayDialog(it, state.shifts, state.shiftsFailure, viewModel) }
     state.recording?.let { ResultDialog(it, viewModel) }
+    state.moving?.let { MoveDialog(it, state.checks, can.create, viewModel) }
+    state.action?.let { ActionDialog(it, viewModel) }
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
@@ -347,9 +535,10 @@ fun CheckScreen(viewModel: CheckViewModel, tableNumber: Int, can: CheckPermissio
             }
             when {
                 !state.loaded && state.failure == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-                state.loaded && state.checks.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) { Text(stringResource(R.string.check_none)) }
+                // Las canceladas no tienen nada que cobrar ni hacer: no se muestran.
+                state.loaded && state.checks.none { it.status != "CANCELLED" } -> Box(Modifier.fillMaxSize(), Alignment.Center) { Text(stringResource(R.string.check_none)) }
                 else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(state.checks, key = { it.id }) { check ->
+                    items(state.checks.filter { it.status != "CANCELLED" }, key = { it.id }) { check ->
                         CheckCard(check, state.payments[check.id].orEmpty(), can, state.busy, viewModel)
                     }
                 }

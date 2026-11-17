@@ -243,6 +243,8 @@ data class CheckDto(
     val total: MoneyDto,
     val paidTotal: MoneyDto,
     val pendingTotal: MoneyDto,
+    /** Lo devuelto; el backend no lo resta del saldo, así que una cuenta reembolsada puede quedar en negativo. */
+    val refundedTotal: MoneyDto? = null,
     val tipTotal: MoneyDto,
     val balance: MoneyDto,
     val version: Int,
@@ -287,6 +289,8 @@ data class PaymentDto(
     val change: MoneyDto? = null,
     val card: CardDto? = null,
     val reference: String? = null,
+    /** Reembolso activo del pago, si lo tiene (uno por pago). */
+    val refundId: String? = null,
     val createdAt: String,
     val version: Int,
 )
@@ -314,7 +318,24 @@ data class PaymentResultRequest(
 data class PrintJobRequest(val type: String, val sourceId: String)
 
 @Serializable
-data class PrintJobDto(val id: String, val type: String, val status: String)
+data class PrintJobDto(
+    val id: String,
+    val type: String,
+    val status: String,
+    val printerId: String? = null,
+    val sourceId: String? = null,
+    /** Trabajo original de una reimpresión. */
+    val originalJobId: String? = null,
+    val reason: String? = null,
+    val attempts: Int = 0,
+    val lastError: PrintErrorDto? = null,
+    val createdAt: String? = null,
+    val printedAt: String? = null,
+    val version: Int = 1,
+)
+
+@Serializable
+data class PrintErrorDto(val code: String, val message: String)
 
 /** Copia del cliente en la reserva (R-11). Sin teléfono una vez borrados los datos personales. */
 @Serializable
@@ -507,3 +528,54 @@ data class CashShiftSummaryDto(
     val unresolved: CashUnresolvedDto = CashUnresolvedDto(),
     val frozen: Boolean = false,
 )
+
+/** Reembolso del pago completo, con su propina; el efectivo queda CONFIRMED al crear (P-7). */
+@Serializable
+data class RefundDto(
+    val id: String,
+    val paymentId: String,
+    val checkId: String,
+    val cashShiftId: String,
+    val status: String,
+    val amount: MoneyDto,
+    val tip: MoneyDto,
+    val reference: String? = null,
+    val reason: String,
+    val createdAt: String,
+    val version: Int,
+)
+
+/** El reembolso se registra en un turno OPEN, no necesariamente el del pago. */
+@Serializable
+data class RefundCreateRequest(val cashShiftId: String, val reason: String)
+
+/** Resultado de un reembolso PENDING; la referencia es obligatoria en CONFIRMED. */
+@Serializable
+data class RefundResultRequest(val outcome: String, val reference: String? = null)
+
+/** Resolver un pago o reembolso UNKNOWN: CONFIRMED (con referencia) o FAILED, siempre con motivo. */
+@Serializable
+data class ReconcileRequest(val outcome: String, val reference: String? = null, val reason: String)
+
+@Serializable
+data class PrinterDto(val id: String, val code: String, val name: String, val status: String)
+
+/** Otra impresora si la original no funciona; sin ella, se reintenta en la misma. */
+@Serializable
+data class PrintJobRetryRequest(val printerId: String? = null)
+
+/** Un trabajo UNKNOWN: ¿salió impreso o no? */
+@Serializable
+data class PrintJobResolveRequest(val outcome: String, val reason: String)
+
+/** Cuenta vacía en la sesión, para dividir (C-1, C-4). */
+@Serializable
+data class CheckCreateRequest(val sessionId: String, val label: String? = null)
+
+/** C-5: misma sesión; la versión del destino va en el cuerpo y la del origen en If-Match. */
+@Serializable
+data class CheckMoveUnitsRequest(val unitIds: List<String>, val targetCheckId: String, val targetCheckVersion: Int)
+
+/** C-7: solo cortesía de la unidad completa. Sin valor por omisión: el serializador no enviaría `type`. */
+@Serializable
+data class CheckAdjustmentRequest(val unitId: String, val type: String, val reason: String)

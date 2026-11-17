@@ -120,6 +120,62 @@ interface SessionApi {
         @Query("perPage") perPage: Int,
     ): PagedEnvelope<CheckDto>
 
+    @POST("branches/{branchId}/checks")
+    suspend fun createCheck(
+        @Path("branchId") branchId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: CheckCreateRequest,
+    ): Envelope<CheckDto>
+
+    /** Devuelve la cuenta de origen. */
+    @POST("branches/{branchId}/checks/{checkId}/units/move")
+    suspend fun moveCheckUnits(
+        @Path("branchId") branchId: String,
+        @Path("checkId") checkId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: CheckMoveUnitsRequest,
+    ): Envelope<CheckDto>
+
+    /** REQUESTED → OPEN; sin checks.reopen, con el token CHECK_REOPEN de un gerente (C-9). */
+    @POST("branches/{branchId}/checks/{checkId}/reopen")
+    suspend fun reopenCheck(
+        @Path("branchId") branchId: String,
+        @Path("checkId") checkId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: ReasonRequest,
+        @Header("X-Approval-Token") approvalToken: String? = null,
+    ): Envelope<CheckDto>
+
+    /** Solo sin unidades válidas ni pagos. */
+    @POST("branches/{branchId}/checks/{checkId}/cancel")
+    suspend fun cancelCheck(
+        @Path("branchId") branchId: String,
+        @Path("checkId") checkId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: ReasonRequest,
+    ): Envelope<CheckDto>
+
+    /** Sin checks.adjust, con el token CHECK_ADJUSTMENT ligado a la unidad. */
+    @POST("branches/{branchId}/checks/{checkId}/adjustments")
+    suspend fun createCheckAdjustment(
+        @Path("branchId") branchId: String,
+        @Path("checkId") checkId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: CheckAdjustmentRequest,
+        @Header("X-Approval-Token") approvalToken: String? = null,
+    ): Envelope<CheckDto>
+
+    /** Sin checks.adjust, con el token CHECK_ADJUSTMENT ligado a la cortesía. */
+    @POST("branches/{branchId}/checks/{checkId}/adjustments/{adjustmentId}/revert")
+    suspend fun revertCheckAdjustment(
+        @Path("branchId") branchId: String,
+        @Path("checkId") checkId: String,
+        @Path("adjustmentId") adjustmentId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: ReasonRequest,
+        @Header("X-Approval-Token") approvalToken: String? = null,
+    ): Envelope<CheckDto>
+
     /** Marca la cuenta como solicitada; la mesa pasa a CUENTA_SOLICITADA. */
     @POST("branches/{branchId}/checks/{checkId}/request")
     suspend fun requestCheck(
@@ -199,6 +255,58 @@ interface SessionApi {
     ): Envelope<CashShiftDto>
 
     @GET("branches/{branchId}/payments")
+    suspend fun listShiftPayments(
+        @Path("branchId") branchId: String,
+        @Query("cashShiftId") cashShiftId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<PaymentDto>
+
+    @POST("branches/{branchId}/payments/{paymentId}/reconcile")
+    suspend fun reconcilePayment(
+        @Path("branchId") branchId: String,
+        @Path("paymentId") paymentId: String,
+        @Header("If-Match") ifMatch: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: ReconcileRequest,
+    ): Envelope<PaymentDto>
+
+    @POST("branches/{branchId}/payments/{paymentId}/refunds")
+    suspend fun createRefund(
+        @Path("branchId") branchId: String,
+        @Path("paymentId") paymentId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: RefundCreateRequest,
+    ): Envelope<RefundDto>
+
+    /** Sin filtro por turno en el contrato: se filtra por estado y la app separa los del turno. */
+    @GET("branches/{branchId}/refunds")
+    suspend fun listRefunds(
+        @Path("branchId") branchId: String,
+        @Query("status") status: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<RefundDto>
+
+    @POST("branches/{branchId}/refunds/{refundId}/result")
+    suspend fun recordRefundResult(
+        @Path("branchId") branchId: String,
+        @Path("refundId") refundId: String,
+        @Header("If-Match") ifMatch: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: RefundResultRequest,
+    ): Envelope<RefundDto>
+
+    @POST("branches/{branchId}/refunds/{refundId}/reconcile")
+    suspend fun reconcileRefund(
+        @Path("branchId") branchId: String,
+        @Path("refundId") refundId: String,
+        @Header("If-Match") ifMatch: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: ReconcileRequest,
+    ): Envelope<RefundDto>
+
+    @GET("branches/{branchId}/payments")
     suspend fun listPayments(
         @Path("branchId") branchId: String,
         @Query("checkId") checkId: String,
@@ -221,6 +329,56 @@ interface SessionApi {
         @Header("Idempotency-Key") idempotencyKey: String,
         @Body body: PaymentResultRequest,
     ): Envelope<PaymentDto>
+
+    /** Del más reciente al más antiguo. */
+    @GET("branches/{branchId}/print-jobs")
+    suspend fun listPrintJobs(
+        @Path("branchId") branchId: String,
+        @Query("status") status: String?,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<PrintJobDto>
+
+    @GET("branches/{branchId}/printers")
+    suspend fun listPrinters(
+        @Path("branchId") branchId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<PrinterDto>
+
+    /** Solo FAILED; un UNKNOWN primero se resuelve (PRINT_JOB_UNKNOWN). */
+    @POST("branches/{branchId}/print-jobs/{printJobId}/retry")
+    suspend fun retryPrintJob(
+        @Path("branchId") branchId: String,
+        @Path("printJobId") printJobId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: PrintJobRetryRequest,
+    ): Envelope<PrintJobDto>
+
+    @POST("branches/{branchId}/print-jobs/{printJobId}/resolve")
+    suspend fun resolvePrintJob(
+        @Path("branchId") branchId: String,
+        @Path("printJobId") printJobId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: PrintJobResolveRequest,
+    ): Envelope<PrintJobDto>
+
+    @POST("branches/{branchId}/print-jobs/{printJobId}/cancel")
+    suspend fun cancelPrintJob(
+        @Path("branchId") branchId: String,
+        @Path("printJobId") printJobId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: ReasonRequest,
+    ): Envelope<PrintJobDto>
+
+    /** Crea un trabajo nuevo con el contenido original, marcado como REIMPRESIÓN. */
+    @POST("branches/{branchId}/print-jobs/{printJobId}/reprint")
+    suspend fun reprintPrintJob(
+        @Path("branchId") branchId: String,
+        @Path("printJobId") printJobId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: ReasonRequest,
+    ): Envelope<PrintJobDto>
 
     @POST("branches/{branchId}/print-jobs")
     suspend fun createPrintJob(

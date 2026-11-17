@@ -9,6 +9,8 @@ import com.restia.mobile.ui.cash.CashViewModel
 import com.restia.mobile.ui.cash.CloseForm
 import com.restia.mobile.ui.cash.MoveForm
 import com.restia.mobile.ui.cash.OpenForm
+import com.restia.mobile.ui.cash.ResolveForm
+import com.restia.mobile.ui.cash.ResolveKind
 import com.restia.mobile.ui.cash.closingDifference
 import com.restia.mobile.core.network.CashRegisterDto
 import java.math.BigDecimal
@@ -44,6 +46,14 @@ private fun register(id: String, name: String, status: String = "ACTIVE") =
 private fun shift(id: String, register: String, status: String = "OPEN", version: Int = 1, extra: String = "") =
     """{"id":"$id","branchId":"b1","cashRegisterId":"$register","status":"$status","businessDate":"2026-11-16","openedBy":"u",""" +
         """"openedAt":"2026-11-16T15:00:00Z","openingAmount":${mxn("500.00")},"version":$version$extra}"""
+
+private fun payment(id: String, status: String, method: String = "CARD_CREDIT", refundId: String? = null, version: Int = 1, shift: String = "s1") =
+    """{"id":"$id","checkId":"c1","cashShiftId":"$shift","method":"$method","status":"$status","amount":${mxn("207.00")},"tip":${mxn("20.00")},""" +
+        (if (refundId != null) """"refundId":"$refundId",""" else "") + """"createdAt":"2026-11-16T16:10:00Z","version":$version}"""
+
+private fun refund(id: String, status: String, shift: String = "s1", version: Int = 1) =
+    """{"id":"$id","paymentId":"p1","checkId":"c1","cashShiftId":"$shift","status":"$status","amount":${mxn("207.00")},"tip":${mxn("20.00")},""" +
+        """"reason":"Platillo frío","createdAt":"2026-11-16T16:20:00Z","version":$version}"""
 
 private fun page(vararg rows: String) = """{"data":[${rows.joinToString()}],"meta":{"pagination":{"page":1,"perPage":100,"total":${rows.size},"lastPage":1}}}"""
 
@@ -85,6 +95,19 @@ class CashPureTest {
     }
 
     @Test
+    fun `resolver exige referencia al confirmar y motivo salvo en el resultado`() {
+        val conciliar = ResolveForm(ResolveKind.RECONCILE_PAYMENT, reason = "Aparece en el cierre")
+        assertFalse(conciliar.canSubmit)
+        assertTrue(conciliar.copy(reference = "AUT-123").canSubmit)
+        assertTrue(conciliar.copy(outcome = "FAILED").canSubmit)
+        assertFalse(conciliar.copy(outcome = "FAILED", reason = "no").canSubmit)
+        assertTrue(ResolveForm(ResolveKind.REFUND_RESULT, reference = "DEV-9").canSubmit)
+        assertTrue(ResolveForm(ResolveKind.REFUND_RESULT, outcome = "FAILED").canSubmit)
+        assertFalse(ResolveForm(ResolveKind.REFUND).canSubmit)
+        assertTrue(ResolveForm(ResolveKind.REFUND, reason = "Platillo frío").canSubmit)
+    }
+
+    @Test
     fun `abrir pide motivo solo cuando el backend lo exige`() {
         assertTrue(OpenForm(caja, amount = "500").canSubmit)
         val conDiferencia = OpenForm(caja, amount = "500", difference = "-50.00")
@@ -106,6 +129,9 @@ class CashFlowTest {
     private var current = shift("s1", "r1")
     private var currentSummary = summary("1150.00")
     private var movements = page()
+    private var shiftPayments = page()
+    private var refundsPending = page()
+    private var refundsUnknown = page()
     private var keys = 0
 
     @Before
@@ -124,6 +150,8 @@ class CashFlowTest {
                         "/branches/b1/cash-shifts/s1" -> """{"data":$current}"""
                         "/branches/b1/cash-shifts/s1/summary" -> currentSummary
                         "/branches/b1/cash-shifts/s1/movements" -> movements
+                        "/branches/b1/payments" -> if (url.queryParameter("cashShiftId") == "s1") shiftPayments else page()
+                        "/branches/b1/refunds" -> if (url.queryParameter("status") == "PENDING") refundsPending else refundsUnknown
                         else -> return MockResponse().setResponseCode(404)
                     },
                 )
@@ -261,7 +289,8 @@ class CashFlowTest {
             """{"countedCash":{"amount":"1200.00","currency":"MXN"},"cashLeftInDrawer":{"amount":"500.00","currency":"MXN"},"differenceReason":"Faltó cambio"}""",
             close.second,
         )
-        assertEquals(R.string.cash_closed_with_difference, vm.state.value.notice!!.text)
+        assertEquals(R.string.cash_closed_short, vm.state.value.notice!!.text)
+        assertEquals("$50.00 MXN", vm.state.value.notice!!.arg)
     }
 
     @Test
@@ -284,5 +313,83 @@ class CashFlowTest {
         val cancel = posts("/branches/b1/cash-shifts/s1/cancel-closing").single()
         assertEquals("\"4\"", cancel.first.getHeader("If-Match"))
         assertEquals("""{"reason":"Falta conciliar una tarjeta"}""", cancel.second)
+    }
+
+    private val all = CashPermissions(
+        open = true, move = true, close = true, readPayments = true, reconcilePayments = true,
+        readRefunds = true, refund = true, refundResult = true, reconcileRefunds = true,
+    )
+
+    @Test
+    fun `concilia un pago sin confirmar y reembolsa uno confirmado`() {
+        shiftPayments = page(payment("p1", "CONFIRMED", method = "CASH"), payment("p2", "UNKNOWN", version = 3))
+        currentSummary = summary("1150.00", pending = 1)
+        val vm = loaded(all)
+        vm.view(vm.state.value.registers.first { it.register.id == "r1" })
+        waitFor { vm.state.value.detail?.payments?.size == 2 }
+        assertEquals("s1", requests.first { it.first.requestUrl!!.encodedPath == "/branches/b1/payments" }.first.requestUrl!!.queryParameter("cashShiftId"))
+
+        vm.startReconcilePayment(vm.state.value.detail!!.payments.first { it.id == "p2" })
+        vm.editResolve { it.copy(reference = " AUT-778 ", reason = "Aparece en el cierre de la terminal") }
+        shiftPayments = page(payment("p1", "CONFIRMED", method = "CASH"), payment("p2", "CONFIRMED", version = 4))
+        answers += MockResponse().setBody("""{"data":${payment("p2", "CONFIRMED", version = 4)}}""")
+        vm.submitResolve()
+        waitFor { vm.state.value.resolving == null && vm.state.value.detail?.payments?.all { it.status == "CONFIRMED" } == true }
+        val reconcile = posts("/branches/b1/payments/p2/reconcile").single()
+        assertEquals("\"3\"", reconcile.first.getHeader("If-Match"))
+        assertTrue(reconcile.first.getHeader("Idempotency-Key")!!.isNotBlank())
+        assertEquals("""{"outcome":"CONFIRMED","reference":"AUT-778","reason":"Aparece en el cierre de la terminal"}""", reconcile.second)
+        assertEquals(R.string.cash_resolved_confirmed, vm.state.value.notice!!.text)
+
+        // Reembolsar el pago en efectivo: va al turno que se ve.
+        vm.startRefund(vm.state.value.detail!!.payments.first { it.id == "p1" })
+        vm.editResolve { it.copy(reason = "Platillo frío") }
+        shiftPayments = page(payment("p1", "CONFIRMED", method = "CASH", refundId = "f1"), payment("p2", "CONFIRMED", version = 4))
+        answers += MockResponse().setResponseCode(201).setBody("""{"data":${refund("f1", "CONFIRMED")}}""")
+        vm.submitResolve()
+        waitFor { vm.state.value.resolving == null && vm.state.value.detail?.payments?.first { it.id == "p1" }?.refundId == "f1" }
+        assertEquals("""{"cashShiftId":"s1","reason":"Platillo frío"}""", posts("/branches/b1/payments/p1/refunds").single().second)
+        assertEquals(R.string.cash_refund_done, vm.state.value.notice!!.text)
+        // Ya reembolsado, no se ofrece otra vez.
+        vm.startRefund(vm.state.value.detail!!.payments.first { it.id == "p1" })
+        assertNull(vm.state.value.resolving)
+    }
+
+    @Test
+    fun `resuelve los reembolsos del turno y deja fuera los de otros`() {
+        refundsPending = page(refund("f1", "PENDING"), refund("f9", "PENDING", shift = "s7"))
+        refundsUnknown = page(refund("f2", "UNKNOWN", version = 2))
+        val vm = loaded(all)
+        vm.view(vm.state.value.registers.first { it.register.id == "r1" })
+        waitFor { vm.state.value.detail?.refunds?.size == 2 }
+        assertEquals(listOf("f1", "f2"), vm.state.value.detail!!.refunds.map { it.id })
+
+        vm.startRefundResolution(vm.state.value.detail!!.refunds.first { it.id == "f1" })
+        assertEquals(ResolveKind.REFUND_RESULT, vm.state.value.resolving!!.kind)
+        vm.editResolve { it.copy(outcome = "FAILED") }
+        refundsPending = page(refund("f9", "PENDING", shift = "s7"))
+        answers += MockResponse().setBody("""{"data":${refund("f1", "FAILED", version = 2)}}""")
+        vm.submitResolve()
+        waitFor { vm.state.value.resolving == null && vm.state.value.detail?.refunds?.map { it.id } == listOf("f2") }
+        val result = posts("/branches/b1/refunds/f1/result").single()
+        assertEquals("\"1\"", result.first.getHeader("If-Match"))
+        assertEquals("""{"outcome":"FAILED"}""", result.second)
+
+        vm.startRefundResolution(vm.state.value.detail!!.refunds.single())
+        assertEquals(ResolveKind.RECONCILE_REFUND, vm.state.value.resolving!!.kind)
+        vm.editResolve { it.copy(reference = "DEV-55", reason = "El banco confirmó la devolución") }
+        answers += MockResponse().setResponseCode(409).setBody("""{"error":{"code":"VERSION_CONFLICT","message":"Cambió."}}""")
+        refundsUnknown = page(refund("f2", "UNKNOWN", version = 3))
+        vm.submitResolve()
+        waitFor { vm.state.value.resolving?.failure != null && vm.state.value.detail?.refunds?.single()?.version == 3 }
+        assertEquals("""{"outcome":"CONFIRMED","reference":"DEV-55","reason":"El banco confirmó la devolución"}""", posts("/branches/b1/refunds/f2/reconcile").single().second)
+    }
+
+    @Test
+    fun `sin permisos de pagos no los pide ni ofrece acciones`() {
+        val vm = loaded()
+        vm.view(vm.state.value.registers.first { it.register.id == "r1" })
+        waitFor { vm.state.value.detail?.loading == false }
+        assertTrue(requests.none { it.first.requestUrl!!.encodedPath in setOf("/branches/b1/payments", "/branches/b1/refunds") })
     }
 }
