@@ -65,6 +65,9 @@ dependencies {
     implementation(libs.coroutines.android)
     // Solo para dibujar el código QR del enlace de alta; sin red ni permisos.
     implementation(libs.zxing.core)
+    // Fotos del menú, con el cliente de ImageClient (sin token de sesión).
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)
