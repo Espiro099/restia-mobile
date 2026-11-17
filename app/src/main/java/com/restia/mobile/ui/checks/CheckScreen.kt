@@ -12,40 +12,48 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -57,6 +65,10 @@ import com.restia.mobile.core.network.CheckDto
 import com.restia.mobile.core.network.MoneyDto
 import com.restia.mobile.core.network.PaymentDto
 import com.restia.mobile.ui.orders.moneyText
+import com.restia.mobile.ui.theme.EmptyState
+import com.restia.mobile.ui.theme.GroupCard
+import com.restia.mobile.ui.theme.Restia
+import com.restia.mobile.ui.theme.StatusPill
 import java.math.BigDecimal
 import kotlinx.coroutines.delay
 
@@ -106,10 +118,62 @@ private fun money(v: BigDecimal, currency: String): String = moneyText(v, curren
 
 @Composable
 private fun AmountRow(label: String, value: String, strong: Boolean = false) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        Text(label, modifier = Modifier.weight(1f), fontWeight = if (strong) FontWeight.Bold else null)
-        Text(value, fontWeight = if (strong) FontWeight.Bold else null)
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label,
+            modifier = Modifier.weight(1f),
+            style = if (strong) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
+            color = if (strong) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(value, style = if (strong) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium)
     }
+}
+
+/** Suma un importe de las cuentas que aún cuentan (ni reembolsadas ni canceladas); null si las monedas no coinciden. */
+private fun tableSum(checks: List<CheckDto>, amount: (CheckDto) -> MoneyDto): MoneyDto? {
+    val open = checks.filter { it.status !in setOf("REFUNDED", "CANCELLED") }
+    val currency = open.map { amount(it).currency }.distinct().singleOrNull() ?: return null
+    val sum = open.fold(BigDecimal.ZERO) { acc, c -> acc + amountOf(amount(c)) }
+    return MoneyDto(sum.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString(), currency)
+}
+
+/** Lo que falta por cobrar en la mesa, sumado entre sus cuentas. */
+fun tableBalance(checks: List<CheckDto>): MoneyDto? = tableSum(checks) { it.balance }
+
+/** Lo que suma la mesa, para cuando ya no falta nada por cobrar. */
+fun tableTotal(checks: List<CheckDto>): MoneyDto? = tableSum(checks) { it.total }
+
+/** Encabezado de la cuenta (propuesta 5): el saldo de la mesa en grande, sobre el color de la marca. */
+@Composable
+private fun BalanceHeader(checks: List<CheckDto>) {
+    val balance = tableBalance(checks) ?: return
+    val settled = amountOf(balance).signum() <= 0
+    Surface(shape = MaterialTheme.shapes.large, color = Restia.colors.brandDeep, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                stringResource(if (settled) R.string.check_summary_paid else R.string.check_summary_due),
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White.copy(alpha = 0.8f),
+            )
+            val shown = if (settled) tableTotal(checks) ?: balance else balance
+            Text(money(shown), style = MaterialTheme.typography.displaySmall, color = Color.White)
+            val count = checks.count { it.status != "CANCELLED" }
+            Text(
+                pluralStringResource(R.plurals.check_summary_count, count, count),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.8f),
+            )
+        }
+    }
+}
+
+/** Color del estado de la cuenta; el texto siempre lo dice. */
+@Composable
+private fun checkTone(status: String): Color = when (status) {
+    "OPEN" -> Restia.colors.free
+    "REQUESTED", "PARTIALLY_PAID" -> Restia.colors.busy
+    "PAID" -> Restia.colors.brandDeep
+    else -> MaterialTheme.colorScheme.outline
 }
 
 @Composable
@@ -148,11 +212,18 @@ data class CheckPermissions(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CheckCard(check: CheckDto, payments: List<PaymentDto>, can: CheckPermissions, busy: Boolean, viewModel: CheckViewModel) {
-    Card {
-        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    GroupCard {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val title = stringResource(R.string.check_title, check.number) + (check.label?.let { " · $it" } ?: "")
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(checkStatusLabel(check.status)), style = MaterialTheme.typography.bodySmall)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Restia.colors.brandDeep,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                )
+                StatusPill(stringResource(checkStatusLabel(check.status)), checkTone(check.status))
+            }
             // Igual que la precuenta: lo cancelado o anulado no se cobra y no aparece.
             val billed = check.units.filter { it.status != "CANCELLED" && it.status != "VOIDED" }
             billed.groupBy { it.productName to it.price.amount }.forEach { (key, rows) ->
@@ -171,7 +242,7 @@ private fun CheckCard(check: CheckDto, payments: List<PaymentDto>, can: CheckPer
                 }
             }
             if (billed.isEmpty()) Text(stringResource(R.string.check_empty), style = MaterialTheme.typography.bodySmall)
-            HorizontalDivider()
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             AmountRow(stringResource(R.string.check_subtotal), money(check.subtotal))
             AmountRow(stringResource(R.string.check_tax), money(check.taxTotal))
             if (amountOf(check.adjustmentTotal).signum() != 0) AmountRow(stringResource(R.string.check_courtesies), "-" + money(check.adjustmentTotal))
@@ -181,15 +252,26 @@ private fun CheckCard(check: CheckDto, payments: List<PaymentDto>, can: CheckPer
             check.refundedTotal?.takeIf { amountOf(it).signum() != 0 }?.let { AmountRow(stringResource(R.string.check_refunded_total), "-" + money(it)) }
             // Reembolsada o cancelada ya no se cobra: su saldo (que puede ser negativo) no significa nada para el mesero.
             if (check.status !in setOf("REFUNDED", "CANCELLED")) {
-                AmountRow(stringResource(R.string.check_balance), money(check.balance), strong = true)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.check_balance), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    Text(money(check.balance), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                }
             }
             if (payments.isNotEmpty()) {
-                HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 payments.forEach { PaymentRow(it, can.record, can.print, busy, viewModel) }
             }
             // Cobrar es la acción principal: ancho completo, nunca cortada por las demás.
             if (can.pay && isPayable(check)) {
-                Button(onClick = { viewModel.startPay(check) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.pay_action)) }
+                Button(
+                    onClick = { viewModel.startPay(check) },
+                    enabled = !busy,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                ) {
+                    Icon(painterResource(R.drawable.ic_cash), contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                    Text(stringResource(R.string.pay_action))
+                }
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (can.request && check.status == "OPEN" && billed.isNotEmpty()) {
@@ -510,9 +592,14 @@ fun CheckScreen(viewModel: CheckViewModel, tableNumber: Int, can: CheckPermissio
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = { Text(stringResource(R.string.check_screen_title, tableNumber)) },
-                actions = { TextButton(onClick = onBack) { Text(stringResource(R.string.check_back)) } },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.check_back))
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
     ) { padding ->
@@ -536,8 +623,9 @@ fun CheckScreen(viewModel: CheckViewModel, tableNumber: Int, can: CheckPermissio
             when {
                 !state.loaded && state.failure == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 // Las canceladas no tienen nada que cobrar ni hacer: no se muestran.
-                state.loaded && state.checks.none { it.status != "CANCELLED" } -> Box(Modifier.fillMaxSize(), Alignment.Center) { Text(stringResource(R.string.check_none)) }
+                state.loaded && state.checks.none { it.status != "CANCELLED" } -> EmptyState(stringResource(R.string.check_none), body = null)
                 else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    item(key = "saldo") { BalanceHeader(state.checks) }
                     items(state.checks.filter { it.status != "CANCELLED" }, key = { it.id }) { check ->
                         CheckCard(check, state.payments[check.id].orEmpty(), can, state.busy, viewModel)
                     }

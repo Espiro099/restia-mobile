@@ -3,39 +3,56 @@ package com.restia.mobile.ui.orders
 import androidx.activity.compose.BackHandler
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -45,6 +62,10 @@ import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.MoneyDto
 import com.restia.mobile.core.network.OrderDto
 import com.restia.mobile.core.network.OrderItemDto
+import com.restia.mobile.ui.theme.EmptyState
+import com.restia.mobile.ui.theme.GroupCard
+import com.restia.mobile.ui.theme.Restia
+import com.restia.mobile.ui.theme.StatusPill
 import java.math.BigDecimal
 import java.time.OffsetDateTime
 import java.time.ZoneId
@@ -82,6 +103,24 @@ fun actionFailureText(failure: ApiFailure, action: String? = "CANCEL"): Int? = w
     // Otros 4xx: el mensaje del servidor, si lo trae.
     else -> null
 }
+
+/** Pasos del seguimiento de una ronda (propuesta 4). */
+val ROUND_STEPS = listOf(R.string.track_received, R.string.track_preparing, R.string.track_ready, R.string.track_served)
+
+private fun unitStage(status: String): Int? = when (status) {
+    "PENDING" -> 0
+    "PREPARING" -> 1
+    "READY" -> 2
+    "DELIVERED" -> 3
+    else -> null
+}
+
+/**
+ * Paso en el que va la ronda: el de su unidad más atrasada, porque la ronda no está lista hasta que lo está todo.
+ * Las unidades canceladas o anuladas no cuentan; si no queda ninguna, la ronda no tiene seguimiento (null).
+ */
+fun roundStage(order: OrderDto): Int? =
+    order.items.flatMap { it.units }.mapNotNull { unitStage(it.status) }.minOrNull()
 
 private fun roundTime(iso: String?): String? = iso?.let {
     runCatching {
@@ -150,6 +189,65 @@ private fun CloseDialog(state: CloseState, tableNumber: Int, viewModel: TableVie
     )
 }
 
+/** Color de cada estado de unidad: el mismo código que el plano de mesas. */
+@Composable
+private fun unitTone(status: String): Color = when (status) {
+    "PENDING" -> MaterialTheme.colorScheme.outline
+    "PREPARING" -> Restia.colors.busy
+    "READY" -> Restia.colors.free
+    "DELIVERED" -> Restia.colors.brandDeep
+    else -> MaterialTheme.colorScheme.error
+}
+
+/** Línea de pasos: Recibida → En preparación → Lista → Servida. */
+@Composable
+private fun RoundStepper(stage: Int) {
+    val done = MaterialTheme.colorScheme.primary
+    val todo = MaterialTheme.colorScheme.outlineVariant
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ROUND_STEPS.indices.forEach { i ->
+                if (i > 0) {
+                    Box(Modifier.weight(1f).height(3.dp).background(if (i <= stage) done else todo))
+                }
+                Box(
+                    modifier = Modifier.size(22.dp).clip(CircleShape).background(if (i <= stage) done else todo),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (i < stage || i == ROUND_STEPS.lastIndex && stage == i) {
+                        Icon(painterResource(R.drawable.ic_check), contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(14.dp))
+                    } else if (i == stage) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onPrimary))
+                    }
+                }
+            }
+        }
+        Layout(
+            content = {
+                ROUND_STEPS.forEachIndexed { i, label ->
+                    Text(
+                        stringResource(label),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (i == stage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+        ) { measurables, constraints ->
+            val width = constraints.maxWidth
+            val dot = 22.dp.roundToPx()
+            val labels = measurables.map { it.measure(constraints.copy(minWidth = 0)) }
+            layout(width, labels.maxOf { it.height }) {
+                labels.forEachIndexed { i, label ->
+                    // Centro de cada punto: los puntos van de borde a borde, con el mismo hueco entre ellos.
+                    val center = dot / 2 + (width - dot) * i / (labels.size - 1)
+                    label.placeRelative((center - label.width / 2).coerceIn(0, (width - label.width).coerceAtLeast(0)), 0)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ItemRow(
     item: OrderItemDto,
@@ -164,18 +262,16 @@ private fun ItemRow(
     val ready = readyUnits(listOf(item)).size
     val pending = pendingUnits(item).size
     val voidable = voidableUnits(item).size
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(item.quantity.toString() + " × " + item.name, style = MaterialTheme.typography.bodyLarge)
-            item.modifiers.forEach { Text(it.name, style = MaterialTheme.typography.bodySmall) }
-            item.notes?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(item.quantity.toString() + " × " + item.name, style = MaterialTheme.typography.titleSmall)
+            item.modifiers.forEach { Text(it.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            item.notes?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             // El estado siempre va en texto, por unidad agrupada.
-            item.units.groupingBy { it.status }.eachCount().forEach { (status, count) ->
-                Text(
-                    pluralStringResource(unitStatusLabel(status), count, count),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (status == "READY") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                item.units.groupingBy { it.status }.eachCount().forEach { (status, count) ->
+                    StatusPill(pluralStringResource(unitStatusLabel(status), count, count), unitTone(status))
+                }
             }
         }
         Column(horizontalAlignment = Alignment.End) {
@@ -204,17 +300,29 @@ private fun RoundCard(
     onCancel: (OrderItemDto) -> Unit,
     onVoid: (OrderItemDto) -> Unit,
 ) {
-    Card {
-        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            val time = roundTime(order.createdAt)
-            Text(
-                if (time != null) stringResource(R.string.table_round_at, index, time) else stringResource(R.string.table_round, index),
-                style = MaterialTheme.typography.titleMedium,
-            )
+    val stage = roundStage(order)
+    GroupCard {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val time = roundTime(order.createdAt)
+                Text(
+                    if (time != null) stringResource(R.string.table_round_at, index, time) else stringResource(R.string.table_round, index),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Restia.colors.brandDeep,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                )
+                stage?.let { StatusPill(stringResource(ROUND_STEPS[it]), MaterialTheme.colorScheme.primary) }
+            }
+            stage?.let { RoundStepper(it) }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             order.items.forEach { item ->
                 ItemRow(item, canDeliver, canCancel, canVoid, busy, { onDeliver(item) }, { onCancel(item) }, { onVoid(item) })
             }
-            Text(stringResource(R.string.table_round_total, total(order.total)), style = MaterialTheme.typography.bodySmall)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row {
+                Text(stringResource(R.string.table_round_subtotal), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                Text(total(order.total), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            }
         }
     }
 }
@@ -373,24 +481,36 @@ fun TableScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = { Text(stringResource(R.string.table_title, tableNumber)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.nav_back))
+                    }
+                },
                 actions = {
                     if (canClose) {
                         TextButton(onClick = viewModel::startClose, enabled = !state.busy) { Text(stringResource(R.string.close_action)) }
                     }
-                    TextButton(onClick = onBack) { Text(stringResource(R.string.order_back)) }
                 },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
         bottomBar = {
             if (canOrder || canViewCheck) {
-                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     if (canViewCheck) {
-                        OutlinedButton(onClick = onCheck, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.table_check)) }
+                        OutlinedButton(onClick = onCheck, shape = MaterialTheme.shapes.small, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) {
+                            Text(stringResource(R.string.table_check))
+                        }
                     }
                     if (canOrder) {
-                        Button(onClick = onAddOrder, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.table_add_order)) }
+                        Button(onClick = onAddOrder, shape = MaterialTheme.shapes.small, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) {
+                            Text(stringResource(R.string.table_add_order))
+                        }
                     }
                 }
             }
@@ -425,7 +545,10 @@ fun TableScreen(
             }
             when {
                 !state.loaded && state.failure == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-                state.loaded && state.orders.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) { Text(stringResource(R.string.table_empty)) }
+                state.loaded && state.orders.isEmpty() -> EmptyState(
+                    stringResource(R.string.table_empty),
+                    if (canOrder) stringResource(R.string.table_empty_hint) else null,
+                )
                 else -> LazyColumn(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
