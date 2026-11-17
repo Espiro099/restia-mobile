@@ -170,13 +170,16 @@ class CashFlowTest {
         Dispatchers.resetMain()
     }
 
+    /** Copia tomada con el bloqueo: el servidor simulado agrega peticiones desde otro hilo. */
+    private fun sent() = synchronized(requests) { requests.toList() }
+
     private fun waitFor(condition: () -> Boolean) {
         val end = System.currentTimeMillis() + 5000
         while (!condition() && System.currentTimeMillis() < end) Thread.sleep(10)
         assertTrue("tiempo agotado", condition())
     }
 
-    private fun posts(path: String) = requests.filter { it.first.method == "POST" && it.first.requestUrl!!.encodedPath == path }
+    private fun posts(path: String) = sent().filter { it.first.method == "POST" && it.first.requestUrl!!.encodedPath == path }
 
     private fun loaded(can: CashPermissions = CashPermissions(open = true, move = true, close = true)): CashViewModel {
         val vm = CashViewModel(CashRepository(api), "b1", can, newKey = { "clave-${++keys}" })
@@ -191,7 +194,7 @@ class CashFlowTest {
         assertEquals(listOf("Caja 1", "Caja barra"), rows.map { it.register.name })
         assertEquals("s1", rows.first { it.register.id == "r1" }.shift!!.id)
         assertNull(rows.first { it.register.id == "r2" }.shift)
-        val statuses = requests.filter { it.first.requestUrl!!.encodedPath == "/branches/b1/cash-shifts" }.map { it.first.requestUrl!!.queryParameter("status") }
+        val statuses = sent().filter { it.first.requestUrl!!.encodedPath == "/branches/b1/cash-shifts" }.map { it.first.requestUrl!!.queryParameter("status") }
         assertEquals(listOf("OPEN", "CLOSING"), statuses)
     }
 
@@ -327,7 +330,7 @@ class CashFlowTest {
         val vm = loaded(all)
         vm.view(vm.state.value.registers.first { it.register.id == "r1" })
         waitFor { vm.state.value.detail?.payments?.size == 2 }
-        assertEquals("s1", requests.first { it.first.requestUrl!!.encodedPath == "/branches/b1/payments" }.first.requestUrl!!.queryParameter("cashShiftId"))
+        assertEquals("s1", sent().first { it.first.requestUrl!!.encodedPath == "/branches/b1/payments" }.first.requestUrl!!.queryParameter("cashShiftId"))
 
         vm.startReconcilePayment(vm.state.value.detail!!.payments.first { it.id == "p2" })
         vm.editResolve { it.copy(reference = " AUT-778 ", reason = "Aparece en el cierre de la terminal") }
@@ -390,6 +393,6 @@ class CashFlowTest {
         val vm = loaded()
         vm.view(vm.state.value.registers.first { it.register.id == "r1" })
         waitFor { vm.state.value.detail?.loading == false }
-        assertTrue(requests.none { it.first.requestUrl!!.encodedPath in setOf("/branches/b1/payments", "/branches/b1/refunds") })
+        assertTrue(sent().none { it.first.requestUrl!!.encodedPath in setOf("/branches/b1/payments", "/branches/b1/refunds") })
     }
 }

@@ -57,6 +57,8 @@ class MainActivity : ComponentActivity() {
                             permissions = membership?.permissions.orEmpty(),
                             logoutEnabled = !form.busy,
                             onLogout = viewModel::logout,
+                            userName = current.me.user.name,
+                            userEmail = current.me.user.email,
                         )
                     }
                 }

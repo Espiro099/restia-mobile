@@ -122,6 +122,8 @@ fun KitchenScreen(
     branchName: String,
     canPrepare: Boolean,
     showTables: Boolean,
+    /** Dentro de la barra inferior: Mesas y la cuenta ya están ahí. */
+    inTabs: Boolean = false,
     logoutEnabled: Boolean,
     onTables: () -> Unit,
     onLogout: () -> Unit,
@@ -149,8 +151,10 @@ fun KitchenScreen(
                     }
                 },
                 actions = {
-                    if (showTables) TextButton(onClick = onTables) { Text(stringResource(R.string.order_back)) }
-                    AccountMenu(showStaff, logoutEnabled, onStaff, onChangePassword, onLogout, showCash, onCash, showPrinting, onPrinting)
+                    if (!inTabs) {
+                        if (showTables) TextButton(onClick = onTables) { Text(stringResource(R.string.order_back)) }
+                        AccountMenu(showStaff, logoutEnabled, onStaff, onChangePassword, onLogout, showCash, onCash, showPrinting, onPrinting)
+                    }
                 },
             )
         },
