@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -118,6 +119,45 @@ fun ScreenHeader(title: String, modifier: Modifier = Modifier, trailing: @Compos
             modifier = Modifier.weight(1f).semantics { heading() },
         )
         trailing()
+    }
+}
+
+/**
+ * Encabezado de una pantalla de detalle (propuesta 03–05): flecha de regreso, título y acciones a la derecha.
+ * Sin título, [center] ocupa el centro (la marca en el seguimiento de la orden).
+ */
+@Composable
+fun BackHeader(
+    title: String?,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    center: (@Composable () -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    Box(modifier = modifier.fillMaxWidth().statusBarsPadding().padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 8.dp).heightIn(min = 48.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.IconButton(onClick = onBack) {
+                Icon(
+                    painterResource(R.drawable.ic_arrow_back),
+                    contentDescription = stringResource(R.string.nav_back),
+                    tint = Restia.colors.heading,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            if (title != null) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
+                    color = Restia.colors.heading,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f).padding(start = 4.dp).semantics { heading() },
+                )
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+            actions()
+        }
+        center?.let { Box(Modifier.align(Alignment.Center)) { it() } }
     }
 }
 

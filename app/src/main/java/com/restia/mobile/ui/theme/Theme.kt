@@ -2,12 +2,14 @@ package com.restia.mobile.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -235,13 +237,12 @@ fun RestiaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    androidx.compose.runtime.CompositionLocalProvider(LocalRestiaColors provides if (darkTheme) DarkExtras else LightExtras) {
-        MaterialTheme(
-            colorScheme = if (darkTheme) Dark else Light,
-            typography = RestiaTypography,
-            shapes = RestiaShapes,
-            content = content,
-        )
+    CompositionLocalProvider(LocalRestiaColors provides if (darkTheme) DarkExtras else LightExtras) {
+        val scheme = if (darkTheme) Dark else Light
+        MaterialTheme(colorScheme = scheme, typography = RestiaTypography, shapes = RestiaShapes) {
+            // Las pantallas sin Scaffold también escriben en tinta (o crema en oscuro), no en el negro por omisión.
+            CompositionLocalProvider(LocalContentColor provides scheme.onBackground, content = content)
+        }
     }
 }
 

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Propuesta Restia (Figma): ícono de línea. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="20"
+    android:viewportHeight="20"
+    android:tint="?android:attr/colorControlNormal">
+    <path
+        android:pathData="M9.16667 15.8333C12.8486 15.8333 15.8333 12.8486 15.8333 9.16667C15.8333 5.48477 12.8486 2.5 9.16667 2.5C5.48477 2.5 2.5 5.48477 2.5 9.16667C2.5 12.8486 5.48477 15.8333 9.16667 15.8333Z"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.41667"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M17.5 17.5L13.875 13.875"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.41667"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

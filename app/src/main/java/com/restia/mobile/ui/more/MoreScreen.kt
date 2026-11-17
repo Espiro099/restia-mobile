@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
@@ -112,6 +113,10 @@ fun ElevatedNavBar(tabs: List<HomeTab>, selected: HomeTab, onSelect: (HomeTab) -
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp)
+            // En tablet, la barra no se estira: queda centrada, del ancho de un teléfono grande.
+            .wrapContentWidth()
+            .widthIn(max = 600.dp)
+            .fillMaxWidth()
             .height(Nav.Height),
     ) {
         Surface(shape = NotchedBar(center), color = paper, shadowElevation = 2.dp, modifier = Modifier.fillMaxSize()) {}
