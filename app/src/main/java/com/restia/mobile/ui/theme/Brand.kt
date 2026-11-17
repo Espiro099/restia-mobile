@@ -1,6 +1,7 @@
 package com.restia.mobile.ui.theme
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -23,13 +25,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -128,5 +137,65 @@ fun GroupCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
         shadowElevation = 1.dp,
     ) {
         Column { content() }
+    }
+}
+
+/** Campana de servicio sobre su plato: la ilustración de los estados vacíos (propuesta 9). */
+@Composable
+fun Cloche(modifier: Modifier = Modifier, color: Color = Restia.colors.brand) {
+    Canvas(modifier = modifier.size(width = 132.dp, height = 96.dp)) {
+        val w = size.width
+        val base = size.height * 0.8f
+        val radius = w * 0.34f
+        val dome = Size(radius * 2, radius * 2)
+        val corner = Offset(w / 2 - radius, base - radius)
+        drawArc(color.copy(alpha = 0.16f), startAngle = 180f, sweepAngle = 180f, useCenter = true, topLeft = corner, size = dome)
+        drawArc(color, startAngle = 180f, sweepAngle = 180f, useCenter = false, topLeft = corner, size = dome, style = Stroke(width = w * 0.03f))
+        // Brillo del metal.
+        drawArc(
+            color.copy(alpha = 0.55f),
+            startAngle = 200f,
+            sweepAngle = 40f,
+            useCenter = false,
+            topLeft = Offset(corner.x + radius * 0.25f, corner.y + radius * 0.25f),
+            size = Size(radius * 1.5f, radius * 1.5f),
+            style = Stroke(width = w * 0.025f, cap = StrokeCap.Round),
+        )
+        drawCircle(color, radius = w * 0.04f, center = Offset(w / 2, base - radius - w * 0.03f))
+        drawRoundRect(
+            color,
+            topLeft = Offset(w * 0.04f, base),
+            size = Size(w * 0.92f, size.height * 0.07f),
+            cornerRadius = CornerRadius(size.height * 0.035f),
+        )
+    }
+}
+
+/** Estado vacío: la campana, un título y, si ayuda, qué hacer a continuación. */
+@Composable
+fun EmptyState(title: String, body: String?, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Cloche(Modifier.padding(bottom = 8.dp))
+        Text(title, style = MaterialTheme.typography.titleLarge, color = Restia.colors.brandDeep, textAlign = TextAlign.Center)
+        body?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+/** Etiqueta en píldora: el texto siempre dice el estado; el color solo lo refuerza. */
+@Composable
+fun StatusPill(text: String, tone: Color) {
+    Surface(shape = CircleShape, color = tone.copy(alpha = 0.14f)) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (tone.luminance() > 0.45f) MaterialTheme.colorScheme.onSurface else tone,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+        )
     }
 }

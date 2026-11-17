@@ -30,7 +30,19 @@
     <string name="table_title">Mesa %1$d</string>
     <string name="table_round">Ronda %1$d</string>
     <string name="table_round_at">Ronda %1$d · %2$s</string>
-    <string name="table_round_total">Total de la ronda: %1$s</string>
+    <string name="table_round_subtotal">Total de la ronda</string>
+    <string name="table_empty_hint">Agrega la primera comanda para enviarla a cocina.</string>
+    <string name="check_summary_due">Por cobrar en la mesa</string>
+    <string name="check_summary_paid">Mesa pagada · total</string>
+    <plurals name="check_summary_count">
+        <item quantity="one">%1$d cuenta</item>
+        <item quantity="other">%1$d cuentas</item>
+    </plurals>
+    <string name="track_received">Recibida</string>
+    <string name="track_preparing">En preparación</string>
+    <string name="track_ready">Lista</string>
+    <string name="track_served">Servida</string>
+    <string name="kitchen_empty_hint">Las comandas nuevas aparecerán aquí.</string>
     <string name="table_add_order">Agregar comanda</string>
     <string name="table_empty">Esta mesa aún no tiene comandas.</string>
     <string name="table_not_loaded">No se pudieron cargar las comandas.</string>
@@ -107,6 +119,8 @@
     </plurals>
     <string name="order_title">Comanda · Mesa %1$d</string>
     <string name="order_back">Mesas</string>
+    <string name="order_all">Todos</string>
+    <string name="nav_back">Regresar</string>
     <string name="order_sold_out">Agotado</string>
     <string name="order_notes">Notas</string>
     <string name="order_add">Agregar</string>

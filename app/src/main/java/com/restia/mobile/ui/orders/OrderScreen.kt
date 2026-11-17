@@ -1,39 +1,61 @@
 package com.restia.mobile.ui.orders
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.restia.mobile.R
 import com.restia.mobile.core.network.ApiFailure
@@ -42,6 +64,7 @@ import com.restia.mobile.core.network.MoneyDto
 import com.restia.mobile.data.orders.CartLine
 import com.restia.mobile.data.orders.MAX_QUANTITY
 import com.restia.mobile.data.orders.invalidModifiers
+import com.restia.mobile.ui.theme.Restia
 import java.math.BigDecimal
 import java.math.RoundingMode
 
@@ -59,20 +82,75 @@ private fun failureText(failure: ApiFailure): String = when {
     else -> stringResource(R.string.error_unexpected)
 }
 
+/** Tonos de la miniatura: cada categoría conserva el suyo mientras no hay fotos de los platillos. */
+@Composable
+private fun categoryTone(category: String): Color {
+    val tones = listOf(Restia.colors.brand, Restia.colors.free, Restia.colors.busy, Restia.colors.brandDeep)
+    return tones[Math.floorMod(category.hashCode(), tones.size)]
+}
+
+/** Miniatura del platillo: la inicial sobre el color de su categoría (propuesta 3, sin foto). */
+@Composable
+private fun DishThumb(product: MenuProductDto, available: Boolean) {
+    val tone = categoryTone(product.category)
+    Box(
+        modifier = Modifier.size(64.dp).clip(MaterialTheme.shapes.medium).background(tone.copy(alpha = if (available) 0.18f else 0.08f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            product.name.trim().take(1).uppercase().ifEmpty { "?" },
+            style = MaterialTheme.typography.headlineMedium,
+            color = if (available) tone else MaterialTheme.colorScheme.outline,
+        )
+    }
+}
+
 @Composable
 private fun ProductRow(product: MenuProductDto, onClick: () -> Unit) {
     val available = product.availability == "AVAILABLE"
-    Column(
-        modifier = Modifier.fillMaxWidth()
-            .clickable(enabled = available, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        shadowElevation = 1.dp,
+        modifier = Modifier.fillMaxWidth().clickable(enabled = available, role = Role.Button, onClick = onClick),
     ) {
-        Text(product.name, style = MaterialTheme.typography.bodyLarge)
-        Text(
-            if (available) moneyText(product.price) else stringResource(R.string.order_sold_out),
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (available) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
-        )
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            DishThumb(product, available)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    product.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (available) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                product.description?.takeIf { it.isNotBlank() }?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    if (available) moneyText(product.price) else stringResource(R.string.order_sold_out),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (available) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                )
+            }
+            if (available) {
+                // Decorativo: toda la tarjeta abre el platillo; el botón solo lo señala.
+                Box(
+                    modifier = Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(painterResource(R.drawable.ic_add), contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
     }
 }
 
@@ -182,47 +260,81 @@ fun OrderScreen(viewModel: OrderViewModel, tableNumber: Int, onBack: () -> Unit,
             onSent()
         }
     }
+    // null = todas las categorías.
+    var category by rememberSaveable { mutableStateOf<String?>(null) }
     state.editor?.let { EditorDialog(viewModel, it) }
     if (state.reviewing) ReviewDialog(viewModel, state)
     Scaffold(
         modifier = Modifier.fillMaxSize().imePadding(),
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = { Text(stringResource(R.string.order_title, tableNumber)) },
-                actions = { TextButton(onClick = onBack) { Text(stringResource(R.string.order_back)) } },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.nav_back))
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
         bottomBar = {
             if (state.cart.isNotEmpty()) {
+                val currency = state.cart.first().product.price.currency
+                val estimate = runCatching { state.cart.fold(BigDecimal.ZERO) { sum, l -> sum + l.estimate } }.getOrNull()
                 Button(
                     onClick = { viewModel.setReviewing(true) },
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                ) { Text(stringResource(R.string.order_view_cart, state.cart.sumOf { it.quantity })) }
+                    shape = MaterialTheme.shapes.small,
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
+                    modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
+                ) {
+                    Text(stringResource(R.string.order_view_cart, state.cart.sumOf { it.quantity }), modifier = Modifier.weight(1f))
+                    estimate?.let { Text(moneyText(it, currency), style = MaterialTheme.typography.titleSmall) }
+                }
             }
         },
     ) { padding ->
         val menu = state.menu
         when {
-            menu != null -> LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
-                if (state.menuStale || state.readOnly) {
-                    item(key = "avisos") {
-                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            if (state.menuStale) Text(stringResource(R.string.order_menu_stale), color = MaterialTheme.colorScheme.error)
-                            if (state.readOnly) Text(stringResource(R.string.order_read_only), color = MaterialTheme.colorScheme.error)
+            menu != null -> {
+                val categories = menu.products.map { it.category }.distinct()
+                val selected = category?.takeIf { it in categories }
+                Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+                if (categories.size > 1) {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        item { CategoryChip(stringResource(R.string.order_all), selected == null) { category = null } }
+                        items(categories) { name -> CategoryChip(name, selected == name) { category = name } }
+                    }
+                }
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    if (state.menuStale || state.readOnly) {
+                        item(key = "avisos") {
+                            Column {
+                                if (state.menuStale) Text(stringResource(R.string.order_menu_stale), color = MaterialTheme.colorScheme.error)
+                                if (state.readOnly) Text(stringResource(R.string.order_read_only), color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                    menu.products.filter { selected == null || it.category == selected }.groupBy { it.category }.forEach { (name, products) ->
+                        item(key = "c-$name") {
+                            Text(
+                                name,
+                                style = MaterialTheme.typography.titleLarge,
+                                color = Restia.colors.brandDeep,
+                                modifier = Modifier.padding(top = 8.dp).semantics { heading() },
+                            )
+                        }
+                        items(products.sortedBy { it.displayOrder }, key = { it.id }) { product ->
+                            ProductRow(product) { viewModel.selectProduct(product) }
                         }
                     }
                 }
-                menu.products.groupBy { it.category }.forEach { (category, products) ->
-                    item(key = "c-$category") {
-                        Text(
-                            category,
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp),
-                        )
-                    }
-                    items(products.sortedBy { it.displayOrder }, key = { it.id }) { product ->
-                        ProductRow(product) { viewModel.selectProduct(product) }
-                    }
                 }
             }
             state.menuFailure != null -> Column(
@@ -236,4 +348,18 @@ fun OrderScreen(viewModel: OrderViewModel, tableNumber: Int, onBack: () -> Unit,
             else -> Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) { CircularProgressIndicator() }
         }
     }
+}
+
+@Composable
+private fun CategoryChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label) },
+        shape = CircleShape,
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = MaterialTheme.colorScheme.primary,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+        ),
+    )
 }
