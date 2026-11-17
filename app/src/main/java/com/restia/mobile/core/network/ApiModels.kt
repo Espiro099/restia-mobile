@@ -117,6 +117,8 @@ data class MenuProductDto(
     val price: MoneyDto,
     val availability: String,
     val modifierIds: List<String> = emptyList(),
+    /** Foto del platillo; solo se muestra si es HTTPS (ImageClient.isAllowed). */
+    val imageUrl: String? = null,
 )
 
 @Serializable

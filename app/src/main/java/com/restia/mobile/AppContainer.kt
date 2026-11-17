@@ -1,9 +1,13 @@
 package com.restia.mobile
 
 import android.content.Context
+import coil3.ImageLoader
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.util.DebugLogger
 import com.restia.mobile.core.network.BearerInterceptor
 import com.restia.mobile.core.network.CertificatePinning
 import com.restia.mobile.core.network.ContactInterceptor
+import com.restia.mobile.core.network.ImageClient
 import com.restia.mobile.core.network.PublicAuthApi
 import com.restia.mobile.core.network.RequestIdInterceptor
 import com.restia.mobile.core.network.SessionApi
@@ -101,12 +105,23 @@ fun buildRepositories(
 
 class AppContainer(context: Context) {
     private val blobs = EncryptedFileStore(context.applicationContext)
+    private val pins = CertificatePinning.parse(BuildConfig.API_CERT_PINS)
     val repositories = buildRepositories(
         BuildConfig.API_BASE_URL,
         KeystoreCredentialStore(context.applicationContext, blobs),
         blobs,
-        certificatePins = CertificatePinning.parse(BuildConfig.API_CERT_PINS),
+        certificatePins = pins,
         // En release, sin HTTPS o sin huellas la app no se conecta (falla cerrado).
         pinsRequired = !BuildConfig.DEBUG,
     )
+
+    /** Cargador de las fotos del menú: su propio cliente, sin la sesión. */
+    val imageLoader: ImageLoader by lazy {
+        val client = ImageClient.build(BuildConfig.API_BASE_URL, pins, pinsRequired = !BuildConfig.DEBUG)
+        ImageLoader.Builder(context.applicationContext)
+            .components { add(OkHttpNetworkFetcherFactory(callFactory = { client })) }
+            // En debug, por qué no cargó una foto (Logcat, etiqueta del cargador).
+            .apply { if (BuildConfig.DEBUG) logger(DebugLogger()) }
+            .build()
+    }
 }

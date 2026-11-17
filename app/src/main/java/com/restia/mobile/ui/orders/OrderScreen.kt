@@ -50,6 +50,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -57,8 +60,10 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.restia.mobile.R
 import com.restia.mobile.core.network.ApiFailure
+import com.restia.mobile.core.network.ImageClient
 import com.restia.mobile.core.network.MenuProductDto
 import com.restia.mobile.core.network.MoneyDto
 import com.restia.mobile.data.orders.CartLine
@@ -89,7 +94,13 @@ private fun categoryTone(category: String): Color {
     return tones[Math.floorMod(category.hashCode(), tones.size)]
 }
 
-/** Miniatura del platillo: la inicial sobre el color de su categoría (propuesta 3, sin foto). */
+/** En gris: la foto de un platillo agotado. */
+private val SoldOutFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
+
+/**
+ * Miniatura del platillo (propuesta 3): la foto si la hay; debajo, la inicial sobre el color de su categoría,
+ * que es lo que queda a la vista mientras carga, si falla o si no hay foto.
+ */
 @Composable
 private fun DishThumb(product: MenuProductDto, available: Boolean) {
     val tone = categoryTone(product.category)
@@ -102,6 +113,17 @@ private fun DishThumb(product: MenuProductDto, available: Boolean) {
             style = MaterialTheme.typography.headlineMedium,
             color = if (available) tone else MaterialTheme.colorScheme.outline,
         )
+        if (ImageClient.isAllowed(product.imageUrl)) {
+            // Decorativa: el nombre del platillo ya está escrito junto a ella.
+            AsyncImage(
+                model = product.imageUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                // Opaca, para tapar la inicial; lo agotado va en gris.
+                colorFilter = if (available) null else SoldOutFilter,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 
