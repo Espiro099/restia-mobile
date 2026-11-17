@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
@@ -189,6 +190,12 @@ fun PrintJobsScreen(viewModel: PrintJobsViewModel, onBack: () -> Unit) {
         viewModel.startPolling()
         onStopOrDispose { viewModel.stopPolling() }
     }
+    val listState = rememberLazyListState()
+    // La lista va del más reciente al más antiguo. Al insertar arriba, LazyColumn conserva el elemento visible
+    // y el trabajo nuevo (una reimpresión, un fallo) quedaba fuera de la vista: si se estaba al principio, se sube.
+    LaunchedEffect(state.jobs.firstOrNull()?.id) {
+        if (listState.firstVisibleItemIndex <= 1) listState.scrollToItem(0)
+    }
     LaunchedEffect(state.notice) {
         if (state.notice != null) {
             delay(6_000)
@@ -225,7 +232,7 @@ fun PrintJobsScreen(viewModel: PrintJobsViewModel, onBack: () -> Unit) {
                 state.loaded && state.jobs.isEmpty() -> Box(Modifier.fillMaxSize().padding(24.dp), Alignment.Center) {
                     Text(stringResource(if (state.tab == PrintTab.ATTENTION) R.string.print_nothing_pending else R.string.print_empty))
                 }
-                else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                else -> LazyColumn(state = listState, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(state.jobs, key = { it.id }) { JobCard(it, state, viewModel) }
                 }
             }
