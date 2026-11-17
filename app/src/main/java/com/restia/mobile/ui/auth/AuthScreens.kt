@@ -110,7 +110,7 @@ private fun AuthLayout(content: @Composable () -> Unit) {
 
 @Composable
 private fun Heading(title: String, subtitle: String?) {
-    Text(title, style = MaterialTheme.typography.headlineSmall, color = Restia.colors.brandDeep, textAlign = TextAlign.Center)
+    Text(title, style = MaterialTheme.typography.headlineSmall, color = Restia.colors.heading, textAlign = TextAlign.Center)
     subtitle?.let {
         Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }

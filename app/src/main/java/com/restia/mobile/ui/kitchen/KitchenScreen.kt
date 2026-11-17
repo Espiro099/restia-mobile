@@ -10,8 +10,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -34,9 +35,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleStartEffect
 import com.restia.mobile.R
-import com.restia.mobile.ui.theme.EmptyState
-import com.restia.mobile.ui.account.AccountMenu
 import com.restia.mobile.core.network.ApiFailure
+import com.restia.mobile.ui.account.AccountMenu
+import com.restia.mobile.ui.theme.EmptyState
 import java.time.Duration
 import java.time.OffsetDateTime
 import java.time.ZoneId
@@ -188,7 +189,13 @@ fun KitchenScreen(
             when {
                 !state.loaded && state.failure == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 state.loaded && state.units.isEmpty() -> EmptyState(stringResource(R.string.kitchen_empty), stringResource(R.string.kitchen_empty_hint))
-                else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // En tablet (el uso típico en cocina) las comandas se acomodan en columnas; en teléfono queda una.
+                else -> LazyVerticalStaggeredGrid(
+                    columns = StaggeredGridCells.Adaptive(minSize = 340.dp),
+                    contentPadding = PaddingValues(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalItemSpacing = 12.dp,
+                ) {
                     items(state.tickets, key = { it.orderId }) { ticket -> TicketCard(ticket, canPrepare, state.working, viewModel) }
                 }
             }

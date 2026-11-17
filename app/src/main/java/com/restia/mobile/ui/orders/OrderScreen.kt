@@ -70,6 +70,7 @@ import com.restia.mobile.data.orders.CartLine
 import com.restia.mobile.data.orders.MAX_QUANTITY
 import com.restia.mobile.data.orders.invalidModifiers
 import com.restia.mobile.ui.theme.Restia
+import com.restia.mobile.ui.theme.readableWidth
 import java.math.BigDecimal
 import java.math.RoundingMode
 
@@ -90,7 +91,7 @@ private fun failureText(failure: ApiFailure): String = when {
 /** Tonos de la miniatura: cada categoría conserva el suyo mientras no hay fotos de los platillos. */
 @Composable
 private fun categoryTone(category: String): Color {
-    val tones = listOf(Restia.colors.brand, Restia.colors.free, Restia.colors.busy, Restia.colors.brandDeep)
+    val tones = listOf(Restia.colors.brand, Restia.colors.free, Restia.colors.busy, Restia.colors.heading)
     return tones[Math.floorMod(category.hashCode(), tones.size)]
 }
 
@@ -307,7 +308,7 @@ fun OrderScreen(viewModel: OrderViewModel, tableNumber: Int, onBack: () -> Unit,
                     onClick = { viewModel.setReviewing(true) },
                     shape = MaterialTheme.shapes.small,
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
-                    modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
+                    modifier = Modifier.readableWidth().navigationBarsPadding().padding(16.dp),
                 ) {
                     Text(stringResource(R.string.order_view_cart, state.cart.sumOf { it.quantity }), modifier = Modifier.weight(1f))
                     estimate?.let { Text(moneyText(it, currency), style = MaterialTheme.typography.titleSmall) }
@@ -320,7 +321,7 @@ fun OrderScreen(viewModel: OrderViewModel, tableNumber: Int, onBack: () -> Unit,
             menu != null -> {
                 val categories = menu.products.map { it.category }.distinct()
                 val selected = category?.takeIf { it in categories }
-                Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+                Column(modifier = Modifier.fillMaxSize().padding(padding).readableWidth()) {
                 if (categories.size > 1) {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
@@ -348,7 +349,7 @@ fun OrderScreen(viewModel: OrderViewModel, tableNumber: Int, onBack: () -> Unit,
                             Text(
                                 name,
                                 style = MaterialTheme.typography.titleLarge,
-                                color = Restia.colors.brandDeep,
+                                color = Restia.colors.heading,
                                 modifier = Modifier.padding(top = 8.dp).semantics { heading() },
                             )
                         }

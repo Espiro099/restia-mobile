@@ -69,6 +69,7 @@ import com.restia.mobile.ui.theme.EmptyState
 import com.restia.mobile.ui.theme.GroupCard
 import com.restia.mobile.ui.theme.Restia
 import com.restia.mobile.ui.theme.StatusPill
+import com.restia.mobile.ui.theme.readableWidth
 import java.math.BigDecimal
 import kotlinx.coroutines.delay
 
@@ -172,7 +173,7 @@ private fun BalanceHeader(checks: List<CheckDto>) {
 private fun checkTone(status: String): Color = when (status) {
     "OPEN" -> Restia.colors.free
     "REQUESTED", "PARTIALLY_PAID" -> Restia.colors.busy
-    "PAID" -> Restia.colors.brandDeep
+    "PAID" -> Restia.colors.heading
     else -> MaterialTheme.colorScheme.outline
 }
 
@@ -219,7 +220,7 @@ private fun CheckCard(check: CheckDto, payments: List<PaymentDto>, can: CheckPer
                 Text(
                     title,
                     style = MaterialTheme.typography.titleMedium,
-                    color = Restia.colors.brandDeep,
+                    color = Restia.colors.heading,
                     modifier = Modifier.weight(1f).semantics { heading() },
                 )
                 StatusPill(stringResource(checkStatusLabel(check.status)), checkTone(check.status))
@@ -603,7 +604,7 @@ fun CheckScreen(viewModel: CheckViewModel, tableNumber: Int, can: CheckPermissio
             )
         },
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Column(modifier = Modifier.fillMaxSize().padding(padding).readableWidth()) {
             state.failure?.let {
                 Text(
                     stringResource(if (state.loaded) R.string.tables_stale else R.string.check_not_loaded) + " " + failureText(it),

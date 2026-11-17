@@ -66,6 +66,7 @@ import com.restia.mobile.ui.theme.EmptyState
 import com.restia.mobile.ui.theme.GroupCard
 import com.restia.mobile.ui.theme.Restia
 import com.restia.mobile.ui.theme.StatusPill
+import com.restia.mobile.ui.theme.readableWidth
 import java.math.BigDecimal
 import java.time.OffsetDateTime
 import java.time.ZoneId
@@ -195,7 +196,7 @@ private fun unitTone(status: String): Color = when (status) {
     "PENDING" -> MaterialTheme.colorScheme.outline
     "PREPARING" -> Restia.colors.busy
     "READY" -> Restia.colors.free
-    "DELIVERED" -> Restia.colors.brandDeep
+    "DELIVERED" -> Restia.colors.heading
     else -> MaterialTheme.colorScheme.error
 }
 
@@ -308,7 +309,7 @@ private fun RoundCard(
                 Text(
                     if (time != null) stringResource(R.string.table_round_at, index, time) else stringResource(R.string.table_round, index),
                     style = MaterialTheme.typography.titleMedium,
-                    color = Restia.colors.brandDeep,
+                    color = Restia.colors.heading,
                     modifier = Modifier.weight(1f).semantics { heading() },
                 )
                 stage?.let { StatusPill(stringResource(ROUND_STEPS[it]), MaterialTheme.colorScheme.primary) }
@@ -499,7 +500,7 @@ fun TableScreen(
         bottomBar = {
             if (canOrder || canViewCheck) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
+                    modifier = Modifier.readableWidth().navigationBarsPadding().padding(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     if (canViewCheck) {
@@ -516,7 +517,7 @@ fun TableScreen(
             }
         },
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Column(modifier = Modifier.fillMaxSize().padding(padding).readableWidth()) {
             state.failure?.let {
                 Text(
                     stringResource(if (state.loaded) R.string.tables_stale else R.string.table_not_loaded) + " " + loadFailureText(it),
