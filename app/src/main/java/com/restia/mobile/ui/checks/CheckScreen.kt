@@ -120,7 +120,7 @@ private fun PaymentRow(payment: PaymentDto, canRecord: Boolean, canPrint: Boolea
             Text(stringResource(methodLabel(payment.method)) + brand + " · " + money(payment.amount))
             if (amountOf(payment.tip).signum() > 0) Text(stringResource(R.string.payment_tip, money(payment.tip)), style = MaterialTheme.typography.bodySmall)
             Text(
-                stringResource(paymentStatusLabel(payment.status)),
+                stringResource(paymentStatusLabel(payment.status)) + if (payment.refundId != null) " · " + stringResource(R.string.payment_refunded) else "",
                 style = MaterialTheme.typography.bodySmall,
                 color = if (payment.status == "UNKNOWN" || payment.status == "PENDING") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -178,7 +178,11 @@ private fun CheckCard(check: CheckDto, payments: List<PaymentDto>, can: CheckPer
             AmountRow(stringResource(R.string.check_total), money(check.total), strong = true)
             if (amountOf(check.paidTotal).signum() != 0) AmountRow(stringResource(R.string.check_paid_total), money(check.paidTotal))
             if (amountOf(check.pendingTotal).signum() != 0) AmountRow(stringResource(R.string.check_pending_total), money(check.pendingTotal))
-            AmountRow(stringResource(R.string.check_balance), money(check.balance), strong = true)
+            check.refundedTotal?.takeIf { amountOf(it).signum() != 0 }?.let { AmountRow(stringResource(R.string.check_refunded_total), "-" + money(it)) }
+            // Reembolsada o cancelada ya no se cobra: su saldo (que puede ser negativo) no significa nada para el mesero.
+            if (check.status !in setOf("REFUNDED", "CANCELLED")) {
+                AmountRow(stringResource(R.string.check_balance), money(check.balance), strong = true)
+            }
             if (payments.isNotEmpty()) {
                 HorizontalDivider()
                 payments.forEach { PaymentRow(it, can.record, can.print, busy, viewModel) }
@@ -531,9 +535,10 @@ fun CheckScreen(viewModel: CheckViewModel, tableNumber: Int, can: CheckPermissio
             }
             when {
                 !state.loaded && state.failure == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-                state.loaded && state.checks.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) { Text(stringResource(R.string.check_none)) }
+                // Las canceladas no tienen nada que cobrar ni hacer: no se muestran.
+                state.loaded && state.checks.none { it.status != "CANCELLED" } -> Box(Modifier.fillMaxSize(), Alignment.Center) { Text(stringResource(R.string.check_none)) }
                 else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(state.checks, key = { it.id }) { check ->
+                    items(state.checks.filter { it.status != "CANCELLED" }, key = { it.id }) { check ->
                         CheckCard(check, state.payments[check.id].orEmpty(), can, state.busy, viewModel)
                     }
                 }

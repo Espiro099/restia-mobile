@@ -204,6 +204,8 @@
     <string name="check_courtesies">Cortesías</string>
     <string name="check_total">Total</string>
     <string name="check_paid_total">Pagado</string>
+    <string name="check_refunded_total">Reembolsado</string>
+    <string name="payment_refunded">reembolsado</string>
     <string name="check_pending_total">En cobro</string>
     <string name="check_balance">Por pagar</string>
     <string name="check_request">Pedir la cuenta</string>
@@ -437,7 +439,8 @@
     <string name="cash_difference_reason">Motivo de la diferencia</string>
     <string name="cash_close_confirm">Cerrar</string>
     <string name="cash_closed">Turno de %1$s cerrado.</string>
-    <string name="cash_closed_with_difference">Turno cerrado con una diferencia de %1$s.</string>
+    <string name="cash_closed_short">Turno cerrado; faltaron %1$s.</string>
+    <string name="cash_closed_over">Turno cerrado; sobraron %1$s.</string>
     <string name="cash_cancel_closing">Cancelar corte</string>
     <string name="cash_cancel_closing_title">Cancelar el corte</string>
     <string name="cash_cancel_closing_body">La caja vuelve a aceptar cobros y el efectivo esperado se recalcula.</string>
@@ -507,7 +510,7 @@
     <string name="print_not_loaded">No se pudieron cargar las impresiones.</string>
     <string name="print_tab_attention">Por atender</string>
     <string name="print_tab_recent">Recientes</string>
-    <string name="print_nothing_pending">Todo salió impreso. No hay nada por atender.</string>
+    <string name="print_nothing_pending">No hay impresiones con problemas. Lo que está en cola aparece en Recientes.</string>
     <string name="print_empty">Todavía no hay impresiones.</string>
     <string name="print_type_kitchen">Comanda</string>
     <string name="print_type_void">Aviso de anulación</string>

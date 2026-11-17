@@ -116,23 +116,39 @@ class PrintJobsViewModel(
         _state.value = _state.value.copy(notice = null)
     }
 
+    /** Se pidió otra carga mientras una estaba en curso: lo traído ya puede no incluir el último cambio. */
+    private var reloadAgain = false
+
+    /**
+     * Una sola carga a la vez. Si otra llega a la mitad (sondeo, Actualizar o tras una acción), no se pierde:
+     * se repite al terminar, para que lo recién reimpreso o cancelado aparezca de inmediato.
+     */
     private suspend fun load() {
-        if (_state.value.loading) return
-        val tab = _state.value.tab
-        _state.value = _state.value.copy(loading = true)
-        if (_state.value.printers.isEmpty()) {
-            (repository.printerNames(branchId) as? ApiResult.Success)?.let { _state.value = _state.value.copy(printers = it.value) }
-        }
-        val r = if (tab == PrintTab.ATTENTION) repository.attention(branchId) else repository.recent(branchId)
-        // Si cambió de pestaña mientras cargaba, esta respuesta ya no sirve.
-        if (_state.value.tab != tab) {
-            _state.value = _state.value.copy(loading = false)
-            load()
+        if (_state.value.loading) {
+            reloadAgain = true
             return
         }
-        _state.value = when (r) {
-            is ApiResult.Success -> _state.value.copy(jobs = r.value, loaded = true, loading = false, failure = null)
-            is ApiResult.Failure -> _state.value.copy(loading = false, failure = r.failure)
+        _state.value = _state.value.copy(loading = true)
+        try {
+            do {
+                reloadAgain = false
+                val tab = _state.value.tab
+                if (_state.value.printers.isEmpty()) {
+                    (repository.printerNames(branchId) as? ApiResult.Success)?.let { _state.value = _state.value.copy(printers = it.value) }
+                }
+                val r = if (tab == PrintTab.ATTENTION) repository.attention(branchId) else repository.recent(branchId)
+                // Si cambió de pestaña mientras cargaba, esta respuesta ya no sirve: se carga la nueva.
+                if (_state.value.tab != tab) {
+                    reloadAgain = true
+                    continue
+                }
+                _state.value = when (r) {
+                    is ApiResult.Success -> _state.value.copy(jobs = r.value, loaded = true, failure = null)
+                    is ApiResult.Failure -> _state.value.copy(failure = r.failure)
+                }
+            } while (reloadAgain)
+        } finally {
+            _state.value = _state.value.copy(loading = false)
         }
     }
 

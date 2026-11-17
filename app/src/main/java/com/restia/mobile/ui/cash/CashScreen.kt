@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -350,7 +351,7 @@ private fun SummaryCard(summary: CashShiftSummaryDto, closing: Boolean) {
                 }
             }
             SummaryLine(stringResource(R.string.cash_deposits), money(summary.deposits))
-            SummaryLine(stringResource(R.string.cash_withdrawals), "−" + money(summary.withdrawals))
+            SummaryLine(stringResource(R.string.cash_withdrawals), (if (amountOf(summary.withdrawals).signum() != 0) "−" else "") + money(summary.withdrawals))
             HorizontalDivider()
             SummaryLine(stringResource(if (closing) R.string.cash_expected_closing else R.string.cash_expected_now), money(summary.expectedCash), bold = true)
             if (summary.unresolved.total > 0) {
@@ -487,6 +488,13 @@ private fun RegisterCard(row: RegisterShift, can: CashPermissions, viewModel: Ca
 @Composable
 fun CashScreen(viewModel: CashViewModel, onBack: () -> Unit) {
     val state by viewModel.state.collectAsState()
+    // El aviso de lo que sí ocurrió se va solo, como en la cuenta.
+    LaunchedEffect(state.notice) {
+        if (state.notice != null) {
+            kotlinx.coroutines.delay(6_000)
+            viewModel.clearNotice()
+        }
+    }
     state.opening?.let { OpenDialog(it, viewModel) }
     state.moving?.let { MoveDialog(it, viewModel) }
     state.closing?.let { CloseDialog(it, viewModel) }

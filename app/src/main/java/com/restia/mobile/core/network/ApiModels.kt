@@ -243,6 +243,8 @@ data class CheckDto(
     val total: MoneyDto,
     val paidTotal: MoneyDto,
     val pendingTotal: MoneyDto,
+    /** Lo devuelto; el backend no lo resta del saldo, así que una cuenta reembolsada puede quedar en negativo. */
+    val refundedTotal: MoneyDto? = null,
     val tipTotal: MoneyDto,
     val balance: MoneyDto,
     val version: Int,

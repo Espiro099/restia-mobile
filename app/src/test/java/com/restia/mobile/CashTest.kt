@@ -289,7 +289,8 @@ class CashFlowTest {
             """{"countedCash":{"amount":"1200.00","currency":"MXN"},"cashLeftInDrawer":{"amount":"500.00","currency":"MXN"},"differenceReason":"Faltó cambio"}""",
             close.second,
         )
-        assertEquals(R.string.cash_closed_with_difference, vm.state.value.notice!!.text)
+        assertEquals(R.string.cash_closed_short, vm.state.value.notice!!.text)
+        assertEquals("$50.00 MXN", vm.state.value.notice!!.arg)
     }
 
     @Test

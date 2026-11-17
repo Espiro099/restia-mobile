@@ -504,7 +504,8 @@ class CashViewModel(
                         closing = null,
                         detail = null,
                         notice = if (difference.signum() == 0) Notice(R.string.cash_closed, detail.register.name)
-                        else Notice(R.string.cash_closed_with_difference, moneyText(difference, CASH_CURRENCY)),
+                        // "Faltaron" o "sobraron" con el importe en positivo: "$-14.00" no se lee bien.
+                        else Notice(if (difference.signum() < 0) R.string.cash_closed_short else R.string.cash_closed_over, moneyText(difference.abs(), CASH_CURRENCY)),
                     )
                     refresh()
                 }

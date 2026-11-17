@@ -83,6 +83,8 @@ class PrintJobsFlowTest {
     private var unknown = jobs(job("j2", "UNKNOWN", type = "PRE_CHECK", version = 2, createdAt = "2026-11-16T18:05:00Z"))
     private var recent = jobs(job("j3", "PRINTED", type = "PAYMENT_RECEIPT"), job("j1", "FAILED"))
     private var keys = 0
+    /** Retraso de la lista de recientes, para simular una carga lenta. */
+    private var recentDelayMs = 0L
 
     @Before
     fun setUp() {
@@ -93,7 +95,8 @@ class PrintJobsFlowTest {
                 requests += request to request.body.readUtf8()
                 val url = request.requestUrl!!
                 if (request.method != "GET") return answers.removeFirst()
-                return MockResponse().setBody(
+                val delay = if (url.encodedPath == "/branches/b1/print-jobs" && url.queryParameter("status") == null) recentDelayMs else 0L
+                return MockResponse().setBodyDelay(delay, TimeUnit.MILLISECONDS).setBody(
                     when (url.encodedPath) {
                         "/branches/b1/printers" -> """{"data":[{"id":"pr1","branchId":"b1","agentId":"a1","code":"COCINA","name":"Cocina caliente","connection":"NETWORK","paperWidth":80,"status":"ACTIVE","version":1}],"meta":{}}"""
                         "/branches/b1/print-jobs" -> when (url.queryParameter("status")) {
@@ -214,5 +217,21 @@ class PrintJobsFlowTest {
         vm.start(vm.state.value.jobs.first { it.id == "j2" }, PrintActionKind.REPRINT)
         assertNull(vm.state.value.action)
         assertTrue(requests.none { it.first.method == "POST" })
+    }
+
+    @Test
+    fun `una recarga que llega durante otra no se pierde`() {
+        val vm = loaded()
+        vm.selectTab(PrintTab.RECENT)
+        waitFor { vm.state.value.loaded && vm.state.value.tab == PrintTab.RECENT && !vm.state.value.loading }
+        // Una carga lenta en curso (como el sondeo) trae la lista de antes...
+        recentDelayMs = 600
+        vm.refresh()
+        waitFor { vm.state.value.loading }
+        // ...y mientras tanto se reimprime algo: esa recarga debe repetirse al terminar.
+        recentDelayMs = 0
+        recent = jobs(job("j9", "PENDING", type = "PRE_CHECK", createdAt = "2026-11-16T18:39:00Z"), job("j3", "PRINTED", type = "PAYMENT_RECEIPT"))
+        vm.refresh()
+        waitFor { !vm.state.value.loading && vm.state.value.jobs.firstOrNull()?.id == "j9" }
     }
 }
