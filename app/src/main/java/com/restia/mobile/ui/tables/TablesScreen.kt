@@ -386,7 +386,7 @@ fun TablesScreen(
                 !state.loaded && state.failure == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 state.loaded && state.tables.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) { Text(stringResource(R.string.tables_empty)) }
                 else -> LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 96.dp),
+                    columns = GridCells.Adaptive(minSize = 116.dp),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),

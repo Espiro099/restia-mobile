@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,7 +48,7 @@ import com.restia.mobile.R
 
 /** La flama con la palabra "Restia". En tamaño grande lleva el lema debajo, como en la portada. */
 @Composable
-fun RestiaLogo(modifier: Modifier = Modifier, height: Dp = 28.dp, tagline: Boolean = false, color: Color = Restia.colors.brandDeep) {
+fun RestiaLogo(modifier: Modifier = Modifier, height: Dp = 28.dp, tagline: Boolean = false, color: Color = Restia.colors.heading) {
     Column(modifier = modifier.semantics(mergeDescendants = true) {}, horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Image(painterResource(R.drawable.ic_restia_flame), contentDescription = null, modifier = Modifier.size(height))
@@ -180,7 +182,7 @@ fun EmptyState(title: String, body: String?, modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Cloche(Modifier.padding(bottom = 8.dp))
-        Text(title, style = MaterialTheme.typography.titleLarge, color = Restia.colors.brandDeep, textAlign = TextAlign.Center)
+        Text(title, style = MaterialTheme.typography.titleLarge, color = Restia.colors.heading, textAlign = TextAlign.Center)
         body?.let {
             Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         }
@@ -199,3 +201,10 @@ fun StatusPill(text: String, tone: Color) {
         )
     }
 }
+
+/** Ancho máximo de una pantalla de lectura (mesa, comanda, cuenta): en tablet queda centrada, no estirada. */
+val ReadableWidth = 720.dp
+
+/** Ocupa todo el ancho en teléfono; en pantallas anchas se limita a [ReadableWidth] y se centra. */
+fun Modifier.readableWidth(): Modifier =
+    fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = ReadableWidth)

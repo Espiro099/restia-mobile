@@ -101,7 +101,10 @@ private val Dark = darkColorScheme(
 @Immutable
 data class RestiaColors(
     val brand: Color,
+    /** Café de la marca como fondo (encabezado de la cuenta, arco del acceso); lleva texto blanco encima. */
     val brandDeep: Color,
+    /** Café de la marca como texto (títulos, logo): café sobre crema, crema cálida sobre el fondo oscuro. */
+    val heading: Color,
     val free: Color,
     val busy: Color,
     val attention: Color,
@@ -111,6 +114,7 @@ data class RestiaColors(
 private val LightExtras = RestiaColors(
     brand = Palette.Terracotta,
     brandDeep = Palette.Brown,
+    heading = Palette.Brown,
     free = Palette.Olive,
     busy = Palette.Mustard,
     attention = Color(0xFFD2452F),
@@ -119,7 +123,9 @@ private val LightExtras = RestiaColors(
 
 private val DarkExtras = RestiaColors(
     brand = Color(0xFFF0A07D),
-    brandDeep = Color(0xFF2A160D),
+    // Más claro que el fondo para que el encabezado de la cuenta se distinga; el blanco sigue contrastando.
+    brandDeep = Color(0xFF5A2E1B),
+    heading = Color(0xFFF3D9C6),
     free = Color(0xFF8DBB74),
     busy = Color(0xFFE9B65A),
     attention = Color(0xFFF07A64),

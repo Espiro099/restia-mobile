@@ -111,7 +111,7 @@ fun MoreScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            SectionTitle(stringResource(R.string.profile_title), Modifier.fillMaxWidth())
+            SectionTitle(stringResource(R.string.profile_title), Modifier.widthIn(max = 560.dp).fillMaxWidth())
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Avatar(userName, size = 88.dp)
                 Text(userName, style = MaterialTheme.typography.titleLarge)
