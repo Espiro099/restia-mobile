@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Propuesta Restia (Figma, boceto 03/04): ícono de línea. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24"
+    android:viewportWidth="15"
+    android:viewportHeight="15"
     android:tint="?android:attr/colorControlNormal">
-    <path android:fillColor="#FF000000" android:pathData="M10,6L8.59,7.41 13.17,12l-4.58,4.59L10,18l6,-6z" />
+    <path
+        android:pathData="M5.625 3.125L10 7.5L5.625 11.875"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.0625"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
 </vector>

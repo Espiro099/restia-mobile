@@ -2,7 +2,6 @@
     <string name="app_name">Restia</string>
     <string name="brand_tagline">Conecta · Sirve · Crece</string>
     <string name="login_welcome">Bienvenido de nuevo</string>
-    <string name="login_subtitle">Inicia sesión para continuar</string>
     <string name="password_reveal">Mostrar contraseña</string>
     <string name="password_conceal">Ocultar contraseña</string>
     <string name="enroll_title">Registrar este dispositivo</string>
@@ -147,14 +146,9 @@
         <item quantity="other">%1$d personas</item>
     </plurals>
     <string name="table_free">Libre</string>
-    <string name="legend_busy">Ocupada</string>
-    <string name="legend_off">Fuera de servicio</string>
-    <string name="greeting">Hola, %1$s</string>
     <string name="tab_tables">Mesas</string>
     <string name="tab_more">Más</string>
     <string name="profile_title">Mi perfil</string>
-    <string name="profile_user">Usuario</string>
-    <string name="profile_role">Rol</string>
     <string name="profile_branch">Sucursal</string>
     <string name="table_possibly_occupied">Posiblemente ocupada</string>
     <string name="table_no_order">Ocupada, sin comanda</string>
@@ -580,4 +574,46 @@
     <string name="print_reprint_done">Reimpresión enviada.</string>
     <string name="print_conflict">La impresión cambió mientras tanto. Ya se muestra lo actual.</string>
     <string name="cash_conflict">Alguien cambió este turno al mismo tiempo. Ya se muestra lo actual; vuelve a intentarlo.</string>
+    <!-- Propuesta 04 (Figma): bienvenida, acceso, mesas, comandas y más. -->
+    <string name="welcome_body">Continúa tu jornada en el restaurante</string>
+    <string name="welcome_action">Iniciar sesión</string>
+    <string name="welcome_note">Aplicación privada para empleados</string>
+    <string name="login_hint">Usa tu cuenta de empleado.</string>
+    <string name="login_help">¿No puedes entrar? Contacta a tu responsable.</string>
+    <string name="greeting_morning">Buenos días, %1$s</string>
+    <string name="greeting_afternoon">Buenas tardes, %1$s</string>
+    <string name="greeting_evening">Buenas noches, %1$s</string>
+    <string name="zone_all">Todas · %1$d</string>
+    <string name="zone_tag">%1$s · %2$d</string>
+    <string name="table_to_confirm">Por confirmar</string>
+    <string name="table_to_charge">Por cobrar</string>
+    <string name="table_ready_to_serve">Lista para servir</string>
+    <string name="table_minutes">%1$d min</string>
+    <string name="table_hours">%1$d h</string>
+    <string name="table_days">%1$d d</string>
+    <plurals name="table_seats">
+        <item quantity="one">%1$d lugar</item>
+        <item quantity="other">%1$d lugares</item>
+    </plurals>
+    <plurals name="table_dishes">
+        <item quantity="one">%1$d platillo</item>
+        <item quantity="other">%1$d platillos</item>
+    </plurals>
+    <string name="ready_notice_title">Mesa %1$d · orden lista</string>
+    <plurals name="ready_notice_body">
+        <item quantity="one">%1$d platillo espera entrega</item>
+        <item quantity="other">%1$d platillos esperan entrega</item>
+    </plurals>
+    <string name="legend_free">Libre</string>
+    <string name="legend_attention">En atención</string>
+    <string name="legend_check">Cuenta</string>
+    <string name="tab_orders">Comandas</string>
+    <string name="orders_not_loaded">No se pudieron cargar las comandas.</string>
+    <string name="orders_empty_title">Todo listo para empezar</string>
+    <string name="orders_empty_body">Las comandas de tus mesas aparecerán aquí cuando las envíes a cocina.</string>
+    <string name="orders_go_to_tables">Ir a mesas</string>
+    <string name="orders_waiting">Pidió hace %1$s</string>
+    <string name="more_account">Mi cuenta</string>
+    <string name="more_tools">Herramientas</string>
+    <string name="more_security">Seguridad de tu cuenta</string>
 </resources>
