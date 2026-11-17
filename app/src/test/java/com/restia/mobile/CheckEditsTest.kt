@@ -129,13 +129,16 @@ class CheckEditsFlowTest {
         Dispatchers.resetMain()
     }
 
+    /** Copia tomada con el bloqueo: el servidor simulado agrega peticiones desde otro hilo. */
+    private fun sent() = synchronized(requests) { requests.toList() }
+
     private fun waitFor(condition: () -> Boolean) {
         val end = System.currentTimeMillis() + 5000
         while (!condition() && System.currentTimeMillis() < end) Thread.sleep(10)
         assertTrue("tiempo agotado", condition())
     }
 
-    private fun posts(path: String) = requests.filter { it.first.method == "POST" && it.first.requestUrl!!.encodedPath == path }
+    private fun posts(path: String) = sent().filter { it.first.method == "POST" && it.first.requestUrl!!.encodedPath == path }
 
     private fun loaded(reopen: Boolean = false, adjust: Boolean = false): CheckViewModel {
         val vm = CheckViewModel(

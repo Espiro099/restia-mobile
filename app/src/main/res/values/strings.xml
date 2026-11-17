@@ -1,5 +1,10 @@
 <resources>
     <string name="app_name">Restia</string>
+    <string name="brand_tagline">Conecta · Sirve · Crece</string>
+    <string name="login_welcome">Bienvenido de nuevo</string>
+    <string name="login_subtitle">Inicia sesión para continuar</string>
+    <string name="password_reveal">Mostrar contraseña</string>
+    <string name="password_conceal">Ocultar contraseña</string>
     <string name="enroll_title">Registrar este dispositivo</string>
     <string name="enroll_body">Pide a un gerente un código de alta. Vence en 15 minutos y sirve una sola vez.</string>
     <string name="login_title">Iniciar sesión</string>
@@ -128,6 +133,15 @@
         <item quantity="other">%1$d personas</item>
     </plurals>
     <string name="table_free">Libre</string>
+    <string name="legend_busy">Ocupada</string>
+    <string name="legend_off">Fuera de servicio</string>
+    <string name="greeting">Hola, %1$s</string>
+    <string name="tab_tables">Mesas</string>
+    <string name="tab_more">Más</string>
+    <string name="profile_title">Mi perfil</string>
+    <string name="profile_user">Usuario</string>
+    <string name="profile_role">Rol</string>
+    <string name="profile_branch">Sucursal</string>
     <string name="table_possibly_occupied">Posiblemente ocupada</string>
     <string name="table_no_order">Ocupada, sin comanda</string>
     <string name="table_waiting_food">Esperando comida</string>

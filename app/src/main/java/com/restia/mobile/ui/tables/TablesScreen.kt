@@ -1,21 +1,29 @@
 package com.restia.mobile.ui.tables
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -24,21 +32,34 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleStartEffect
 import com.restia.mobile.R
 import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.TableDto
 import com.restia.mobile.ui.account.AccountMenu
+import com.restia.mobile.ui.theme.Avatar
+import com.restia.mobile.ui.theme.Restia
+import com.restia.mobile.ui.theme.RestiaLogo
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -70,31 +91,144 @@ fun tableStateLabel(table: TableDto): Int = when {
     }
 }
 
+/** Los cinco grupos de la leyenda: libre, ocupada, cuenta, por limpiar y fuera de servicio. */
+enum class TableTone { FREE, BUSY, CHECK, CLEANING, OFF }
+
+fun tableTone(table: TableDto): TableTone = when {
+    table.status != "ACTIVE" -> TableTone.OFF
+    table.operationalState == "LIBRE" -> TableTone.FREE
+    table.operationalState == "CUENTA_SOLICITADA" -> TableTone.CHECK
+    table.operationalState == "POR_LIMPIAR" -> TableTone.CLEANING
+    else -> TableTone.BUSY
+}
+
 @Composable
-private fun tableColor(table: TableDto): Color {
-    val scheme = MaterialTheme.colorScheme
-    return when {
-        table.status != "ACTIVE" -> scheme.surfaceVariant
-        table.operationalState == "LIBRE" -> scheme.primaryContainer
-        table.operationalState == "POR_LIMPIAR" -> scheme.tertiaryContainer
-        table.operationalState == "CUENTA_SOLICITADA" -> scheme.errorContainer
-        else -> scheme.secondaryContainer
+private fun toneColor(tone: TableTone): Color {
+    val c = Restia.colors
+    return when (tone) {
+        TableTone.FREE -> c.free
+        TableTone.BUSY -> c.busy
+        TableTone.CHECK -> c.attention
+        TableTone.CLEANING -> c.idle
+        TableTone.OFF -> c.idle.copy(alpha = 0.45f)
+    }
+}
+
+@StringRes
+private fun toneLabel(tone: TableTone): Int = when (tone) {
+    TableTone.FREE -> R.string.table_free
+    TableTone.BUSY -> R.string.legend_busy
+    TableTone.CHECK -> R.string.table_check_requested
+    TableTone.CLEANING -> R.string.table_to_clean
+    TableTone.OFF -> R.string.legend_off
+}
+
+/** La mesa vista desde arriba: cuatro sillas y la mesa al centro con su número, en el color de su estado. */
+@Composable
+private fun TableGlyph(number: Int, color: Color, modifier: Modifier = Modifier) {
+    // Texto oscuro sobre mostaza y gris (el blanco no alcanza contraste); blanco sobre verde y rojo.
+    val numberColor = if (color.luminance() > 0.3f) Color(0xFF2B1D16) else Color.White
+    Box(modifier = modifier.size(64.dp), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val chair = CornerRadius(w * 0.06f)
+            val long = w * 0.30f
+            val short = w * 0.13f
+            // Sillas: arriba, abajo, izquierda y derecha.
+            drawRoundRect(color, Offset((w - long) / 2f, 0f), Size(long, short), chair)
+            drawRoundRect(color, Offset((w - long) / 2f, w - short), Size(long, short), chair)
+            drawRoundRect(color, Offset(0f, (w - long) / 2f), Size(short, long), chair)
+            drawRoundRect(color, Offset(w - short, (w - long) / 2f), Size(short, long), chair)
+            drawCircle(color, radius = w * 0.31f)
+        }
+        Text(number.toString(), style = MaterialTheme.typography.titleMedium, color = numberColor)
     }
 }
 
 @Composable
 private fun TableCard(table: TableDto, onClick: (() -> Unit)?) {
     // El estado siempre va en texto: el color solo lo refuerza.
-    val colors = CardDefaults.cardColors(containerColor = tableColor(table))
-    val content: @Composable ColumnScope.() -> Unit = {
-        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(stringResource(R.string.table_number, table.number), style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(tableStateLabel(table)), style = MaterialTheme.typography.bodyMedium)
-            Text(pluralStringResource(R.plurals.table_capacity, table.capacity, table.capacity), style = MaterialTheme.typography.bodySmall)
-            table.zone?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+    val tone = tableTone(table)
+    val clickable = if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier
+    Column(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .then(clickable)
+            .padding(vertical = 10.dp, horizontal = 4.dp)
+            .semantics(mergeDescendants = true) {},
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        TableGlyph(table.number, toneColor(tone))
+        Text(
+            stringResource(R.string.table_number, table.number),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.clearAndSetSemantics {},
+        )
+        Text(
+            stringResource(tableStateLabel(table)),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            // Dos líneas siempre: así todas las tarjetas miden lo mismo.
+            minLines = 2,
+            maxLines = 2,
+        )
+        Text(
+            pluralStringResource(R.plurals.table_capacity, table.capacity, table.capacity) + (table.zone?.let { " · $it" } ?: ""),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+        )
+    }
+}
+
+/** Leyenda de colores: solo los estados que hay en el salón ahora mismo. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun Legend(tables: List<TableDto>) {
+    val tones = tables.map(::tableTone).toSet()
+    FlowRow(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        TableTone.entries.filter { it in tones }.forEach { tone ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(Modifier.size(12.dp).clip(CircleShape).background(toneColor(tone)))
+                Text(stringResource(toneLabel(tone)), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
-    if (onClick != null) Card(onClick = onClick, colors = colors, content = content) else Card(colors = colors, content = content)
+}
+
+/** Saludo con el empleado, su rol y la sucursal, como en la propuesta. */
+@Composable
+private fun Greeting(userName: String, role: String, branchName: String, refreshing: Boolean, onRefresh: () -> Unit) {
+    val first = userName.trim().substringBefore(' ').ifEmpty { userName }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Avatar(userName)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(stringResource(R.string.greeting, first), style = MaterialTheme.typography.titleMedium)
+            Text(
+                (roleLabel(role)?.let { stringResource(it) } ?: role) + " · " + branchName,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        TextButton(onClick = onRefresh, enabled = !refreshing) { Text(stringResource(R.string.action_refresh)) }
+    }
 }
 
 private fun localTime(iso: String): String? = runCatching {
@@ -170,6 +304,9 @@ private fun failureText(failure: ApiFailure): String = when {
 @Composable
 fun TablesScreen(
     viewModel: TablesViewModel,
+    userName: String = "",
+    /** Dentro de la barra inferior: Reservas, Cocina y la cuenta ya están ahí. */
+    inTabs: Boolean = false,
     branchName: String,
     role: String,
     canOpenTables: Boolean,
@@ -214,22 +351,21 @@ fun TablesScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(branchName, style = MaterialTheme.typography.titleMedium)
-                        Text(roleLabel(role)?.let { stringResource(it) } ?: role, style = MaterialTheme.typography.bodySmall)
+            CenterAlignedTopAppBar(
+                title = { RestiaLogo(height = 26.dp) },
+                actions = {
+                    if (!inTabs) {
+                        if (showReservations) TextButton(onClick = onReservations) { Text(stringResource(R.string.reservations_title)) }
+                        if (showKitchen) TextButton(onClick = onKitchen) { Text(stringResource(R.string.kitchen_title)) }
+                        AccountMenu(showStaff, logoutEnabled, onStaff, onChangePassword, onLogout, showCash, onCash, showPrinting, onPrinting)
                     }
                 },
-                actions = {
-                    if (showReservations) TextButton(onClick = onReservations) { Text(stringResource(R.string.reservations_title)) }
-                    if (showKitchen) TextButton(onClick = onKitchen) { Text(stringResource(R.string.kitchen_title)) }
-                    AccountMenu(showStaff, logoutEnabled, onStaff, onChangePassword, onLogout, showCash, onCash, showPrinting, onPrinting)
-                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Greeting(userName.ifBlank { branchName }, role, branchName, state.refreshing, viewModel::refresh)
             state.failure?.let {
                 Text(
                     stringResource(if (state.loaded) R.string.tables_stale else R.string.tables_not_loaded) + " " + failureText(it),
@@ -246,19 +382,15 @@ fun TablesScreen(
                     modifier = Modifier.padding(horizontal = 8.dp),
                 ) { Text(stringResource(R.string.tables_pending_draft, draft.tableNumber)) }
             }
-            TextButton(
-                onClick = viewModel::refresh,
-                enabled = !state.refreshing,
-                modifier = Modifier.padding(horizontal = 8.dp),
-            ) { Text(stringResource(R.string.action_refresh)) }
             when {
                 !state.loaded && state.failure == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 state.loaded && state.tables.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) { Text(stringResource(R.string.tables_empty)) }
                 else -> LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 150.dp),
-                    contentPadding = PaddingValues(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    columns = GridCells.Adaptive(minSize = 96.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.weight(1f),
                 ) {
                     items(state.tables, key = { it.id }) { table ->
                         // El permiso solo ajusta la interfaz; el backend siempre lo valida.
@@ -275,6 +407,7 @@ fun TablesScreen(
                     }
                 }
             }
+            if (state.loaded && state.tables.isNotEmpty()) Legend(state.tables)
         }
     }
 }

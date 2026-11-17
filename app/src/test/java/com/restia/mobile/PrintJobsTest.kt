@@ -123,13 +123,16 @@ class PrintJobsFlowTest {
         Dispatchers.resetMain()
     }
 
+    /** Copia tomada con el bloqueo: el servidor simulado agrega peticiones desde otro hilo. */
+    private fun sent() = synchronized(requests) { requests.toList() }
+
     private fun waitFor(condition: () -> Boolean) {
         val end = System.currentTimeMillis() + 5000
         while (!condition() && System.currentTimeMillis() < end) Thread.sleep(10)
         assertTrue("tiempo agotado", condition())
     }
 
-    private fun posts(path: String) = requests.filter { it.first.method == "POST" && it.first.requestUrl!!.encodedPath == path }
+    private fun posts(path: String) = sent().filter { it.first.method == "POST" && it.first.requestUrl!!.encodedPath == path }
 
     private fun loaded(can: PrintPermissions = PrintPermissions(resolve = true, reprint = true)): PrintJobsViewModel {
         val vm = PrintJobsViewModel(PrintingRepository(api), "b1", can, newKey = { "clave-${++keys}" })
@@ -147,7 +150,7 @@ class PrintJobsFlowTest {
         vm.selectTab(PrintTab.RECENT)
         waitFor { vm.state.value.loaded && vm.state.value.tab == PrintTab.RECENT }
         assertEquals(listOf("j3", "j1"), vm.state.value.jobs.map { it.id })
-        assertNull(requests.last { it.first.requestUrl!!.encodedPath == "/branches/b1/print-jobs" }.first.requestUrl!!.queryParameter("status"))
+        assertNull(sent().last { it.first.requestUrl!!.encodedPath == "/branches/b1/print-jobs" }.first.requestUrl!!.queryParameter("status"))
     }
 
     @Test
@@ -216,7 +219,7 @@ class PrintJobsFlowTest {
         vm.start(vm.state.value.jobs.first { it.id == "j2" }, PrintActionKind.RESOLVE)
         vm.start(vm.state.value.jobs.first { it.id == "j2" }, PrintActionKind.REPRINT)
         assertNull(vm.state.value.action)
-        assertTrue(requests.none { it.first.method == "POST" })
+        assertTrue(sent().none { it.first.method == "POST" })
     }
 
     @Test

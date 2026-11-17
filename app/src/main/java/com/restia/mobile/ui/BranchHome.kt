@@ -6,7 +6,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.restia.mobile.R
 import com.restia.mobile.Repositories
+import com.restia.mobile.ui.more.HomeScaffold
+import com.restia.mobile.ui.more.HomeTab
+import com.restia.mobile.ui.more.MoreOption
+import com.restia.mobile.ui.more.MoreScreen
 import com.restia.mobile.ui.account.ChangePasswordScreen
 import com.restia.mobile.ui.account.ChangePasswordViewModel
 import com.restia.mobile.ui.cash.CashPermissions
@@ -45,12 +50,13 @@ fun BranchHome(
     permissions: List<String>,
     logoutEnabled: Boolean,
     onLogout: () -> Unit,
+    userName: String = "",
+    userEmail: String = "",
 ) {
     var sessionId by rememberSaveable { mutableStateOf<String?>(null) }
     var tableNumber by rememberSaveable { mutableStateOf(0) }
     var capturing by rememberSaveable { mutableStateOf(false) }
     var viewingCheck by rememberSaveable { mutableStateOf(false) }
-    var inReservations by rememberSaveable { mutableStateOf(false) }
     var inCustomers by rememberSaveable { mutableStateOf(false) }
     // Cliente abierto desde una reserva; null para la búsqueda.
     var customerId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -135,111 +141,133 @@ fun BranchHome(
     }
     val canOrder = "orders.create" in permissions
     val canPrepare = "order_units.prepare" in permissions
-    // Quien prepara pero no toma comandas (cocina) empieza en la cola; el resto, en las mesas.
-    var inKitchen by rememberSaveable { mutableStateOf(canPrepare && !canOrder) }
-    if (inKitchen && "orders.read" in permissions) {
-        KitchenScreen(
-            viewModel = viewModel(key = "cocina-$userId-$branchId", factory = KitchenViewModel.Factory(repositories.kitchen, branchId)),
-            branchName = branchName,
-            canPrepare = canPrepare,
-            showTables = "tables.read" in permissions,
-            logoutEnabled = logoutEnabled,
-            onTables = { inKitchen = false },
-            onLogout = onLogout,
-            showStaff = showStaff,
-            onStaff = { inStaff = true },
-            onChangePassword = { changingPassword = true },
-            showCash = showCash,
-            onCash = { inCash = true },
-            showPrinting = showPrinting,
-            onPrinting = { inPrinting = true },
-        )
-        return
-    }
     // La clave incluye al usuario: otro inicio de sesión empieza sin la lista anterior.
     val tables: TablesViewModel = viewModel(
         key = "mesas-$userId-$branchId",
         factory = TablesViewModel.Factory(repositories.tables, branchId, repositories.drafts, userId),
     )
     val current = sessionId
-    if (inReservations && current == null && "reservations.read" in permissions) {
-        ReservationsScreen(
-            viewModel = viewModel(
-                key = "reservas-$userId-$branchId",
-                factory = ReservationsViewModel.Factory(
-                    repositories.reservations,
-                    repositories.tables,
-                    branchId,
-                    repositories.customers,
-                    canRegisterCustomers = "customers.create" in permissions,
-                ),
-            ),
-            can = ReservationPermissions(
-                create = "reservations.create" in permissions,
-                readCustomers = "customers.read" in permissions,
-                createCustomers = "customers.create" in permissions,
-                confirm = "reservations.confirm" in permissions,
-                arrive = "reservations.arrive" in permissions,
-                seat = "reservations.check_in" in permissions,
-                cancel = "reservations.cancel" in permissions,
-                noShow = "reservations.mark_no_show" in permissions,
-                overridePriority = "reservations.override_priority" in permissions,
-            ),
-            onBack = { inReservations = false },
-            onCustomers = {
-                customerId = null
-                inCustomers = true
-            },
-            onCustomer = {
-                customerId = it
-                inCustomers = true
-            },
-            // Al sentar, la mesa se abre: se pasa directo a su vista.
-            onSeated = { session, number ->
-                inReservations = false
-                sessionId = session
-                tableNumber = number
-                capturing = false
-                viewingCheck = false
-            },
-        )
-        return
-    }
     if (current == null) {
-        TablesScreen(
-            viewModel = tables,
-            branchName = branchName,
-            role = role,
-            canOpenTables = "table_sessions.open" in permissions,
-            canOrder = canOrder,
-            canViewOrders = "orders.read" in permissions,
-            canClean = "tables.clean" in permissions,
-            showKitchen = "orders.read" in permissions && (canPrepare || "order_units.deliver" in permissions),
-            logoutEnabled = logoutEnabled,
-            onLogout = onLogout,
-            showStaff = showStaff,
-            onStaff = { inStaff = true },
-            onChangePassword = { changingPassword = true },
-            showCash = showCash,
-            onCash = { inCash = true },
-            showPrinting = showPrinting,
-            onPrinting = { inPrinting = true },
-            onViewTable = { session, number ->
-                sessionId = session
-                tableNumber = number
-                capturing = false
-                viewingCheck = false
-            },
-            onOrder = { session, number ->
-                sessionId = session
-                tableNumber = number
-                capturing = canOrder
-                viewingCheck = false
-            },
-            onKitchen = { inKitchen = true },
-            showReservations = "reservations.read" in permissions,
-            onReservations = { inReservations = true },
-        )
+        // Secciones de la barra inferior, según los permisos; "Más" siempre está.
+        val tabs = buildList {
+            if ("tables.read" in permissions) add(HomeTab.TABLES)
+            if ("reservations.read" in permissions) add(HomeTab.RESERVATIONS)
+            if ("orders.read" in permissions && (canPrepare || "order_units.deliver" in permissions)) add(HomeTab.KITCHEN)
+            add(HomeTab.MORE)
+        }
+        // Quien prepara pero no toma comandas (cocina) empieza en la cola; el resto, en las mesas.
+        val start = if (canPrepare && !canOrder && HomeTab.KITCHEN in tabs) HomeTab.KITCHEN else tabs.first()
+        var tabName by rememberSaveable { mutableStateOf(start.name) }
+        val tab = HomeTab.valueOf(tabName).takeIf { it in tabs } ?: start
+        HomeScaffold(tabs, tab, onSelect = { tabName = it.name }) {
+            when (tab) {
+                HomeTab.TABLES -> TablesScreen(
+                    viewModel = tables,
+                    userName = userName,
+                    inTabs = true,
+                    branchName = branchName,
+                    role = role,
+                    canOpenTables = "table_sessions.open" in permissions,
+                    canOrder = canOrder,
+                    canViewOrders = "orders.read" in permissions,
+                    canClean = "tables.clean" in permissions,
+                    showKitchen = false,
+                    logoutEnabled = logoutEnabled,
+                    onLogout = onLogout,
+                    showStaff = false,
+                    onStaff = {},
+                    onChangePassword = {},
+                    onViewTable = { session, number ->
+                        sessionId = session
+                        tableNumber = number
+                        capturing = false
+                        viewingCheck = false
+                    },
+                    onOrder = { session, number ->
+                        sessionId = session
+                        tableNumber = number
+                        capturing = canOrder
+                        viewingCheck = false
+                    },
+                    onKitchen = {},
+                    showReservations = false,
+                    onReservations = {},
+                )
+                HomeTab.RESERVATIONS -> ReservationsScreen(
+                    viewModel = viewModel(
+                        key = "reservas-$userId-$branchId",
+                        factory = ReservationsViewModel.Factory(
+                            repositories.reservations,
+                            repositories.tables,
+                            branchId,
+                            repositories.customers,
+                            canRegisterCustomers = "customers.create" in permissions,
+                        ),
+                    ),
+                    can = ReservationPermissions(
+                        create = "reservations.create" in permissions,
+                        readCustomers = "customers.read" in permissions,
+                        createCustomers = "customers.create" in permissions,
+                        confirm = "reservations.confirm" in permissions,
+                        arrive = "reservations.arrive" in permissions,
+                        seat = "reservations.check_in" in permissions,
+                        cancel = "reservations.cancel" in permissions,
+                        noShow = "reservations.mark_no_show" in permissions,
+                        overridePriority = "reservations.override_priority" in permissions,
+                    ),
+                    onBack = { tabName = tabs.first().name },
+                    onCustomers = {
+                        customerId = null
+                        inCustomers = true
+                    },
+                    onCustomer = {
+                        customerId = it
+                        inCustomers = true
+                    },
+                    // Al sentar, la mesa se abre: se pasa directo a su vista.
+                    onSeated = { session, number ->
+                        tabName = HomeTab.TABLES.name
+                        sessionId = session
+                        tableNumber = number
+                        capturing = false
+                        viewingCheck = false
+                    },
+                )
+                HomeTab.KITCHEN -> KitchenScreen(
+                    viewModel = viewModel(key = "cocina-$userId-$branchId", factory = KitchenViewModel.Factory(repositories.kitchen, branchId)),
+                    branchName = branchName,
+                    canPrepare = canPrepare,
+                    showTables = false,
+                    inTabs = true,
+                    logoutEnabled = logoutEnabled,
+                    onTables = {},
+                    onLogout = onLogout,
+                    showStaff = false,
+                    onStaff = {},
+                    onChangePassword = {},
+                )
+                HomeTab.MORE -> MoreScreen(
+                    userName = userName,
+                    userEmail = userEmail,
+                    role = role,
+                    branchName = branchName,
+                    options = buildList {
+                        if (showCash) add(MoreOption(R.drawable.ic_cash, R.string.cash_title) { inCash = true })
+                        if (showPrinting) add(MoreOption(R.drawable.ic_print, R.string.print_title) { inPrinting = true })
+                        if (showStaff) add(MoreOption(R.drawable.ic_group, R.string.staff_title) { inStaff = true })
+                        if ("customers.read" in permissions) {
+                            add(MoreOption(R.drawable.ic_person, R.string.customers_title) {
+                                customerId = null
+                                inCustomers = true
+                            })
+                        }
+                        add(MoreOption(R.drawable.ic_lock, R.string.password_change_title) { changingPassword = true })
+                    },
+                    logoutEnabled = logoutEnabled,
+                    onLogout = onLogout,
+                )
+            }
+        }
         return
     }
     val table: TableViewModel = viewModel(
