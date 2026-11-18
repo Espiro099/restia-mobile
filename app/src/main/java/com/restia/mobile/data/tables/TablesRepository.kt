@@ -8,6 +8,7 @@ import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.TableDto
 import com.restia.mobile.core.network.TableSessionDto
 import com.restia.mobile.core.network.TableSessionOpenRequest
+import com.restia.mobile.core.network.TableSessionUpdateRequest
 import com.restia.mobile.core.network.apiCall
 import com.restia.mobile.core.storage.BlobStore
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +66,10 @@ class TablesRepository(private val api: SessionApi, private val cache: BlobStore
 
     suspend fun session(branchId: String, sessionId: String): ApiResult<TableSessionDto> =
         apiCall { api.getTableSession(branchId, sessionId).data }
+
+    /** Cambia los comensales con la versión que se leyó; si otro empleado cambió la sesión, responde 409. */
+    suspend fun updateGuests(branchId: String, sessionId: String, version: Int, guestCount: Int): ApiResult<TableSessionDto> =
+        apiCall { api.updateTableSession(branchId, sessionId, "\"$version\"", TableSessionUpdateRequest(guestCount)).data }
 
     /**
      * Pide el cierre con la versión que tiene la sesión ahora. Las reglas que importan (platillos sin

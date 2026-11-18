@@ -10,6 +10,7 @@ import com.restia.mobile.core.network.OrderItemDto
 import com.restia.mobile.core.network.UnitVersion
 import com.restia.mobile.data.orders.OrderRepository
 import com.restia.mobile.data.tables.TablesRepository
+import com.restia.mobile.ui.tables.MAX_GUESTS
 import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -85,6 +86,22 @@ data class VoidState(
 /** Confirmación de cierre (T-4): la mesa queda por limpiar. */
 data class CloseState(val submitting: Boolean = false, val failure: ApiFailure? = null)
 
+/**
+ * Cambio de comensales. Se lee la sesión al abrir el diálogo para tener la versión que pide el
+ * If-Match; sin ella no se puede enviar.
+ */
+data class GuestsState(
+    val count: Int = 0,
+    val current: Int? = null,
+    val version: Int? = null,
+    val loading: Boolean = true,
+    val submitting: Boolean = false,
+    val failure: ApiFailure? = null,
+) {
+    val canConfirm: Boolean
+        get() = !loading && !submitting && version != null && count in 1..MAX_GUESTS && count != current
+}
+
 data class TableUiState(
     val orders: List<OrderDto> = emptyList(),
     val loaded: Boolean = false,
@@ -103,9 +120,16 @@ data class TableUiState(
     val closing: CloseState? = null,
     /** La sesión se cerró: la pantalla vuelve a las mesas y lo consume. */
     val closed: Boolean = false,
+    /** Comensales de la sesión; null mientras no se ha leído. */
+    val guestCount: Int? = null,
+    val guests: GuestsState? = null,
+    /** A cuántos comensales se acaba de cambiar, para el aviso. */
+    val guestsChanged: Int? = null,
 ) {
     val readyCount: Int get() = orders.sumOf { order -> readyUnits(order.items).size }
-    val busy: Boolean get() = delivering || cancelling?.submitting == true || voiding?.submitting == true || closing?.submitting == true
+    val busy: Boolean
+        get() = delivering || cancelling?.submitting == true || voiding?.submitting == true || closing?.submitting == true ||
+            guests?.submitting == true
 }
 
 class TableViewModel(
@@ -140,6 +164,7 @@ class TableViewModel(
     fun startPolling() {
         if (polling?.isActive == true) return
         polling = viewModelScope.launch {
+            loadGuests()
             while (isActive) {
                 load()
                 delay(pollMillis)
@@ -376,6 +401,93 @@ class TableViewModel(
 
     fun consumeClosed() {
         _state.value = _state.value.copy(closed = false)
+    }
+
+    /** Solo informativo: si falla, la pantalla simplemente no muestra los comensales. */
+    private suspend fun loadGuests() {
+        val repo = sessions ?: return
+        (repo.session(branchId, sessionId) as? ApiResult.Success)?.let {
+            _state.value = _state.value.copy(guestCount = it.value.guestCount)
+        }
+    }
+
+    fun startGuests() {
+        if (sessions == null || _state.value.busy || _state.value.guests != null) return
+        _state.value = _state.value.copy(guests = GuestsState(count = _state.value.guestCount ?: 0), actionFailure = null, guestsChanged = null)
+        readGuests()
+    }
+
+    /** Lee la sesión para tener los comensales y la versión actuales; conserva lo que ya se eligió. */
+    private fun readGuests() {
+        val repo = sessions ?: return
+        viewModelScope.launch {
+            val r = repo.session(branchId, sessionId)
+            val current = _state.value.guests ?: return@launch
+            _state.value = when (r) {
+                is ApiResult.Success -> {
+                    val chosen = if (current.count in 1..MAX_GUESTS) current.count else r.value.guestCount
+                    _state.value.copy(
+                        guestCount = r.value.guestCount,
+                        guests = current.copy(count = chosen, current = r.value.guestCount, version = r.value.version, loading = false),
+                    )
+                }
+                is ApiResult.Failure -> _state.value.copy(guests = current.copy(loading = false, failure = r.failure))
+            }
+        }
+    }
+
+    fun retryGuests() {
+        val current = _state.value.guests ?: return
+        if (current.loading || current.submitting) return
+        _state.value = _state.value.copy(guests = current.copy(loading = true, failure = null))
+        readGuests()
+    }
+
+    fun setGuests(count: Int) {
+        val current = _state.value.guests ?: return
+        if (current.submitting) return
+        _state.value = _state.value.copy(guests = current.copy(count = count.coerceIn(1, MAX_GUESTS), failure = null))
+    }
+
+    fun dismissGuests() {
+        if (_state.value.guests?.submitting == true) return
+        _state.value = _state.value.copy(guests = null)
+    }
+
+    fun confirmGuests() {
+        val repo = sessions ?: return
+        val current = _state.value.guests ?: return
+        val version = current.version ?: return
+        if (!current.canConfirm) return
+        _state.value = _state.value.copy(guests = current.copy(submitting = true, failure = null))
+        viewModelScope.launch {
+            when (val r = repo.updateGuests(branchId, sessionId, version, current.count)) {
+                is ApiResult.Success -> _state.value = _state.value.copy(guests = null, guestCount = r.value.guestCount, guestsChanged = r.value.guestCount)
+                is ApiResult.Failure -> {
+                    val conflict = (r.failure as? ApiFailure.Server)?.code == "VERSION_CONFLICT"
+                    if (conflict) {
+                        // Otro empleado cambió la sesión (o la respuesta anterior se perdió): se relee y,
+                        // si ya quedó como se pidió, no hay nada más que hacer.
+                        val again = repo.session(branchId, sessionId)
+                        _state.value = when {
+                            again is ApiResult.Failure -> _state.value.copy(guests = current.copy(submitting = false, failure = again.failure))
+                            (again as ApiResult.Success).value.guestCount == current.count ->
+                                _state.value.copy(guests = null, guestCount = current.count, guestsChanged = current.count)
+                            else -> _state.value.copy(
+                                guestCount = again.value.guestCount,
+                                guests = current.copy(current = again.value.guestCount, version = again.value.version, submitting = false, failure = r.failure),
+                            )
+                        }
+                    } else {
+                        _state.value = _state.value.copy(guests = current.copy(submitting = false, failure = r.failure))
+                    }
+                }
+            }
+        }
+    }
+
+    fun clearGuestsChanged() {
+        _state.value = _state.value.copy(guestsChanged = null)
     }
 
     private fun isRetryable(failure: ApiFailure): Boolean =

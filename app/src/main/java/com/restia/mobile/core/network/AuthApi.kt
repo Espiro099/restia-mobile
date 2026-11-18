@@ -458,6 +458,15 @@ interface SessionApi {
         @Path("sessionId") sessionId: String,
     ): Envelope<TableSessionDto>
 
+    /** Con If-Match: repetirlo con la versión vieja responde 409, no se aplica dos veces. */
+    @PATCH("branches/{branchId}/table-sessions/{sessionId}")
+    suspend fun updateTableSession(
+        @Path("branchId") branchId: String,
+        @Path("sessionId") sessionId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: TableSessionUpdateRequest,
+    ): Envelope<TableSessionDto>
+
     /** T-4: sin cuerpo; las mesas quedan por limpiar y la sesión en PENDING_CLEANING. */
     @POST("branches/{branchId}/table-sessions/{sessionId}/close")
     suspend fun closeTableSession(

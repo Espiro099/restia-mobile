@@ -101,6 +101,10 @@ data class TableSessionDto(
     val tables: List<SessionTableDto> = emptyList(),
 )
 
+/** PATCH de la sesión: por ahora solo cambia cuántos comensales hay. */
+@Serializable
+data class TableSessionUpdateRequest(val guestCount: Int)
+
 @Serializable
 data class CleaningConfirmationRequest(val membershipVersion: Int)
 
