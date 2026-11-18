@@ -7,6 +7,8 @@ import com.restia.mobile.core.network.TableSessionUpdateRequest
 import com.restia.mobile.core.network.TableSessionAddTablesRequest
 import com.restia.mobile.core.network.TableReleaseRequest
 import com.restia.mobile.core.network.AuthSessionDto
+import com.restia.mobile.core.network.DeviceDto
+import com.restia.mobile.core.network.EnrollmentCodeDto
 import com.restia.mobile.core.network.ReservationUpdateRequest
 import com.restia.mobile.core.network.OrderUnitReassignRequest
 import com.restia.mobile.core.network.ProductAvailabilityRequest
@@ -208,4 +210,8 @@ open class UnusedSessionApi : SessionApi {
         error("sin uso")
     override suspend fun revokeMember(branchId: String, userId: String, ifMatch: String, body: ReasonRequest): Envelope<MemberDto> = error("sin uso")
     override suspend fun passwordSetupLink(userId: String): Envelope<PasswordSetupLinkDto> = error("sin uso")
+    override suspend fun createEnrollmentCode(branchId: String): Envelope<EnrollmentCodeDto> = error("sin uso")
+    override suspend fun listDevices(branchId: String, page: Int, perPage: Int): PagedEnvelope<DeviceDto> = error("sin uso")
+    override suspend fun blockDevice(branchId: String, deviceId: String, body: ReasonRequest): Response<Unit> = error("sin uso")
+    override suspend fun retireDevice(branchId: String, deviceId: String, body: ReasonRequest): Response<Unit> = error("sin uso")
 }
