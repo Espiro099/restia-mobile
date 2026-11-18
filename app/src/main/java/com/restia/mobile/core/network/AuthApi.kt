@@ -62,6 +62,21 @@ interface SessionApi {
         @Query("perPage") perPage: Int,
     ): PagedEnvelope<TableDto>
 
+    /** Hasta 92 días; `from` y `to` son días de negocio (YYYY-MM-DD), ambos incluidos. */
+    @GET("branches/{branchId}/reports/daily-sales")
+    suspend fun dailySales(
+        @Path("branchId") branchId: String,
+        @Query("from") from: String,
+        @Query("to") to: String,
+    ): Envelope<List<DailySalesDto>>
+
+    @GET("branches/{branchId}/reports/hourly-occupancy")
+    suspend fun hourlyOccupancy(
+        @Path("branchId") branchId: String,
+        @Query("from") from: String,
+        @Query("to") to: String,
+    ): Envelope<List<HourlyOccupancyDto>>
+
     @GET("branches/{branchId}/menu")
     suspend fun getMenu(
         @Path("branchId") branchId: String,

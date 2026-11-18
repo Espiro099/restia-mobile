@@ -6,6 +6,8 @@ import com.restia.mobile.core.network.CleaningConfirmationRequest
 import com.restia.mobile.core.network.TableSessionUpdateRequest
 import com.restia.mobile.core.network.TableSessionAddTablesRequest
 import com.restia.mobile.core.network.TableReleaseRequest
+import com.restia.mobile.core.network.DailySalesDto
+import com.restia.mobile.core.network.HourlyOccupancyDto
 import com.restia.mobile.core.network.AuthSessionDto
 import com.restia.mobile.core.network.DeviceDto
 import com.restia.mobile.core.network.EnrollmentCodeDto
@@ -192,6 +194,8 @@ open class UnusedSessionApi : SessionApi {
     override suspend fun updateOrderItemNotes(branchId: String, orderId: String, itemId: String, ifMatch: String, body: OrderItemUpdateRequest): Envelope<OrderDto> =
         error("sin uso")
     override suspend fun setProductAvailability(branchId: String, productId: String, body: ProductAvailabilityRequest): ResponseBody = error("sin uso")
+    override suspend fun dailySales(branchId: String, from: String, to: String): Envelope<List<DailySalesDto>> = error("sin uso")
+    override suspend fun hourlyOccupancy(branchId: String, from: String, to: String): Envelope<List<HourlyOccupancyDto>> = error("sin uso")
     override suspend fun reassignOrderUnitStation(branchId: String, unitId: String, ifMatch: String, body: OrderUnitReassignRequest): ResponseBody = error("sin uso")
     override suspend fun addTablesToSession(branchId: String, sessionId: String, ifMatch: String, body: TableSessionAddTablesRequest): Envelope<TableSessionDto> =
         error("sin uso")
