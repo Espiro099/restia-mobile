@@ -39,6 +39,18 @@ interface SessionApi {
     @POST("auth/logout")
     suspend fun logout(): Response<Unit>
 
+    /** Sesiones propias (Android y web); `current` marca la que hace la petición. */
+    @GET("auth/sessions")
+    suspend fun listOwnSessions(
+        @Query("status") status: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<AuthSessionDto>
+
+    /** 204; una sesión ajena responde 404 y una ya cerrada no cambia. */
+    @POST("auth/sessions/{sessionId}/revoke")
+    suspend fun revokeOwnSession(@Path("sessionId") sessionId: String): Response<Unit>
+
     /** Cierra las demás sesiones del usuario; esta sigue abierta. */
     @POST("auth/password/change")
     suspend fun changePassword(@Body body: PasswordChangeRequest): Response<Unit>
@@ -430,6 +442,16 @@ interface SessionApi {
         @Path("branchId") branchId: String,
         @Header("Idempotency-Key") idempotencyKey: String,
         @Body body: ReservationCreateRequest,
+    ): Envelope<ReservationDto>
+
+    /** Cambia horario, personas o notas de una reserva PENDING o CONFIRMED; replanea las mesas. */
+    @PATCH("branches/{branchId}/reservations/{reservationId}")
+    suspend fun updateReservation(
+        @Path("branchId") branchId: String,
+        @Path("reservationId") reservationId: String,
+        @Header("If-Match") ifMatch: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: ReservationUpdateRequest,
     ): Envelope<ReservationDto>
 
     /** confirm, arrive, check-in, cancel o no-show: todas con If-Match e Idempotency-Key (R-12). */

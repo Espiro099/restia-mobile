@@ -722,13 +722,25 @@
     <string name="availability_confirm_on">Marcar disponible</string>
     <string name="availability_done_off">%1$s quedó agotado.</string>
     <string name="availability_done_on">%1$s está disponible otra vez.</string>
-    <string name="availability_sheet_open">Agotados</string>
-    <string name="availability_sheet_title">Agotados</string>
-    <string name="availability_sheet_none">Todo está disponible. Apaga un platillo cuando se acabe.</string>
-    <plurals name="availability_sheet_count">
-        <item quantity="one">%1$d platillo agotado. Nadie puede pedirlo hasta que lo vuelvas a prender.</item>
-        <item quantity="other">%1$d platillos agotados. Nadie puede pedirlos hasta que los vuelvas a prender.</item>
-    </plurals>
-    <string name="availability_on">Disponible</string>
-    <string name="availability_failed">No se pudo cambiar %1$s.</string>
+    <string name="reservation_edit">Editar</string>
+    <string name="reservation_edit_title">Reserva de %1$s</string>
+    <string name="reservation_edit_hint">Si cambias el horario o las personas, se vuelven a planear las mesas.</string>
+    <string name="reservation_edit_save">Guardar</string>
+    <string name="reservation_updated_done">Se actualizó la reserva de %1$s.</string>
+    <string name="sessions_title">Mis sesiones</string>
+    <string name="sessions_detail">Dónde está abierta tu cuenta</string>
+    <string name="sessions_body">Tu cuenta está abierta en estos lugares. Cierra la que no reconozcas o ya no uses; esta se cierra con "Cerrar sesión".</string>
+    <string name="sessions_android">App Android</string>
+    <string name="sessions_web">Panel web</string>
+    <string name="sessions_current">Esta</string>
+    <string name="sessions_last_activity">Última actividad: %1$s</string>
+    <string name="sessions_expires">Vence: %1$s</string>
+    <string name="sessions_today">hoy %1$s</string>
+    <string name="sessions_yesterday">ayer %1$s</string>
+    <string name="sessions_close">Cerrar</string>
+    <string name="sessions_confirm_title">¿Cerrar esta sesión?</string>
+    <string name="sessions_confirm_android">Ese dispositivo tendrá que iniciar sesión otra vez.</string>
+    <string name="sessions_confirm_web">El navegador tendrá que iniciar sesión otra vez.</string>
+    <string name="sessions_closed_done">Se cerró la sesión.</string>
+    <string name="sessions_empty">No hay sesiones abiertas.</string>
 </resources>

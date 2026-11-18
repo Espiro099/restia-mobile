@@ -20,6 +20,7 @@ import com.restia.mobile.core.network.TableOptionDto
 import com.restia.mobile.data.customers.CustomersRepository
 import com.restia.mobile.data.reservations.ReservationsRepository
 import com.restia.mobile.data.tables.TablesRepository
+import com.restia.mobile.core.network.ReservationUpdateRequest
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -106,6 +107,49 @@ data class SeatState(
         get() = !submitting && !loading && selected in options.indices && (!priorityConflict || overrideReason.trim().length >= 3)
 }
 
+/** Se edita mientras la reserva está PENDING o CONFIRMED; después ya hay mesa asignada o terminó. */
+fun canEdit(r: ReservationDto) = r.status == "PENDING" || r.status == "CONFIRMED"
+
+/** Editar una reserva: horario, personas y notas, partiendo de lo que tiene ahora. */
+data class EditReservationState(
+    val reservation: ReservationDto,
+    val date: LocalDate,
+    val start: LocalTime,
+    val durationMinutes: Int,
+    val partySize: Int,
+    val notes: String,
+    val submitting: Boolean = false,
+    val failure: ApiFailure? = null,
+) {
+    /** Solo lo que cambió; null si nada cambió (el contrato pide al menos un campo). */
+    fun changes(zone: ZoneId): ReservationUpdateRequest? {
+        val startAt = date.atTime(start).atZone(zone).toInstant()
+        val endAt = startAt.plusSeconds(durationMinutes * 60L)
+        val timeChanged = startAt != runCatching { Instant.parse(reservation.startAt) }.getOrNull() ||
+            endAt != runCatching { Instant.parse(reservation.endAt) }.getOrNull()
+        val trimmed = notes.trim()
+        val body = ReservationUpdateRequest(
+            startAt = if (timeChanged) isoInstant(startAt) else null,
+            endAt = if (timeChanged) isoInstant(endAt) else null,
+            partySize = partySize.takeIf { it != reservation.partySize },
+            // Vacío las borra: el backend convierte "" en null.
+            notes = trimmed.takeIf { it != reservation.notes.orEmpty().trim() },
+        )
+        return body.takeIf { it != ReservationUpdateRequest() }
+    }
+
+    fun canSubmit(zone: ZoneId): Boolean = !submitting && changes(zone) != null
+
+    companion object {
+        fun of(r: ReservationDto, zone: ZoneId): EditReservationState {
+            val start = runCatching { Instant.parse(r.startAt) }.getOrDefault(Instant.now()).atZone(zone)
+            val end = runCatching { Instant.parse(r.endAt) }.getOrNull()?.atZone(zone)
+            val minutes = end?.let { java.time.Duration.between(start, it).toMinutes().toInt() } ?: 90
+            return EditReservationState(r, start.toLocalDate(), start.toLocalTime().withSecond(0).withNano(0), minutes.coerceIn(30, 360), r.partySize, r.notes.orEmpty())
+        }
+    }
+}
+
 data class CancelReservationState(val reservation: ReservationDto, val reason: String = "", val submitting: Boolean = false, val failure: ApiFailure? = null) {
     val canSubmit: Boolean get() = !submitting && reason.trim().length in 3..500
 }
@@ -125,12 +169,14 @@ data class ReservationsUiState(
     val creating: CreateState? = null,
     val seating: SeatState? = null,
     val cancelling: CancelReservationState? = null,
+    val editing: EditReservationState? = null,
     val working: Boolean = false,
     val actionFailure: ApiFailure? = null,
     val notice: Notice? = null,
     val seated: Seated? = null,
 ) {
-    val busy: Boolean get() = working || creating?.submitting == true || seating?.submitting == true || cancelling?.submitting == true
+    val busy: Boolean
+        get() = working || creating?.submitting == true || seating?.submitting == true || cancelling?.submitting == true || editing?.submitting == true
 
     /** "Mesa 1 y 2" a partir de los ids; una mesa que ya no existe se omite. */
     fun tableNumbers(ids: List<String>): List<Int> = ids.mapNotNull { tables[it]?.number }.sorted()
@@ -389,6 +435,57 @@ class ReservationsViewModel(
             if (failure == null || !isRetryable(failure)) intent = null
             _state.value = _state.value.copy(working = false, actionFailure = failure, notice = if (failure == null) Notice(done, r.customer.name) else null)
             load()
+        }
+    }
+
+    // --- Editar ---
+
+    fun startEdit(r: ReservationDto) {
+        if (!canEdit(r) || _state.value.busy) return
+        _state.value = _state.value.copy(editing = EditReservationState.of(r, zone), notice = null, actionFailure = null)
+    }
+
+    private fun edit(change: (EditReservationState) -> EditReservationState) {
+        val current = _state.value.editing ?: return
+        if (!current.submitting) _state.value = _state.value.copy(editing = change(current).copy(failure = null))
+    }
+
+    fun editShiftDate(days: Long) = edit { it.copy(date = it.date.plusDays(days).coerceAtLeast(now().atZone(zone).toLocalDate())) }
+    fun editSetDate(date: LocalDate) = edit { it.copy(date = date.coerceAtLeast(now().atZone(zone).toLocalDate())) }
+    fun editShiftStart(minutes: Long) = edit { it.copy(start = it.start.plusMinutes(minutes)) }
+    fun editSetStart(time: LocalTime) = edit { it.copy(start = time) }
+    fun editShiftDuration(minutes: Int) = edit { it.copy(durationMinutes = (it.durationMinutes + minutes).coerceIn(30, 360)) }
+    fun editSetParty(size: Int) = edit { it.copy(partySize = size.coerceIn(1, 200)) }
+    fun editSetNotes(notes: String) = edit { it.copy(notes = notes.take(500)) }
+
+    fun dismissEdit() {
+        if (_state.value.editing?.submitting != true) _state.value = _state.value.copy(editing = null)
+    }
+
+    fun confirmEdit() {
+        val current = _state.value.editing ?: return
+        val body = current.changes(zone) ?: return
+        if (current.submitting) return
+        // Mismo cambio, misma clave: reintentar tras perder la respuesta no lo aplica dos veces.
+        val key = keyFor(Triple("update", current.reservation.id, body))
+        _state.value = _state.value.copy(editing = current.copy(submitting = true, failure = null))
+        viewModelScope.launch {
+            when (val r = repository.update(branchId, current.reservation, key, body)) {
+                is ApiResult.Success -> {
+                    intent = null
+                    _state.value = _state.value.copy(editing = null, notice = Notice(R.string.reservation_updated_done, current.reservation.customer.name))
+                }
+                is ApiResult.Failure -> {
+                    if (!isRetryable(r.failure)) intent = null
+                    _state.value = _state.value.copy(editing = current.copy(submitting = false, failure = r.failure))
+                }
+            }
+            load()
+            // Con la versión nueva, un segundo intento ya no choca por versión.
+            _state.value.editing?.let { open ->
+                val fresh = _state.value.reservations.firstOrNull { it.id == open.reservation.id }
+                if (fresh != null && fresh.version != open.reservation.version) _state.value = _state.value.copy(editing = open.copy(reservation = fresh))
+            }
         }
     }
 

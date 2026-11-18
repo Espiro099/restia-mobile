@@ -187,6 +187,7 @@ fun MoreScreen(
     onChangePassword: () -> Unit,
     logoutEnabled: Boolean,
     onLogout: () -> Unit,
+    onSessions: (() -> Unit)? = null,
 ) {
     val roleText = roleLabel(role)?.let { stringResource(it) } ?: role
     Column(modifier = Modifier.fillMaxSize()) {
@@ -222,6 +223,10 @@ fun MoreScreen(
             }
             OptionRow(R.drawable.ic_lock, stringResource(R.string.password_change_title), detail = stringResource(R.string.more_security), onClick = onChangePassword)
             Separator()
+            if (onSessions != null) {
+                OptionRow(R.drawable.ic_card, stringResource(R.string.sessions_title), detail = stringResource(R.string.sessions_detail), onClick = onSessions)
+                Separator()
+            }
             OptionRow(R.drawable.ic_place, stringResource(R.string.profile_branch), detail = branchName)
             Separator()
             if (tools.isNotEmpty()) {

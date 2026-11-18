@@ -12,6 +12,8 @@ import com.restia.mobile.R
 import com.restia.mobile.Repositories
 import com.restia.mobile.ui.account.ChangePasswordScreen
 import com.restia.mobile.ui.account.ChangePasswordViewModel
+import com.restia.mobile.ui.account.SessionsScreen
+import com.restia.mobile.ui.account.SessionsViewModel
 import com.restia.mobile.ui.cash.CashPermissions
 import com.restia.mobile.ui.cash.CashScreen
 import com.restia.mobile.ui.cash.CashViewModel
@@ -20,7 +22,6 @@ import com.restia.mobile.ui.checks.CheckScreen
 import com.restia.mobile.ui.checks.CheckViewModel
 import com.restia.mobile.ui.customers.CustomersScreen
 import com.restia.mobile.ui.customers.CustomersViewModel
-import com.restia.mobile.ui.kitchen.AvailabilityViewModel
 import com.restia.mobile.ui.kitchen.KitchenScreen
 import com.restia.mobile.ui.kitchen.KitchenViewModel
 import com.restia.mobile.ui.members.MembersScreen
@@ -74,6 +75,7 @@ fun BranchHome(
     var inCash by rememberSaveable { mutableStateOf(false) }
     var inReservations by rememberSaveable { mutableStateOf(false) }
     var inNotifications by rememberSaveable { mutableStateOf(false) }
+    var inSessions by rememberSaveable { mutableStateOf(false) }
     // Ver montos y movimientos exige cash.read; quien solo tiene cash.read_open (mesero) no entra.
     val showCash = "cash.read" in permissions
     var inPrinting by rememberSaveable { mutableStateOf(false) }
@@ -89,6 +91,13 @@ fun BranchHome(
                 ),
             ),
             onBack = { inPrinting = false },
+        )
+        return
+    }
+    if (inSessions) {
+        SessionsScreen(
+            viewModel = viewModel(key = "sesiones-$userId", factory = SessionsViewModel.Factory(repositories.sessions)),
+            onBack = { inSessions = false },
         )
         return
     }
@@ -170,6 +179,7 @@ fun BranchHome(
                 seat = "reservations.check_in" in permissions,
                 cancel = "reservations.cancel" in permissions,
                 noShow = "reservations.mark_no_show" in permissions,
+                update = "reservations.update" in permissions,
                 overridePriority = "reservations.override_priority" in permissions,
             ),
             onBack = { inReservations = false },
@@ -303,11 +313,6 @@ fun BranchHome(
                     canPrepare = canPrepare,
                     showTables = false,
                     canReassign = "order_units.reassign" in permissions,
-                    availability = if ("menu.set_availability" in permissions) {
-                        viewModel(key = "agotados-$userId-$branchId", factory = AvailabilityViewModel.Factory(repositories.menu, branchId))
-                    } else {
-                        null
-                    },
                     inTabs = true,
                     logoutEnabled = logoutEnabled,
                     onTables = {},
@@ -334,6 +339,7 @@ fun BranchHome(
                         }
                     },
                     onChangePassword = { changingPassword = true },
+                    onSessions = { inSessions = true },
                     logoutEnabled = logoutEnabled,
                     onLogout = onLogout,
                 )

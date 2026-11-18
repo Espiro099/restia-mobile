@@ -1,8 +1,5 @@
 package com.restia.mobile.ui.kitchen
 
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -226,12 +223,8 @@ fun KitchenScreen(
     onPrinting: () -> Unit = {},
     /** `order_units.reassign`: mover lo pendiente a otra estación. */
     canReassign: Boolean = false,
-    /** Con `menu.set_availability`: abre la lista de agotados. */
-    availability: AvailabilityViewModel? = null,
 ) {
     val state by viewModel.state.collectAsState()
-    var showAvailability by rememberSaveable { mutableStateOf(false) }
-    if (showAvailability && availability != null) AvailabilitySheet(availability) { showAvailability = false }
     LifecycleStartEffect(viewModel) {
         viewModel.startPolling()
         onStopOrDispose { viewModel.stopPolling() }
@@ -249,9 +242,6 @@ fun KitchenScreen(
             if (!inTabs) {
                 if (showTables) TextButton(onClick = onTables) { Text(stringResource(R.string.order_back)) }
                 AccountMenu(showStaff, logoutEnabled, onStaff, onChangePassword, onLogout, showCash, onCash, showPrinting, onPrinting)
-            }
-            if (availability != null) {
-                TextButton(onClick = { showAvailability = true }) { Text(stringResource(R.string.availability_sheet_open)) }
             }
             TextButton(onClick = viewModel::refresh, enabled = !state.refreshing) { Text(stringResource(R.string.action_refresh)) }
         }

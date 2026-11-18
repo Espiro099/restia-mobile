@@ -72,6 +72,8 @@ data class ReservationPermissions(
     val cancel: Boolean,
     val noShow: Boolean,
     val overridePriority: Boolean,
+    /** `reservations.update`: cambiar horario, personas o notas. */
+    val update: Boolean = false,
 )
 
 private val HOUR = DateTimeFormatter.ofPattern("HH:mm")
@@ -138,6 +140,7 @@ private fun ReservationCard(
                 if (can.arrive && canArrive(r)) OutlinedButton(onClick = { viewModel.arrive(r) }, enabled = !busy) { Text(stringResource(R.string.reservation_arrive)) }
                 if (can.confirm && canConfirm(r)) OutlinedButton(onClick = { viewModel.confirm(r) }, enabled = !busy) { Text(stringResource(R.string.reservation_confirm)) }
                 if (can.noShow && canMarkNoShow(r, Instant.now())) TextButton(onClick = { viewModel.markNoShow(r) }, enabled = !busy) { Text(stringResource(R.string.reservation_mark_no_show)) }
+                if (can.update && canEdit(r)) TextButton(onClick = { viewModel.startEdit(r) }, enabled = !busy) { Text(stringResource(R.string.reservation_edit)) }
                 if (can.cancel && canCancel(r)) TextButton(onClick = { viewModel.startCancel(r) }, enabled = !busy) { Text(stringResource(R.string.reservation_cancel)) }
                 val customerId = r.customer.customerId
                 if (can.readCustomers && customerId != null) TextButton(onClick = { onCustomer(customerId) }) { Text(stringResource(R.string.reservation_view_customer)) }
@@ -275,6 +278,36 @@ private fun SeatDialog(s: SeatState, state: ReservationsUiState, canOverride: Bo
 }
 
 @Composable
+private fun EditDialog(e: EditReservationState, zone: ZoneId, viewModel: ReservationsViewModel) {
+    val enabled = !e.submitting
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = viewModel::dismissEdit,
+        title = { Text(stringResource(R.string.reservation_edit_title, e.reservation.customer.name)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Stepper(stringResource(R.string.reservation_day), e.date.format(DAY), { viewModel.editShiftDate(-1) }, { viewModel.editShiftDate(1) }, enabled) {
+                    DatePickerDialog(context, { _, y, m, d -> viewModel.editSetDate(LocalDate.of(y, m + 1, d)) }, e.date.year, e.date.monthValue - 1, e.date.dayOfMonth).apply {
+                        datePicker.minDate = System.currentTimeMillis() - 1000
+                    }.show()
+                }
+                Stepper(stringResource(R.string.reservation_start), e.start.format(HOUR), { viewModel.editShiftStart(-15) }, { viewModel.editShiftStart(15) }, enabled) {
+                    TimePickerDialog(context, { _, h, m -> viewModel.editSetStart(LocalTime.of(h, m)) }, e.start.hour, e.start.minute, true).show()
+                }
+                Stepper(stringResource(R.string.reservation_duration), "%d:%02d".format(e.durationMinutes / 60, e.durationMinutes % 60),
+                    { viewModel.editShiftDuration(-30) }, { viewModel.editShiftDuration(30) }, enabled)
+                Stepper(stringResource(R.string.open_guests), e.partySize.toString(), { viewModel.editSetParty(e.partySize - 1) }, { viewModel.editSetParty(e.partySize + 1) }, enabled)
+                OutlinedTextField(e.notes, viewModel::editSetNotes, label = { Text(stringResource(R.string.order_notes)) }, enabled = enabled, modifier = Modifier.fillMaxWidth())
+                Text(stringResource(R.string.reservation_edit_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                e.failure?.let { Text(failureText(it), color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = { TextButton(onClick = viewModel::confirmEdit, enabled = e.canSubmit(zone)) { Text(stringResource(R.string.reservation_edit_save)) } },
+        dismissButton = { TextButton(onClick = viewModel::dismissEdit, enabled = enabled) { Text(stringResource(R.string.cancel_back)) } },
+    )
+}
+
+@Composable
 private fun CancelDialog(c: CancelReservationState, viewModel: ReservationsViewModel) {
     AlertDialog(
         onDismissRequest = viewModel::dismissCancel,
@@ -323,6 +356,7 @@ fun ReservationsScreen(
     state.creating?.let { CreateDialog(it, zone, can.readCustomers, can.createCustomers, viewModel) }
     state.seating?.let { SeatDialog(it, state, can.overridePriority, viewModel) }
     state.cancelling?.let { CancelDialog(it, viewModel) }
+    state.editing?.let { EditDialog(it, zone, viewModel) }
     val today = LocalDate.now(zone)
     Scaffold(
         modifier = Modifier.fillMaxSize(),
