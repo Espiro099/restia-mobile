@@ -140,14 +140,13 @@ class CustomersFlowTest {
         assertEquals("+523312345678", vm.state.value.form!!.phone)
         vm.setName("Ana López")
         vm.setPreferences("Terraza")
-        answers += MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)
+        // Respuesta perdida: el servidor recibe la petición y no contesta; el cliente agota su espera.
+        answers += MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
         answers += MockResponse().setResponseCode(201).setBody("""{"data":${customer()}}""")
         vm.submit()
         waitFor { vm.state.value.form?.failure != null }
         vm.submit()
-        val end = System.currentTimeMillis() + 5000
-        while (!vm.state.value.saved && System.currentTimeMillis() < end) Thread.sleep(10)
-        assertTrue("formulario: ${vm.state.value.form?.failure}; peticiones: ${requests.map { it.first.method + " " + it.first.path }}", vm.state.value.saved)
+        waitFor { vm.state.value.saved }
         val creates = sent("/branches/b1/customers")
         assertEquals(2, creates.size)
         assertEquals(creates[0].first.getHeader("Idempotency-Key"), creates[1].first.getHeader("Idempotency-Key"))

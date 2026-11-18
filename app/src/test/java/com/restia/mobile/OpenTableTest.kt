@@ -122,12 +122,14 @@ class OpenTableTest {
 
     @Test
     fun `reintentar tras perder la respuesta repite la clave`() {
-        respond(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST), MockResponse().setResponseCode(201).setBody(SESSION))
+        // Respuesta perdida: el servidor recibe la petición y no contesta; el cliente agota su espera.
+        // (DISCONNECT_AFTER_REQUEST deja en Linux la siguiente conexión sin enviar nada.)
+        respond(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE), MockResponse().setResponseCode(201).setBody(SESSION))
         vm.selectTable(mesa)
         submitAndWait()
         assertEquals(ApiFailure.Network, vm.state.value.opening?.failure)
         submitAndWait()
-        assertEquals("estado: ${vm.state.value.opening}; peticiones al servidor: ${server.requestCount}", 2, posts.size)
+        assertEquals(2, posts.size)
         assertEquals(posts[0].getHeader("Idempotency-Key"), posts[1].getHeader("Idempotency-Key"))
         assertNull(vm.state.value.opening)
     }
