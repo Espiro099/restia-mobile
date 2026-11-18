@@ -1,12 +1,14 @@
 package com.restia.mobile.ui.auth
 
 import android.os.Build
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,12 +21,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,102 +37,117 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.restia.mobile.R
 import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.data.auth.SessionNotice
+import com.restia.mobile.ui.theme.PrimaryButton
 import com.restia.mobile.ui.theme.Restia
 import com.restia.mobile.ui.theme.RestiaLogo
+import com.restia.mobile.ui.theme.ScreenPadding
 
 /**
- * Fondo de las pantallas de acceso: crema arriba y, abajo, un arco cálido de terracota a café que hace las veces
- * de la foto del restaurante de la propuesta (sin cargar imágenes pesadas).
+ * Fondo del acceso (propuesta 01 y 11): la foto del restaurante abajo y, encima, la crema con su borde curvo.
+ * La crema cubre el 69 % de la pantalla, como en el diseño (590 de 852).
  */
 @Composable
-private fun WarmArch(modifier: Modifier = Modifier) {
-    val brand = Restia.colors.brand
-    val deep = Restia.colors.brandDeep
-    val lamp = Restia.colors.busy
-    Canvas(modifier = modifier) {
-        val top = size.height * 0.28f
-        val path = Path().apply {
-            moveTo(0f, top + size.height * 0.18f)
-            quadraticTo(size.width / 2f, -size.height * 0.08f, size.width, top + size.height * 0.18f)
-            lineTo(size.width, size.height)
-            lineTo(0f, size.height)
-            close()
-        }
-        drawPath(path, Brush.verticalGradient(listOf(brand.copy(alpha = 0.92f), deep), startY = 0f, endY = size.height))
-        // Lámparas al fondo: un punto cálido con su halo.
-        listOf(0.18f to 0.66f, 0.5f to 0.56f, 0.82f to 0.68f).forEach { (x, y) ->
-            val center = Offset(size.width * x, size.height * y)
-            val halo = size.width * 0.09f
-            drawCircle(Brush.radialGradient(listOf(lamp.copy(alpha = 0.45f), lamp.copy(alpha = 0f)), center, halo), radius = halo, center = center)
-            drawCircle(lamp, radius = size.width * 0.012f, center = center)
+private fun PhotoBackground() {
+    val cream = MaterialTheme.colorScheme.background
+    Box(modifier = Modifier.fillMaxSize().background(cream)) {
+        Image(
+            painterResource(R.drawable.restia_photo),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.BottomCenter,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val h = size.height * 0.69f
+            val dip = size.height * 0.053f
+            // Mismo trazo que el marco de la propuesta: baja recto y cierra con una curva suave hacia abajo.
+            val path = Path().apply {
+                moveTo(0f, 0f)
+                lineTo(size.width, 0f)
+                lineTo(size.width, h - dip)
+                cubicTo(size.width * 0.667f, h, size.width * 0.333f, h, 0f, h - dip)
+                close()
+            }
+            drawPath(path, cream)
         }
     }
 }
 
+/** Acceso: fondo de foto y el contenido sobre la crema, desplazable con el teclado abierto. */
 @Composable
-private fun AuthLayout(content: @Composable () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        WarmArch(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(180.dp))
+private fun AuthLayout(centered: Boolean, content: @Composable ColumnScope.() -> Unit) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val photo = maxHeight * 0.33f
+        PhotoBackground()
         Column(
-            // Mantiene el contenido sobre el teclado; con pantallas chicas se puede desplazar.
             modifier = Modifier
                 .fillMaxSize()
                 .safeDrawingPadding()
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 28.dp)
-                .padding(top = 48.dp, bottom = 150.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(horizontal = ScreenPadding)
+                .padding(top = if (centered) 52.dp else 24.dp, bottom = photo),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            RestiaLogo(height = 52.dp, tagline = true)
-            Spacer(Modifier.height(12.dp))
             Column(
                 modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) { content() }
+                horizontalAlignment = if (centered) Alignment.CenterHorizontally else Alignment.Start,
+                content = content,
+            )
         }
     }
 }
 
+/** Título y explicación, alineados a la izquierda (acceso y alta). */
 @Composable
 private fun Heading(title: String, subtitle: String?) {
-    Text(title, style = MaterialTheme.typography.headlineSmall, color = Restia.colors.heading, textAlign = TextAlign.Center)
+    Text(
+        title,
+        style = MaterialTheme.typography.headlineSmall,
+        color = Restia.colors.heading,
+        modifier = Modifier.padding(top = 12.dp).semantics { heading() },
+    )
     subtitle?.let {
-        Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
     }
 }
 
+/** Campo con su etiqueta arriba, sobre papel y con borde de arena (propuesta 11). */
 @Composable
 private fun Field(
     value: String,
     onChange: (String) -> Unit,
     label: String,
-    @DrawableRes icon: Int,
     keyboard: KeyboardOptions = KeyboardOptions.Default,
     secret: Boolean = false,
 ) {
     var visible by remember { mutableStateOf(false) }
+    Text(
+        label,
+        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Bold),
+        modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
+    )
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text(label) },
-        leadingIcon = { Icon(painterResource(icon), contentDescription = null) },
         trailingIcon = if (secret) {
             {
                 IconButton(onClick = { visible = !visible }) {
@@ -147,32 +164,53 @@ private fun Field(
         singleLine = true,
         keyboardOptions = keyboard,
         shape = MaterialTheme.shapes.small,
-        modifier = Modifier.fillMaxWidth(),
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+        ),
+        textStyle = MaterialTheme.typography.bodyMedium,
+        // La etiqueta va visible arriba; el lector de pantalla la anuncia junto con el campo.
+        modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
     )
-}
-
-@Composable
-private fun PrimaryButton(text: String, enabled: Boolean, busy: Boolean, onClick: () -> Unit) {
-    Button(onClick = onClick, enabled = enabled, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-        if (busy) CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.height(20.dp)) else Text(text)
-    }
 }
 
 @Composable
 fun LoadingScreen() {
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            RestiaLogo(height = 56.dp, tagline = true)
+            RestiaLogo(height = 78.dp, tagline = true)
             CircularProgressIndicator()
         }
     }
 }
 
+/** Título centrado de la bienvenida y de "sin conexión". */
+@Composable
+private fun CenteredHeading(title: String, body: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp, lineHeight = 31.sp),
+        color = Restia.colors.heading,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.semantics { heading() },
+    )
+    Text(
+        body,
+        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.padding(top = 10.dp, bottom = 19.dp),
+    )
+}
+
 @Composable
 fun OfflineScreen(onRetry: () -> Unit) {
-    AuthLayout {
-        Heading(stringResource(R.string.offline_title), stringResource(R.string.offline_body))
-        PrimaryButton(stringResource(R.string.action_retry), enabled = true, busy = false, onClick = onRetry)
+    AuthLayout(centered = true) {
+        RestiaLogo(height = 78.dp, tagline = true)
+        Spacer(Modifier.height(29.dp))
+        CenteredHeading(stringResource(R.string.offline_title), stringResource(R.string.offline_body))
+        PrimaryButton(stringResource(R.string.action_retry), onRetry)
     }
 }
 
@@ -197,56 +235,89 @@ private fun Messages(form: FormState, notice: SessionNotice?) {
             SessionNotice.SESSION_EXPIRED -> R.string.notice_session_expired
             SessionNotice.DEVICE_BLOCKED -> R.string.notice_device_blocked
         }
-        Text(stringResource(text), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+        Text(stringResource(text), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
     }
-    form.failure?.let { Text(failureText(it), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center) }
+    form.failure?.let {
+        Text(failureText(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
+    }
+}
+
+/** Bienvenida (propuesta 01): la marca, el saludo y el paso a iniciar sesión. */
+@Composable
+fun WelcomeScreen(onContinue: () -> Unit) {
+    AuthLayout(centered = true) {
+        RestiaLogo(height = 78.dp, tagline = true)
+        Spacer(Modifier.height(29.dp))
+        CenteredHeading(stringResource(R.string.login_welcome), stringResource(R.string.welcome_body))
+        PrimaryButton(stringResource(R.string.welcome_action), onContinue)
+        Text(
+            stringResource(R.string.welcome_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 10.dp),
+        )
+    }
 }
 
 @Composable
 fun EnrollScreen(form: FormState, notice: SessionNotice?, onEnroll: (String, String) -> Unit) {
     var code by rememberSaveable { mutableStateOf("") }
     var name by rememberSaveable { mutableStateOf(Build.MODEL.take(80)) }
-    AuthLayout {
+    AuthLayout(centered = false) {
+        RestiaLogo(height = 54.dp)
         Heading(stringResource(R.string.enroll_title), stringResource(R.string.enroll_body))
-        Field(code, { code = it.take(32) }, stringResource(R.string.field_code), R.drawable.ic_lock)
-        Field(name, { name = it.take(80) }, stringResource(R.string.field_device_name), R.drawable.ic_place)
+        Field(code, { code = it.take(32) }, stringResource(R.string.field_code))
+        Field(name, { name = it.take(80) }, stringResource(R.string.field_device_name))
         Messages(form, notice)
+        Spacer(Modifier.height(12.dp))
         PrimaryButton(
             stringResource(R.string.action_enroll),
-            enabled = !form.busy && code.trim().length >= 8 && name.isNotBlank(),
+            onClick = { onEnroll(code, name) },
+            enabled = code.trim().length >= 8 && name.isNotBlank(),
             busy = form.busy,
-        ) { onEnroll(code, name) }
+        )
     }
 }
 
+/** Iniciar sesión (propuesta 11). */
 @Composable
 fun LoginScreen(form: FormState, notice: SessionNotice?, onLogin: (String, String) -> Unit, onForgot: (email: String) -> Unit) {
     var email by rememberSaveable { mutableStateOf("") }
     // Sin rememberSaveable: la contraseña no debe sobrevivir en el estado guardado.
     var password by remember { mutableStateOf("") }
-    AuthLayout {
-        Heading(stringResource(R.string.login_welcome), stringResource(R.string.login_subtitle))
+    AuthLayout(centered = false) {
+        RestiaLogo(height = 54.dp)
+        Heading(stringResource(R.string.login_title), stringResource(R.string.login_hint))
         Field(
             email,
             { email = it.take(254) },
             stringResource(R.string.field_email),
-            R.drawable.ic_person,
             keyboard = KeyboardOptions(keyboardType = KeyboardType.Email),
         )
         Field(
             password,
             { password = it.take(1024) },
             stringResource(R.string.field_password),
-            R.drawable.ic_lock,
             keyboard = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
             secret = true,
         )
         Messages(form, notice)
+        Spacer(Modifier.height(12.dp))
         PrimaryButton(
             stringResource(R.string.action_login),
-            enabled = !form.busy && email.contains('@') && password.isNotEmpty(),
+            onClick = { onLogin(email, password) },
+            enabled = email.contains('@') && password.isNotEmpty(),
             busy = form.busy,
-        ) { onLogin(email, password) }
-        TextButton(onClick = { onForgot(email) }, enabled = !form.busy) { Text(stringResource(R.string.password_forgot)) }
+        )
+        Text(
+            stringResource(R.string.login_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+        TextButton(onClick = { onForgot(email) }, enabled = !form.busy, modifier = Modifier.heightIn(min = 48.dp)) {
+            Text(stringResource(R.string.password_forgot))
+        }
     }
 }

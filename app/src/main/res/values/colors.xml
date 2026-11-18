@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Crema de la marca: fondo del ícono y de la ventana mientras arranca la app. -->
-    <color name="restia_cream">#FFFBF6F0</color>
+    <color name="restia_cream">#FFFFF5EC</color>
     <color name="restia_night">#FF1C1410</color>
 </resources>

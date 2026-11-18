@@ -1,11 +1,14 @@
 package com.restia.mobile.ui.orders
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.DrawableRes
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -33,6 +36,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -43,6 +47,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,18 +60,29 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleStartEffect
 import com.restia.mobile.R
 import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.MoneyDto
 import com.restia.mobile.core.network.OrderDto
 import com.restia.mobile.core.network.OrderItemDto
+import com.restia.mobile.ui.tables.waitText
+import com.restia.mobile.ui.theme.BackHeader
 import com.restia.mobile.ui.theme.EmptyState
 import com.restia.mobile.ui.theme.GroupCard
+import com.restia.mobile.ui.theme.OptionRow
+import com.restia.mobile.ui.theme.PrimaryButton
 import com.restia.mobile.ui.theme.Restia
+import com.restia.mobile.ui.theme.RestiaLogo
+import com.restia.mobile.ui.theme.ScreenPadding
+import com.restia.mobile.ui.theme.SecondaryButton
+import com.restia.mobile.ui.theme.Separator
 import com.restia.mobile.ui.theme.StatusPill
 import com.restia.mobile.ui.theme.readableWidth
 import java.math.BigDecimal
@@ -200,48 +218,69 @@ private fun unitTone(status: String): Color = when (status) {
     else -> MaterialTheme.colorScheme.error
 }
 
-/** Línea de pasos: Recibida → En preparación → Lista → Servida. */
+/** Verde de un paso ya cumplido del seguimiento (propuesta 04). */
+private val StepDone = Color(0xFF2F9E5B)
+
+/**
+ * Estado de la cocina (propuesta 04): cuatro círculos unidos por una línea. Cumplido en verde, el actual en
+ * naranja (ambos con palomita) y lo pendiente en crema con un reloj. Debajo, el nombre del paso y, para lo
+ * pendiente, "Pendiente".
+ */
 @Composable
-private fun RoundStepper(stage: Int) {
-    val done = MaterialTheme.colorScheme.primary
-    val todo = MaterialTheme.colorScheme.outlineVariant
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ROUND_STEPS.indices.forEach { i ->
-                if (i > 0) {
-                    Box(Modifier.weight(1f).height(3.dp).background(if (i <= stage) done else todo))
-                }
-                Box(
-                    modifier = Modifier.size(22.dp).clip(CircleShape).background(if (i <= stage) done else todo),
-                    contentAlignment = Alignment.Center,
+private fun RoundStepper(stage: Int, startedAt: String?) {
+    val line = MaterialTheme.colorScheme.outlineVariant
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        // La línea va detrás de los círculos, del centro del primero al del último (un octavo del ancho a cada lado).
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = maxWidth / (ROUND_STEPS.size * 2))
+                .padding(top = 22.dp)
+                .height(1.dp)
+                .background(line),
+        )
+        Row(modifier = Modifier.fillMaxWidth()) {
+            ROUND_STEPS.forEachIndexed { i, label ->
+                val done = i < stage || (i == stage && i == ROUND_STEPS.lastIndex)
+                val current = i == stage && !done
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
-                    if (i < stage || i == ROUND_STEPS.lastIndex && stage == i) {
-                        Icon(painterResource(R.drawable.ic_check), contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(14.dp))
-                    } else if (i == stage) {
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onPrimary))
+                    val fill = when {
+                        done -> StepDone
+                        current -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.background
                     }
-                }
-            }
-        }
-        Layout(
-            content = {
-                ROUND_STEPS.forEachIndexed { i, label ->
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(fill)
+                            .border(1.dp, if (done || current) fill else Color(0xFFD5B79C), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painterResource(if (done || current) R.drawable.ic_state_check else R.drawable.ic_clock),
+                            contentDescription = null,
+                            tint = if (done || current) Color(0xFFFFFCF9) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                     Text(
                         stringResource(label),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (i == stage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = if (current) FontWeight.Bold else FontWeight.Normal),
+                        textAlign = TextAlign.Center,
                     )
-                }
-            },
-        ) { measurables, constraints ->
-            val width = constraints.maxWidth
-            val dot = 22.dp.roundToPx()
-            val labels = measurables.map { it.measure(constraints.copy(minWidth = 0)) }
-            layout(width, labels.maxOf { it.height }) {
-                labels.forEachIndexed { i, label ->
-                    // Centro de cada punto: los puntos van de borde a borde, con el mismo hueco entre ellos.
-                    val center = dot / 2 + (width - dot) * i / (labels.size - 1)
-                    label.placeRelative((center - label.width / 2).coerceIn(0, (width - label.width).coerceAtLeast(0)), 0)
+                    val detail = when {
+                        i == 0 -> startedAt
+                        i > stage -> stringResource(R.string.track_pending)
+                        else -> null
+                    }
+                    detail?.let {
+                        Text(it, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Normal), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
@@ -263,11 +302,14 @@ private fun ItemRow(
     val ready = readyUnits(listOf(item)).size
     val pending = pendingUnits(item).size
     val voidable = voidableUnits(item).size
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(item.quantity.toString() + " × " + item.name, style = MaterialTheme.typography.titleSmall)
-            item.modifiers.forEach { Text(it.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            item.notes?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(item.quantity.toString(), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(item.name, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+            val notes = item.modifiers.map { it.name } + listOfNotNull(item.notes)
+            if (notes.isNotEmpty()) {
+                Text(notes.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             // El estado siempre va en texto, por unidad agrupada.
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 item.units.groupingBy { it.status }.eachCount().forEach { (status, count) ->
@@ -277,7 +319,7 @@ private fun ItemRow(
         }
         Column(horizontalAlignment = Alignment.End) {
             if (canDeliver && ready > 0) {
-                OutlinedButton(onClick = onDeliver, enabled = !busy) { Text(stringResource(R.string.table_deliver, ready)) }
+                TextButton(onClick = onDeliver, enabled = !busy) { Text(stringResource(R.string.table_deliver, ready)) }
             }
             if (canCancel && pending > 0) {
                 TextButton(onClick = onCancel, enabled = !busy) { Text(stringResource(R.string.cancel_action)) }
@@ -289,8 +331,9 @@ private fun ItemRow(
     }
 }
 
+/** Una ronda (comanda enviada): su número y hora, sus platillos, el estado de la cocina y su total. */
 @Composable
-private fun RoundCard(
+private fun RoundSection(
     index: Int,
     order: OrderDto,
     canDeliver: Boolean,
@@ -302,27 +345,79 @@ private fun RoundCard(
     onVoid: (OrderItemDto) -> Unit,
 ) {
     val stage = roundStage(order)
-    GroupCard {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val time = roundTime(order.createdAt)
+    val time = roundTime(order.createdAt)
+    val minutes = order.createdAt?.let { minutesSince(it) }
+    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        Row {
+            Text(
+                stringResource(R.string.table_round, index),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f).semantics { heading() },
+            )
+            if (time != null) {
                 Text(
-                    if (time != null) stringResource(R.string.table_round_at, index, time) else stringResource(R.string.table_round, index),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Restia.colors.heading,
-                    modifier = Modifier.weight(1f).semantics { heading() },
+                    if (minutes != null) stringResource(R.string.track_time_ago, time, waitText(minutes)) else time,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                stage?.let { StatusPill(stringResource(ROUND_STEPS[it]), MaterialTheme.colorScheme.primary) }
             }
-            stage?.let { RoundStepper(it) }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            order.items.forEach { item ->
-                ItemRow(item, canDeliver, canCancel, canVoid, busy, { onDeliver(item) }, { onCancel(item) }, { onVoid(item) })
-            }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
+        Separator()
+        order.items.forEach { item ->
+            ItemRow(item, canDeliver, canCancel, canVoid, busy, { onDeliver(item) }, { onCancel(item) }, { onVoid(item) })
+        }
+        Separator()
+        if (stage != null) {
             Row {
-                Text(stringResource(R.string.table_round_subtotal), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                Text(total(order.total), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.track_kitchen), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
+                if (minutes != null && stage < ROUND_STEPS.lastIndex) {
+                    Text(stringResource(R.string.track_elapsed, waitText(minutes)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            RoundStepper(stage, time)
+        }
+        Row {
+            Text(stringResource(R.string.table_round_subtotal), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text(total(order.total), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+/** Una acción de la hoja "Acciones de Mesa N". */
+private class TableAction(@DrawableRes val icon: Int, val label: Int, val onClick: () -> Unit)
+
+/** Acciones de mesa (propuesta 08): lo que se puede hacer con la mesa, y cerrarla al final. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TableActionsSheet(tableNumber: Int, actions: List<TableAction>, onClose: (() -> Unit)?, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
+        Column(modifier = Modifier.padding(horizontal = ScreenPadding).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.table_actions_title, tableNumber), style = MaterialTheme.typography.headlineSmall, color = Restia.colors.heading)
+            Text(
+                stringResource(R.string.table_actions_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            actions.forEach { action ->
+                OptionRow(action.icon, stringResource(action.label), tint = MaterialTheme.colorScheme.onSurface, onClick = {
+                    onDismiss()
+                    action.onClick()
+                })
+            }
+            if (onClose != null) {
+                Separator(Modifier.padding(vertical = 8.dp))
+                TextButton(
+                    onClick = {
+                        onDismiss()
+                        onClose()
+                    },
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    Text(stringResource(R.string.close_action), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
+                }
+                Text(stringResource(R.string.table_close_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -430,7 +525,7 @@ private fun VoidDialog(state: VoidState, viewModel: TableViewModel) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Seguimiento de la orden (propuesta 04): las rondas de la mesa, su estado en cocina y sus acciones. */
 @Composable
 fun TableScreen(
     viewModel: TableViewModel,
@@ -479,87 +574,105 @@ fun TableScreen(
     state.closing?.let { CloseDialog(it, tableNumber, viewModel) }
     state.cancelling?.let { CancelDialog(it, viewModel) }
     state.voiding?.let { VoidDialog(it, viewModel) }
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.table_title, tableNumber)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.nav_back))
-                    }
-                },
-                actions = {
-                    if (canClose) {
-                        TextButton(onClick = viewModel::startClose, enabled = !state.busy) { Text(stringResource(R.string.close_action)) }
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
-        },
-        bottomBar = {
-            if (canOrder || canViewCheck) {
-                Row(
-                    modifier = Modifier.readableWidth().navigationBarsPadding().padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    if (canViewCheck) {
-                        OutlinedButton(onClick = onCheck, shape = MaterialTheme.shapes.small, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) {
-                            Text(stringResource(R.string.table_check))
-                        }
-                    }
-                    if (canOrder) {
-                        Button(onClick = onAddOrder, shape = MaterialTheme.shapes.small, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) {
-                            Text(stringResource(R.string.table_add_order))
-                        }
+    var showActions by rememberSaveable { mutableStateOf(false) }
+    val actions = buildList {
+        if (canOrder) add(TableAction(R.drawable.ic_add, R.string.table_add_order, onAddOrder))
+        if (canViewCheck) add(TableAction(R.drawable.ic_receipt, R.string.table_view_check, onCheck))
+    }
+    val closeAction = if (canClose && !state.busy) viewModel::startClose else null
+    if (showActions) TableActionsSheet(tableNumber, actions, closeAction) { showActions = false }
+    // El estado de la mesa es el de su ronda más atrasada que siga en cocina.
+    val stage = state.orders.mapNotNull { roundStage(it) }.filter { it < ROUND_STEPS.lastIndex }.minOrNull()
+        ?: state.orders.mapNotNull { roundStage(it) }.maxOrNull()
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        BackHeader(
+            title = null,
+            onBack = onBack,
+            center = { RestiaLogo(height = 32.dp) },
+            actions = {
+                if (actions.isNotEmpty() || closeAction != null) {
+                    IconButton(onClick = { showActions = true }) {
+                        Icon(painterResource(R.drawable.ic_more), contentDescription = stringResource(R.string.table_actions_title, tableNumber), modifier = Modifier.size(22.dp))
                     }
                 }
-            }
-        },
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).readableWidth()) {
-            state.failure?.let {
+            },
+        )
+        Column(modifier = Modifier.weight(1f).readableWidth()) {
+            Row(modifier = Modifier.padding(horizontal = ScreenPadding).padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    stringResource(if (state.loaded) R.string.tables_stale else R.string.table_not_loaded) + " " + loadFailureText(it),
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    stringResource(R.string.table_title, tableNumber),
+                    style = MaterialTheme.typography.headlineSmall.copy(fontSize = 23.sp, lineHeight = 32.sp),
+                    color = Restia.colors.heading,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                )
+                stage?.let { StatusPill(stringResource(ROUND_STEPS[it]), stageTone(it)) }
+            }
+            val notices = buildList {
+                state.failure?.let { add(stringResource(if (state.loaded) R.string.tables_stale else R.string.table_not_loaded) + " " + loadFailureText(it) to true) }
+                state.actionFailure?.let { add(failureText(it, state.failedAction) to true) }
+                if (state.sent) add(stringResource(R.string.order_sent, tableNumber) to false)
+                state.cancelled?.let { add(pluralStringResource(R.plurals.cancel_done, it, it) to false) }
+                state.voided?.let { add(pluralStringResource(R.plurals.void_done, it, it) to false) }
+            }
+            notices.forEach { (text, error) ->
+                Text(
+                    text,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (error) MaterialTheme.colorScheme.error else Restia.colors.free,
+                    modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 4.dp),
                 )
             }
-            state.actionFailure?.let {
-                Text(failureText(it, state.failedAction), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            }
-            if (state.sent) {
-                Text(stringResource(R.string.order_sent, tableNumber), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            }
-            state.cancelled?.let {
-                Text(pluralStringResource(R.plurals.cancel_done, it, it), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            }
-            state.voided?.let {
-                Text(pluralStringResource(R.plurals.void_done, it, it), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            }
             if (canDeliver && state.readyCount > 0) {
-                Button(
+                PrimaryButton(
+                    pluralStringResource(R.plurals.table_deliver_all, state.readyCount, state.readyCount),
                     onClick = viewModel::deliverAll,
                     enabled = !state.busy,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                ) { Text(pluralStringResource(R.plurals.table_deliver_all, state.readyCount, state.readyCount)) }
+                    modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 8.dp),
+                )
             }
             when {
                 !state.loaded && state.failure == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 state.loaded && state.orders.isEmpty() -> EmptyState(
                     stringResource(R.string.table_empty),
                     if (canOrder) stringResource(R.string.table_empty_hint) else null,
+                    action = if (canOrder) stringResource(R.string.table_add_order) else null,
+                    onAction = onAddOrder,
                 )
                 else -> LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(start = ScreenPadding, end = ScreenPadding, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(28.dp),
                 ) {
                     val rounds = state.orders.withIndex().toList()
                     items(rounds, key = { it.value.id }) { (index, order) ->
-                        RoundCard(index + 1, order, canDeliver, canCancel, canVoid, state.busy, viewModel::deliverItem, viewModel::startCancel, viewModel::startVoid)
+                        RoundSection(index + 1, order, canDeliver, canCancel, canVoid, state.busy, viewModel::deliverItem, viewModel::startCancel, viewModel::startVoid)
                     }
                 }
             }
         }
+        if (state.orders.isNotEmpty() && (canViewCheck || canOrder)) {
+            Column(
+                modifier = Modifier.readableWidth().navigationBarsPadding().padding(start = ScreenPadding, end = ScreenPadding, bottom = 16.dp, top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (canOrder) PrimaryButton(stringResource(R.string.table_add_order), onAddOrder)
+                if (canViewCheck) SecondaryButton(stringResource(R.string.table_view_check_of, tableNumber), onCheck)
+                Text(
+                    stringResource(R.string.track_live),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
+}
+
+/** Color de la etiqueta del paso: oro en preparación, verde al estar lista o servida, gris al recibirla. */
+@Composable
+private fun stageTone(stage: Int): Color = when (stage) {
+    0 -> MaterialTheme.colorScheme.onSurfaceVariant
+    1 -> MaterialTheme.colorScheme.onPrimaryContainer
+    else -> Restia.colors.free
 }

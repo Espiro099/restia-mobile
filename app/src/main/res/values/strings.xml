@@ -2,7 +2,6 @@
     <string name="app_name">Restia</string>
     <string name="brand_tagline">Conecta · Sirve · Crece</string>
     <string name="login_welcome">Bienvenido de nuevo</string>
-    <string name="login_subtitle">Inicia sesión para continuar</string>
     <string name="password_reveal">Mostrar contraseña</string>
     <string name="password_conceal">Ocultar contraseña</string>
     <string name="enroll_title">Registrar este dispositivo</string>
@@ -29,15 +28,8 @@
     <string name="order_read_only">Llevas más de 12 horas sin conexión: esta comanda es solo de lectura hasta enviarla.</string>
     <string name="table_title">Mesa %1$d</string>
     <string name="table_round">Ronda %1$d</string>
-    <string name="table_round_at">Ronda %1$d · %2$s</string>
     <string name="table_round_subtotal">Total de la ronda</string>
     <string name="table_empty_hint">Agrega la primera comanda para enviarla a cocina.</string>
-    <string name="check_summary_due">Por cobrar en la mesa</string>
-    <string name="check_summary_paid">Mesa pagada · total</string>
-    <plurals name="check_summary_count">
-        <item quantity="one">%1$d cuenta</item>
-        <item quantity="other">%1$d cuentas</item>
-    </plurals>
     <string name="track_received">Recibida</string>
     <string name="track_preparing">En preparación</string>
     <string name="track_ready">Lista</string>
@@ -117,7 +109,6 @@
         <item quantity="one">%1$d en estado desconocido</item>
         <item quantity="other">%1$d en estado desconocido</item>
     </plurals>
-    <string name="order_title">Comanda · Mesa %1$d</string>
     <string name="order_back">Mesas</string>
     <string name="order_all">Todos</string>
     <string name="nav_back">Regresar</string>
@@ -130,7 +121,6 @@
     <string name="order_retry">Reintentar envío</string>
     <string name="order_discard">Descartar</string>
     <string name="order_keep_adding">Seguir agregando</string>
-    <string name="order_view_cart">Ver comanda (%1$d)</string>
     <string name="order_estimate">Total estimado: %1$s</string>
     <string name="order_modifier_range">Elige entre %1$d y %2$d.</string>
     <string name="order_menu_failed">No se pudo cargar el menú.</string>
@@ -147,14 +137,9 @@
         <item quantity="other">%1$d personas</item>
     </plurals>
     <string name="table_free">Libre</string>
-    <string name="legend_busy">Ocupada</string>
-    <string name="legend_off">Fuera de servicio</string>
-    <string name="greeting">Hola, %1$s</string>
     <string name="tab_tables">Mesas</string>
     <string name="tab_more">Más</string>
     <string name="profile_title">Mi perfil</string>
-    <string name="profile_user">Usuario</string>
-    <string name="profile_role">Rol</string>
     <string name="profile_branch">Sucursal</string>
     <string name="table_possibly_occupied">Posiblemente ocupada</string>
     <string name="table_no_order">Ocupada, sin comanda</string>
@@ -195,11 +180,6 @@
         <item quantity="one">Mesa %1$s</item>
         <item quantity="other">Mesas %1$s</item>
     </plurals>
-    <string name="kitchen_time">%1$s · hace %2$s</string>
-    <plurals name="kitchen_minutes">
-        <item quantity="one">%1$d minuto</item>
-        <item quantity="other">%1$d minutos</item>
-    </plurals>
     <string name="kitchen_notes">Nota: %1$s</string>
     <plurals name="kitchen_ready_waiting">
         <item quantity="one">%1$d listo, esperando al mesero</item>
@@ -212,9 +192,7 @@
     <string name="kitchen_conflict">Otro empleado ya cambió estos platillos. La cola se actualizó.</string>
     <string name="kitchen_no_stock">No hay inventario suficiente para empezar este platillo.</string>
     <string name="kitchen_blocked">Un ingrediente está bloqueado por seguridad alimentaria.</string>
-    <string name="table_check">Cuenta</string>
     <string name="check_screen_title">Cuenta · Mesa %1$d</string>
-    <string name="check_back">Mesa</string>
     <string name="check_not_loaded">No se pudo cargar la cuenta.</string>
     <string name="check_none">Esta mesa todavía no tiene cuenta.</string>
     <string name="check_title">Cuenta %1$d</string>
@@ -235,7 +213,6 @@
     <string name="check_refunded_total">Reembolsado</string>
     <string name="payment_refunded">reembolsado</string>
     <string name="check_pending_total">En cobro</string>
-    <string name="check_balance">Por pagar</string>
     <string name="check_request">Pedir la cuenta</string>
     <string name="check_requested_done">La cuenta quedó solicitada.</string>
     <string name="print_pre_check">Imprimir precuenta</string>
@@ -253,8 +230,6 @@
     <string name="payment_failed">Rechazado</string>
     <string name="payment_cancelled">Cancelado</string>
     <string name="payment_unknown">Sin confirmar: lo resuelve un gerente</string>
-    <string name="pay_action">Cobrar</string>
-    <string name="pay_title">Cobrar la cuenta %1$d</string>
     <string name="pay_available">Por cobrar: %1$s</string>
     <string name="pay_no_shift">No hay una caja abierta. Pide a un gerente que abra el turno.</string>
     <string name="pay_register">Caja</string>
@@ -265,8 +240,6 @@
     <string name="pay_change">Cambio: %1$s</string>
     <string name="pay_exceeds">El monto supera lo que falta por cobrar.</string>
     <string name="pay_terminal_hint">Después de cobrar en la terminal o recibir la transferencia, registra el resultado.</string>
-    <string name="pay_confirm_cash">Cobrar</string>
-    <string name="pay_confirm_other">Iniciar cobro</string>
     <string name="pay_done">Pago registrado.</string>
     <string name="pay_done_change">Pago registrado. Entrega $%1$s de cambio.</string>
     <string name="result_action">Registrar resultado</string>
@@ -580,4 +553,84 @@
     <string name="print_reprint_done">Reimpresión enviada.</string>
     <string name="print_conflict">La impresión cambió mientras tanto. Ya se muestra lo actual.</string>
     <string name="cash_conflict">Alguien cambió este turno al mismo tiempo. Ya se muestra lo actual; vuelve a intentarlo.</string>
+    <!-- Propuesta 04 (Figma): bienvenida, acceso, mesas, comandas y más. -->
+    <string name="welcome_body">Continúa tu jornada en el restaurante</string>
+    <string name="welcome_action">Iniciar sesión</string>
+    <string name="welcome_note">Aplicación privada para empleados</string>
+    <string name="login_hint">Usa tu cuenta de empleado.</string>
+    <string name="login_help">¿No puedes entrar? Contacta a tu responsable.</string>
+    <string name="greeting_morning">Buenos días, %1$s</string>
+    <string name="greeting_afternoon">Buenas tardes, %1$s</string>
+    <string name="greeting_evening">Buenas noches, %1$s</string>
+    <string name="zone_all">Todas · %1$d</string>
+    <string name="zone_tag">%1$s · %2$d</string>
+    <string name="table_to_confirm">Por confirmar</string>
+    <string name="table_to_charge">Por cobrar</string>
+    <string name="table_ready_to_serve">Lista para servir</string>
+    <string name="table_minutes">%1$d min</string>
+    <string name="table_hours">%1$d h</string>
+    <string name="table_days">%1$d d</string>
+    <plurals name="table_seats">
+        <item quantity="one">%1$d lugar</item>
+        <item quantity="other">%1$d lugares</item>
+    </plurals>
+    <plurals name="table_dishes">
+        <item quantity="one">%1$d platillo</item>
+        <item quantity="other">%1$d platillos</item>
+    </plurals>
+    <string name="ready_notice_title">Mesa %1$d · orden lista</string>
+    <plurals name="ready_notice_body">
+        <item quantity="one">%1$d platillo espera entrega</item>
+        <item quantity="other">%1$d platillos esperan entrega</item>
+    </plurals>
+    <string name="legend_free">Libre</string>
+    <string name="legend_attention">En atención</string>
+    <string name="legend_check">Cuenta</string>
+    <string name="tab_orders">Comandas</string>
+    <string name="orders_not_loaded">No se pudieron cargar las comandas.</string>
+    <string name="orders_empty_title">Todo listo para empezar</string>
+    <string name="orders_empty_body">Las comandas de tus mesas aparecerán aquí cuando las envíes a cocina.</string>
+    <string name="orders_go_to_tables">Ir a mesas</string>
+    <string name="orders_waiting">Pidió hace %1$s</string>
+    <string name="more_account">Mi cuenta</string>
+    <string name="more_tools">Herramientas</string>
+    <string name="more_security">Seguridad de tu cuenta</string>
+    <string name="order_add_dishes">Agregar platillos</string>
+    <string name="order_search">Buscar en el menú</string>
+    <string name="order_no_results">No hay platillos con esa búsqueda.</string>
+    <plurals name="order_view_cart_products">
+        <item quantity="one">Ver comanda · %1$d producto</item>
+        <item quantity="other">Ver comanda · %1$d productos</item>
+    </plurals>
+    <string name="track_pending">Pendiente</string>
+    <string name="track_kitchen">Estado de la cocina</string>
+    <string name="track_elapsed">%1$s transcurridos</string>
+    <string name="track_time_ago">%1$s · hace %2$s</string>
+    <string name="track_live">Los tiempos se actualizan con cada cambio de estado.</string>
+    <string name="table_view_check">Ver cuenta</string>
+    <string name="table_view_check_of">Ver cuenta de Mesa %1$d</string>
+    <string name="table_actions_title">Acciones de Mesa %1$d</string>
+    <string name="table_actions_body">Todo lo necesario para esta mesa.</string>
+    <string name="table_close_hint">Disponible al terminar el cobro.</string>
+    <string name="check_total_due">Total por cobrar</string>
+    <string name="check_consumption">Consumo</string>
+    <string name="check_tip">Propina</string>
+    <string name="check_tip_add">Agregar</string>
+    <string name="check_method">Método de pago</string>
+    <string name="check_tip_note">La propina es opcional y se registra por separado.</string>
+    <string name="check_review_action">Revisar cobro · %1$s</string>
+    <string name="check_more_actions">Más acciones de la cuenta %1$d</string>
+    <string name="check_detail_show">Ver detalle</string>
+    <string name="check_detail_hide">Ocultar detalle</string>
+    <plurals name="check_items">
+        <item quantity="one">%1$d platillo</item>
+        <item quantity="other">%1$d platillos</item>
+    </plurals>
+    <string name="payments_title">Pagos</string>
+    <string name="review_title">Revisar cobro</string>
+    <string name="review_hint">Revisa el importe antes de cobrar</string>
+    <string name="review_method">Método seleccionado</string>
+    <string name="review_confirm">Confirmar cobro · %1$s</string>
+    <string name="review_back">Volver a la cuenta</string>
+    <string name="review_no_tip">Sin propina</string>
 </resources>

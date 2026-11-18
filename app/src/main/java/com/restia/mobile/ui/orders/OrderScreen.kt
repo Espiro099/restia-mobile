@@ -3,6 +3,7 @@ package com.restia.mobile.ui.orders
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,35 +11,30 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -54,12 +50,15 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.restia.mobile.R
 import com.restia.mobile.core.network.ApiFailure
@@ -69,7 +68,12 @@ import com.restia.mobile.core.network.MoneyDto
 import com.restia.mobile.data.orders.CartLine
 import com.restia.mobile.data.orders.MAX_QUANTITY
 import com.restia.mobile.data.orders.invalidModifiers
+import com.restia.mobile.ui.theme.BackHeader
+import com.restia.mobile.ui.theme.FilterTag
+import com.restia.mobile.ui.theme.PrimaryButton
 import com.restia.mobile.ui.theme.Restia
+import com.restia.mobile.ui.theme.ScreenPadding
+import com.restia.mobile.ui.theme.SectionTitle
 import com.restia.mobile.ui.theme.readableWidth
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -106,7 +110,7 @@ private val SoldOutFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToS
 private fun DishThumb(product: MenuProductDto, available: Boolean) {
     val tone = categoryTone(product.category)
     Box(
-        modifier = Modifier.size(64.dp).clip(MaterialTheme.shapes.medium).background(tone.copy(alpha = if (available) 0.18f else 0.08f)),
+        modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)).background(tone.copy(alpha = if (available) 0.18f else 0.08f)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -128,53 +132,61 @@ private fun DishThumb(product: MenuProductDto, available: Boolean) {
     }
 }
 
+/** Platillo de la carta (propuesta 03): foto, nombre, descripción, precio y el botón cuadrado para agregar. */
 @Composable
 private fun ProductRow(product: MenuProductDto, onClick: () -> Unit) {
     val available = product.availability == "AVAILABLE"
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-        shadowElevation = 1.dp,
-        modifier = Modifier.fillMaxWidth().clickable(enabled = available, role = Role.Button, onClick = onClick),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.small)
+            .clickable(enabled = available, role = Role.Button, onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            DishThumb(product, available)
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        DishThumb(product, available)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                product.name,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 15.sp),
+                color = if (available) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            product.description?.takeIf { it.isNotBlank() }?.let {
                 Text(
-                    product.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (available) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                product.description?.takeIf { it.isNotBlank() }?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Text(
-                    if (available) moneyText(product.price) else stringResource(R.string.order_sold_out),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = if (available) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (available) {
-                // Decorativo: toda la tarjeta abre el platillo; el botón solo lo señala.
-                Box(
-                    modifier = Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(painterResource(R.drawable.ic_add), contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
-                }
+            Text(
+                if (available) moneyText(product.price) else stringResource(R.string.order_sold_out),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 15.sp),
+                color = if (available) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            )
+        }
+        if (available) {
+            // Decorativo: toda la fila abre el platillo; el botón solo lo señala.
+            Box(
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(painterResource(R.drawable.ic_add), contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
             }
         }
     }
+}
+
+/** Sin acentos ni mayúsculas, para buscar "cesar" y encontrar "César". */
+fun searchKey(text: String): String =
+    java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "").lowercase()
+
+/** El platillo coincide con la búsqueda por nombre o descripción. */
+fun matchesSearch(product: MenuProductDto, query: String): Boolean {
+    val key = searchKey(query.trim())
+    return key.isEmpty() || searchKey(product.name).contains(key) || searchKey(product.description.orEmpty()).contains(key)
 }
 
 @Composable
@@ -272,7 +284,7 @@ private fun ReviewDialog(viewModel: OrderViewModel, state: OrderUiState) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Menú digital (propuesta 03): buscar, filtrar por categoría y agregar platillos a la comanda. */
 @Composable
 fun OrderScreen(viewModel: OrderViewModel, tableNumber: Int, onBack: () -> Unit, onSent: () -> Unit) {
     val state by viewModel.state.collectAsState()
@@ -285,104 +297,86 @@ fun OrderScreen(viewModel: OrderViewModel, tableNumber: Int, onBack: () -> Unit,
     }
     // null = todas las categorías.
     var category by rememberSaveable { mutableStateOf<String?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
     state.editor?.let { EditorDialog(viewModel, it) }
     if (state.reviewing) ReviewDialog(viewModel, state)
-    Scaffold(
-        modifier = Modifier.fillMaxSize().imePadding(),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.order_title, tableNumber)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.nav_back))
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
-        },
-        bottomBar = {
-            if (state.cart.isNotEmpty()) {
-                val currency = state.cart.first().product.price.currency
-                val estimate = runCatching { state.cart.fold(BigDecimal.ZERO) { sum, l -> sum + l.estimate } }.getOrNull()
-                Button(
-                    onClick = { viewModel.setReviewing(true) },
-                    shape = MaterialTheme.shapes.small,
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
-                    modifier = Modifier.readableWidth().navigationBarsPadding().padding(16.dp),
-                ) {
-                    Text(stringResource(R.string.order_view_cart, state.cart.sumOf { it.quantity }), modifier = Modifier.weight(1f))
-                    estimate?.let { Text(moneyText(it, currency), style = MaterialTheme.typography.titleSmall) }
-                }
-            }
-        },
-    ) { padding ->
+    Column(modifier = Modifier.fillMaxSize().imePadding()) {
+        BackHeader(stringResource(R.string.table_title, tableNumber), onBack)
         val menu = state.menu
-        when {
-            menu != null -> {
-                val categories = menu.products.map { it.category }.distinct()
-                val selected = category?.takeIf { it in categories }
-                Column(modifier = Modifier.fillMaxSize().padding(padding).readableWidth()) {
-                if (categories.size > 1) {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Box(modifier = Modifier.weight(1f).readableWidth()) {
+            when {
+                menu != null -> {
+                    val categories = menu.products.map { it.category }.distinct()
+                    val selected = category?.takeIf { it in categories }
+                    val shown = menu.products.filter { (selected == null || it.category == selected) && matchesSearch(it, query) }
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = ScreenPadding, end = ScreenPadding, bottom = 16.dp),
                     ) {
-                        item { CategoryChip(stringResource(R.string.order_all), selected == null) { category = null } }
-                        items(categories) { name -> CategoryChip(name, selected == name) { category = name } }
-                    }
-                }
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    if (state.menuStale || state.readOnly) {
-                        item(key = "avisos") {
-                            Column {
-                                if (state.menuStale) Text(stringResource(R.string.order_menu_stale), color = MaterialTheme.colorScheme.error)
-                                if (state.readOnly) Text(stringResource(R.string.order_read_only), color = MaterialTheme.colorScheme.error)
+                        item(key = "encabezado") {
+                            Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+                                SectionTitle(stringResource(R.string.order_add_dishes))
+                                OutlinedTextField(
+                                    value = query,
+                                    onValueChange = { query = it.take(60) },
+                                    placeholder = { Text(stringResource(R.string.order_search)) },
+                                    leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                    singleLine = true,
+                                    shape = MaterialTheme.shapes.small,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                                    ),
+                                    textStyle = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                if (categories.size > 1) {
+                                    Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        FilterTag(stringResource(R.string.order_all), selected == null) { category = null }
+                                        categories.forEach { name -> FilterTag(name, selected == name) { category = name } }
+                                    }
+                                }
+                                if (state.menuStale) Text(stringResource(R.string.order_menu_stale), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                if (state.readOnly) Text(stringResource(R.string.order_read_only), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                             }
                         }
-                    }
-                    menu.products.filter { selected == null || it.category == selected }.groupBy { it.category }.forEach { (name, products) ->
-                        item(key = "c-$name") {
-                            Text(
-                                name,
-                                style = MaterialTheme.typography.titleLarge,
-                                color = Restia.colors.heading,
-                                modifier = Modifier.padding(top = 8.dp).semantics { heading() },
-                            )
+                        if (shown.isEmpty()) {
+                            item(key = "sin-resultados") {
+                                Text(
+                                    stringResource(R.string.order_no_results),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(vertical = 16.dp),
+                                )
+                            }
                         }
-                        items(products.sortedBy { it.displayOrder }, key = { it.id }) { product ->
+                        items(shown.sortedWith(compareBy({ categories.indexOf(it.category) }, { it.displayOrder })), key = { it.id }) { product ->
                             ProductRow(product) { viewModel.selectProduct(product) }
                         }
                     }
                 }
+                state.menuFailure != null -> Column(
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(stringResource(R.string.order_menu_failed) + " " + failureText(state.menuFailure!!))
+                    PrimaryButton(stringResource(R.string.action_retry), viewModel::loadMenu)
                 }
+                else -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             }
-            state.menuFailure != null -> Column(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(stringResource(R.string.order_menu_failed) + " " + failureText(state.menuFailure!!))
-                Button(onClick = viewModel::loadMenu) { Text(stringResource(R.string.action_retry)) }
-            }
-            else -> Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) { CircularProgressIndicator() }
+        }
+        if (state.cart.isNotEmpty()) {
+            val currency = state.cart.first().product.price.currency
+            val estimate = runCatching { state.cart.fold(BigDecimal.ZERO) { sum, l -> sum + l.estimate } }.getOrNull()
+            val count = state.cart.sumOf { it.quantity }
+            PrimaryButton(
+                pluralStringResource(R.plurals.order_view_cart_products, count, count),
+                onClick = { viewModel.setReviewing(true) },
+                trailing = estimate?.let { moneyText(it, currency) },
+                modifier = Modifier.readableWidth().navigationBarsPadding().padding(horizontal = ScreenPadding, vertical = 16.dp).heightIn(min = 54.dp),
+            )
         }
     }
-}
-
-@Composable
-private fun CategoryChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label) },
-        shape = CircleShape,
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = MaterialTheme.colorScheme.primary,
-            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-        ),
-    )
 }

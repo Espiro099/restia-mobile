@@ -7,6 +7,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import com.restia.mobile.data.auth.AuthState
 import com.restia.mobile.ui.BranchHome
 import com.restia.mobile.ui.account.ForgotPasswordDialog
@@ -16,6 +19,7 @@ import com.restia.mobile.ui.auth.EnrollScreen
 import com.restia.mobile.ui.auth.LoadingScreen
 import com.restia.mobile.ui.auth.LoginScreen
 import com.restia.mobile.ui.auth.OfflineScreen
+import com.restia.mobile.ui.auth.WelcomeScreen
 import com.restia.mobile.ui.theme.RestiaTheme
 
 class MainActivity : ComponentActivity() {
@@ -42,6 +46,12 @@ class MainActivity : ComponentActivity() {
                     AuthState.Offline -> OfflineScreen(viewModel::start)
                     AuthState.NeedsEnrollment -> EnrollScreen(form, notice, viewModel::enroll)
                     AuthState.NeedsLogin -> {
+                        // La bienvenida (propuesta 01) se ve al abrir la app; tras un aviso de sesión se va directo al acceso.
+                        var welcomed by rememberSaveable { mutableStateOf(false) }
+                        if (!welcomed && notice == null && form.failure == null) {
+                            WelcomeScreen(onContinue = { welcomed = true })
+                            return@RestiaTheme
+                        }
                         LoginScreen(form, notice, viewModel::login, forgot::open)
                         val forgotState by forgot.state.collectAsState()
                         if (forgotState.open) ForgotPasswordDialog(forgotState, forgot::setEmail, forgot::submit, forgot::dismiss)

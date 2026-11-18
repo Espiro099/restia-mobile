@@ -15,16 +15,12 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,12 +28,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleStartEffect
 import com.restia.mobile.R
 import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.ui.account.AccountMenu
+import com.restia.mobile.ui.tables.waitText
 import com.restia.mobile.ui.theme.EmptyState
+import com.restia.mobile.ui.theme.FilterTag
+import com.restia.mobile.ui.theme.GroupCard
+import com.restia.mobile.ui.theme.Restia
+import com.restia.mobile.ui.theme.ScreenHeader
+import com.restia.mobile.ui.theme.ScreenPadding
+import com.restia.mobile.ui.theme.Separator
+import com.restia.mobile.ui.theme.StatusPill
 import java.time.Duration
 import java.time.OffsetDateTime
 import java.time.ZoneId
@@ -64,30 +69,37 @@ private fun failureText(failure: ApiFailure): String =
 @Composable
 private fun ticketTime(iso: String): String? {
     val at = runCatching { OffsetDateTime.parse(iso) }.getOrNull() ?: return null
-    val minutes = Duration.between(at, OffsetDateTime.now()).toMinutes().coerceAtLeast(0).toInt()
+    val minutes = Duration.between(at, OffsetDateTime.now()).toMinutes().coerceAtLeast(0)
     val time = at.atZoneSameInstant(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm"))
-    return stringResource(R.string.kitchen_time, time, pluralStringResource(R.plurals.kitchen_minutes, minutes, minutes))
+    return stringResource(R.string.track_time_ago, time, waitText(minutes))
 }
 
 @Composable
 private fun LineRow(line: KitchenLine, canPrepare: Boolean, working: Boolean, onStart: () -> Unit, onReady: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(line.units.size.toString() + " × " + line.productName, style = MaterialTheme.typography.titleMedium)
-            line.modifiers.forEach { Text("+ $it", style = MaterialTheme.typography.bodyMedium) }
-            line.notes?.let { Text(stringResource(R.string.kitchen_notes, it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(line.units.size.toString(), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), modifier = Modifier.align(Alignment.Top))
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(line.productName, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+            if (line.modifiers.isNotEmpty()) {
+                Text(line.modifiers.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            line.notes?.let { Text(stringResource(R.string.kitchen_notes, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
             val pending = line.pending.size
             val preparing = line.preparing.size
-            if (pending > 0) Text(pluralStringResource(R.plurals.unit_pending, pending, pending), style = MaterialTheme.typography.bodySmall)
-            if (preparing > 0) Text(pluralStringResource(R.plurals.unit_preparing, preparing, preparing), style = MaterialTheme.typography.bodySmall)
-            if (line.ready > 0) {
-                Text(pluralStringResource(R.plurals.kitchen_ready_waiting, line.ready, line.ready), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (pending > 0) StatusPill(pluralStringResource(R.plurals.unit_pending, pending, pending), MaterialTheme.colorScheme.onSurfaceVariant)
+                if (preparing > 0) StatusPill(pluralStringResource(R.plurals.unit_preparing, preparing, preparing), MaterialTheme.colorScheme.onPrimaryContainer)
+                if (line.ready > 0) StatusPill(pluralStringResource(R.plurals.kitchen_ready_waiting, line.ready, line.ready), Restia.colors.free)
             }
         }
         if (canPrepare) {
-            Column(horizontalAlignment = Alignment.End) {
-                if (line.pending.isNotEmpty()) OutlinedButton(onClick = onStart, enabled = !working) { Text(stringResource(R.string.kitchen_start)) }
-                if (line.preparing.isNotEmpty()) Button(onClick = onReady, enabled = !working) { Text(stringResource(R.string.kitchen_ready)) }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (line.pending.isNotEmpty()) {
+                    OutlinedButton(onClick = onStart, enabled = !working, shape = MaterialTheme.shapes.medium) { Text(stringResource(R.string.kitchen_start)) }
+                }
+                if (line.preparing.isNotEmpty()) {
+                    Button(onClick = onReady, enabled = !working, shape = MaterialTheme.shapes.medium) { Text(stringResource(R.string.kitchen_ready)) }
+                }
             }
         }
     }
@@ -95,14 +107,19 @@ private fun LineRow(line: KitchenLine, canPrepare: Boolean, working: Boolean, on
 
 @Composable
 private fun TicketCard(ticket: KitchenTicket, canPrepare: Boolean, working: Boolean, viewModel: KitchenViewModel) {
-    Card {
-        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                if (ticket.tableNumbers.isEmpty()) stringResource(R.string.kitchen_no_table)
-                else pluralStringResource(R.plurals.kitchen_tables, ticket.tableNumbers.size, ticket.tableNumbers.joinToString(", ")),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            ticketTime(ticket.createdAt)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+    GroupCard {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (ticket.tableNumbers.isEmpty()) stringResource(R.string.kitchen_no_table)
+                    else pluralStringResource(R.plurals.kitchen_tables, ticket.tableNumbers.size, ticket.tableNumbers.joinToString(", ")),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = Restia.colors.heading,
+                    modifier = Modifier.weight(1f),
+                )
+                ticketTime(ticket.createdAt)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+            Separator()
             ticket.lines.forEach { line ->
                 LineRow(line, canPrepare, working, { viewModel.start(line) }, { viewModel.ready(line) })
             }
@@ -142,34 +159,29 @@ fun KitchenScreen(
         viewModel.startPolling()
         onStopOrDispose { viewModel.stopPolling() }
     }
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(stringResource(R.string.kitchen_title), style = MaterialTheme.typography.titleMedium)
-                        Text(branchName, style = MaterialTheme.typography.bodySmall)
-                    }
-                },
-                actions = {
-                    if (!inTabs) {
-                        if (showTables) TextButton(onClick = onTables) { Text(stringResource(R.string.order_back)) }
-                        AccountMenu(showStaff, logoutEnabled, onStaff, onChangePassword, onLogout, showCash, onCash, showPrinting, onPrinting)
-                    }
-                },
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScreenHeader(stringResource(R.string.kitchen_title)) {
+            if (!inTabs) {
+                if (showTables) TextButton(onClick = onTables) { Text(stringResource(R.string.order_back)) }
+                AccountMenu(showStaff, logoutEnabled, onStaff, onChangePassword, onLogout, showCash, onCash, showPrinting, onPrinting)
+            }
+            TextButton(onClick = viewModel::refresh, enabled = !state.refreshing) { Text(stringResource(R.string.action_refresh)) }
+        }
+        Column(modifier = Modifier.fillMaxSize()) {
+            Text(
+                branchName,
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = ScreenPadding).padding(bottom = 12.dp),
             )
-        },
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (state.stations.size > 1) {
                 Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                    modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = ScreenPadding).padding(bottom = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    FilterChip(selected = state.stationId == null, onClick = { viewModel.selectStation(null) }, label = { Text(stringResource(R.string.kitchen_all_stations)) })
+                    FilterTag(stringResource(R.string.kitchen_all_stations), state.stationId == null) { viewModel.selectStation(null) }
                     state.stations.forEach { station ->
-                        FilterChip(selected = state.stationId == station.id, onClick = { viewModel.selectStation(station.id) }, label = { Text(station.name) })
+                        FilterTag(station.name, state.stationId == station.id) { viewModel.selectStation(station.id) }
                     }
                 }
             }
@@ -183,16 +195,13 @@ fun KitchenScreen(
             state.actionFailure?.let {
                 Text(failureText(it), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
-            TextButton(onClick = viewModel::refresh, enabled = !state.refreshing, modifier = Modifier.padding(horizontal = 8.dp)) {
-                Text(stringResource(R.string.action_refresh))
-            }
             when {
                 !state.loaded && state.failure == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 state.loaded && state.units.isEmpty() -> EmptyState(stringResource(R.string.kitchen_empty), stringResource(R.string.kitchen_empty_hint))
                 // En tablet (el uso típico en cocina) las comandas se acomodan en columnas; en teléfono queda una.
                 else -> LazyVerticalStaggeredGrid(
                     columns = StaggeredGridCells.Adaptive(minSize = 340.dp),
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(start = ScreenPadding, end = ScreenPadding, top = 4.dp, bottom = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalItemSpacing = 12.dp,
                 ) {
