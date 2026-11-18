@@ -58,7 +58,10 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -72,6 +75,7 @@ import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.MoneyDto
 import com.restia.mobile.core.network.OrderDto
 import com.restia.mobile.core.network.OrderItemDto
+import com.restia.mobile.ui.tables.MAX_GUESTS
 import com.restia.mobile.ui.tables.waitText
 import com.restia.mobile.ui.theme.BackHeader
 import com.restia.mobile.ui.theme.EmptyState
@@ -204,6 +208,79 @@ private fun CloseDialog(state: CloseState, tableNumber: Int, viewModel: TableVie
         },
         dismissButton = {
             TextButton(onClick = viewModel::dismissClose, enabled = !state.submitting) { Text(stringResource(R.string.cancel_back)) }
+        },
+    )
+}
+
+/** Texto de una falla al cambiar los comensales. */
+@StringRes
+fun guestsFailureText(failure: ApiFailure): Int? = when {
+    failure == ApiFailure.Network -> R.string.error_network
+    failure !is ApiFailure.Server -> R.string.error_unexpected
+    failure.status >= 500 -> R.string.error_server
+    failure.code == "VERSION_CONFLICT" -> R.string.guests_conflict
+    failure.code == "SESSION_NOT_ACTIVE" -> R.string.guests_inactive
+    failure.status == 403 -> R.string.error_action_forbidden
+    else -> null
+}
+
+@Composable
+private fun GuestsDialog(state: GuestsState, tableNumber: Int, viewModel: TableViewModel) {
+    AlertDialog(
+        onDismissRequest = viewModel::dismissGuests,
+        title = { Text(stringResource(R.string.guests_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.guests_body, tableNumber))
+                if (state.loading) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                } else if (state.version != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
+                    ) {
+                        val less = stringResource(R.string.guests_less)
+                        val more = stringResource(R.string.guests_more)
+                        OutlinedButton(
+                            onClick = { viewModel.setGuests(state.count - 1) },
+                            enabled = !state.submitting && state.count > 1,
+                            modifier = Modifier.semantics { contentDescription = less },
+                        ) {
+                            Text("−")
+                        }
+                        Text(
+                            state.count.toString(),
+                            style = MaterialTheme.typography.displaySmall,
+                            color = Restia.colors.heading,
+                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        )
+                        OutlinedButton(
+                            onClick = { viewModel.setGuests(state.count + 1) },
+                            enabled = !state.submitting && state.count < MAX_GUESTS,
+                            modifier = Modifier.semantics { contentDescription = more },
+                        ) {
+                            Text("+")
+                        }
+                    }
+                }
+                state.failure?.let {
+                    Text(
+                        guestsFailureText(it)?.let { id -> stringResource(id) } ?: (it as? ApiFailure.Server)?.message ?: stringResource(R.string.error_unexpected),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (!state.loading && state.version == null) {
+                TextButton(onClick = viewModel::retryGuests) { Text(stringResource(R.string.action_retry)) }
+            } else {
+                TextButton(onClick = viewModel::confirmGuests, enabled = state.canConfirm) { Text(stringResource(R.string.guests_confirm)) }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = viewModel::dismissGuests, enabled = !state.submitting) { Text(stringResource(R.string.cancel_back)) }
         },
     )
 }
@@ -537,6 +614,7 @@ fun TableScreen(
     canClose: Boolean,
     canViewCheck: Boolean,
     onBack: () -> Unit,
+    canChangeGuests: Boolean = false,
     onAddOrder: () -> Unit,
     onCheck: () -> Unit,
 ) {
@@ -571,13 +649,21 @@ fun TableScreen(
             onBack()
         }
     }
+    LaunchedEffect(state.guestsChanged) {
+        if (state.guestsChanged != null) {
+            delay(NOTICE_MILLIS)
+            viewModel.clearGuestsChanged()
+        }
+    }
     state.closing?.let { CloseDialog(it, tableNumber, viewModel) }
+    state.guests?.let { GuestsDialog(it, tableNumber, viewModel) }
     state.cancelling?.let { CancelDialog(it, viewModel) }
     state.voiding?.let { VoidDialog(it, viewModel) }
     var showActions by rememberSaveable { mutableStateOf(false) }
     val actions = buildList {
         if (canOrder) add(TableAction(R.drawable.ic_add, R.string.table_add_order, onAddOrder))
         if (canViewCheck) add(TableAction(R.drawable.ic_receipt, R.string.table_view_check, onCheck))
+        if (canChangeGuests) add(TableAction(R.drawable.ic_guests, R.string.table_change_guests, viewModel::startGuests))
     }
     val closeAction = if (canClose && !state.busy) viewModel::startClose else null
     if (showActions) TableActionsSheet(tableNumber, actions, closeAction) { showActions = false }
@@ -599,7 +685,10 @@ fun TableScreen(
             },
         )
         Column(modifier = Modifier.weight(1f).readableWidth()) {
-            Row(modifier = Modifier.padding(horizontal = ScreenPadding).padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.padding(horizontal = ScreenPadding).padding(bottom = if (state.guestCount == null) 12.dp else 0.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
                     stringResource(R.string.table_title, tableNumber),
                     style = MaterialTheme.typography.headlineSmall.copy(fontSize = 23.sp, lineHeight = 32.sp),
@@ -608,12 +697,21 @@ fun TableScreen(
                 )
                 stage?.let { StatusPill(stringResource(ROUND_STEPS[it]), stageTone(it)) }
             }
+            state.guestCount?.let {
+                Text(
+                    pluralStringResource(R.plurals.table_guests, it, it),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = ScreenPadding).padding(bottom = 12.dp),
+                )
+            }
             val notices = buildList {
                 state.failure?.let { add(stringResource(if (state.loaded) R.string.tables_stale else R.string.table_not_loaded) + " " + loadFailureText(it) to true) }
                 state.actionFailure?.let { add(failureText(it, state.failedAction) to true) }
                 if (state.sent) add(stringResource(R.string.order_sent, tableNumber) to false)
                 state.cancelled?.let { add(pluralStringResource(R.plurals.cancel_done, it, it) to false) }
                 state.voided?.let { add(pluralStringResource(R.plurals.void_done, it, it) to false) }
+                state.guestsChanged?.let { add(pluralStringResource(R.plurals.guests_changed, it, it) to false) }
             }
             notices.forEach { (text, error) ->
                 Text(

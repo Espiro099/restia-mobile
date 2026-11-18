@@ -3,6 +3,7 @@ package com.restia.mobile
 import com.restia.mobile.core.network.ApprovalData
 import com.restia.mobile.core.network.ApprovalRequest
 import com.restia.mobile.core.network.CleaningConfirmationRequest
+import com.restia.mobile.core.network.TableSessionUpdateRequest
 import com.restia.mobile.core.network.CashRegisterDto
 import com.restia.mobile.core.network.CashShiftDto
 import com.restia.mobile.core.network.CashMovementCreateRequest
@@ -169,6 +170,8 @@ open class UnusedSessionApi : SessionApi {
     override suspend fun updateCustomer(branchId: String, customerId: String, ifMatch: String, body: CustomerUpdateRequest): Envelope<CustomerDto> =
         error("sin uso")
     override suspend fun getTableSession(branchId: String, sessionId: String): Envelope<TableSessionDto> = error("sin uso")
+    override suspend fun updateTableSession(branchId: String, sessionId: String, ifMatch: String, body: TableSessionUpdateRequest): Envelope<TableSessionDto> =
+        error("sin uso")
     override suspend fun closeTableSession(branchId: String, sessionId: String, ifMatch: String): Envelope<TableSessionDto> = error("sin uso")
     override suspend fun confirmCleaning(branchId: String, sessionId: String, tableId: String, body: CleaningConfirmationRequest): Envelope<TableSessionDto> =
         error("sin uso")

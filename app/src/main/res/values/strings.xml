@@ -633,4 +633,20 @@
     <string name="review_confirm">Confirmar cobro · %1$s</string>
     <string name="review_back">Volver a la cuenta</string>
     <string name="review_no_tip">Sin propina</string>
+    <string name="table_change_guests">Cambiar comensales</string>
+    <string name="guests_title">Comensales</string>
+    <string name="guests_body">¿Cuántas personas hay en la mesa %1$d?</string>
+    <string name="guests_confirm">Guardar</string>
+    <string name="guests_conflict">Alguien más cambió la mesa. Ya ves los datos actuales; guarda de nuevo si sigue igual.</string>
+    <string name="guests_inactive">La mesa ya se cerró.</string>
+    <string name="guests_less">Quitar un comensal</string>
+    <string name="guests_more">Agregar un comensal</string>
+    <plurals name="table_guests">
+        <item quantity="one">%1$d comensal</item>
+        <item quantity="other">%1$d comensales</item>
+    </plurals>
+    <plurals name="guests_changed">
+        <item quantity="one">Ahora la mesa tiene %1$d comensal.</item>
+        <item quantity="other">Ahora la mesa tiene %1$d comensales.</item>
+    </plurals>
 </resources>

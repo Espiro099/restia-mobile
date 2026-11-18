@@ -373,6 +373,7 @@ fun BranchHome(
             canClose = "table_sessions.close" in permissions,
             canViewCheck = "checks.read" in permissions,
             onBack = { sessionId = null },
+            canChangeGuests = "table_sessions.update" in permissions,
             onAddOrder = { capturing = true },
             onCheck = { viewingCheck = true },
         )
