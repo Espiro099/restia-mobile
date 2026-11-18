@@ -20,8 +20,8 @@ import org.junit.Test
 
 /** Fotos del menú: solo HTTPS, sin la sesión y con el anclaje del host de la API. */
 class ImageClientTest {
-    private val cert = HeldCertificate.Builder().commonName("localhost").addSubjectAlternativeName("127.0.0.1").build()
-    private val other = HeldCertificate.Builder().commonName("localhost").addSubjectAlternativeName("127.0.0.1").build()
+    private val cert = HeldCertificate.Builder().commonName("localhost").addSubjectAlternativeName("localhost").addSubjectAlternativeName("127.0.0.1").build()
+    private val other = HeldCertificate.Builder().commonName("localhost").addSubjectAlternativeName("localhost").addSubjectAlternativeName("127.0.0.1").build()
     private val server = MockWebServer()
 
     @After fun tearDown() = server.shutdown()

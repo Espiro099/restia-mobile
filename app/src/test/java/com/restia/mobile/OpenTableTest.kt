@@ -127,7 +127,7 @@ class OpenTableTest {
         submitAndWait()
         assertEquals(ApiFailure.Network, vm.state.value.opening?.failure)
         submitAndWait()
-        assertEquals(2, posts.size)
+        assertEquals("estado: ${vm.state.value.opening}; peticiones al servidor: ${server.requestCount}", 2, posts.size)
         assertEquals(posts[0].getHeader("Idempotency-Key"), posts[1].getHeader("Idempotency-Key"))
         assertNull(vm.state.value.opening)
     }

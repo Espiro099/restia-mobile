@@ -145,7 +145,9 @@ class CustomersFlowTest {
         vm.submit()
         waitFor { vm.state.value.form?.failure != null }
         vm.submit()
-        waitFor { vm.state.value.saved }
+        val end = System.currentTimeMillis() + 5000
+        while (!vm.state.value.saved && System.currentTimeMillis() < end) Thread.sleep(10)
+        assertTrue("formulario: ${vm.state.value.form?.failure}; peticiones: ${requests.map { it.first.method + " " + it.first.path }}", vm.state.value.saved)
         val creates = sent("/branches/b1/customers")
         assertEquals(2, creates.size)
         assertEquals(creates[0].first.getHeader("Idempotency-Key"), creates[1].first.getHeader("Idempotency-Key"))
