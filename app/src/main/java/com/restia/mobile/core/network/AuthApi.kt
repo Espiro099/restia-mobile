@@ -608,4 +608,23 @@ interface SessionApi {
     /** Solo un ADMIN de todas las sucursales del usuario; invalida el enlace anterior. */
     @POST("users/{userId}/password-setup-link")
     suspend fun passwordSetupLink(@Path("userId") userId: String): Envelope<PasswordSetupLinkDto>
+
+    /** 201; vence en 15 min y sirve una sola vez. Límite de 10 por usuario. */
+    @POST("branches/{branchId}/devices/enrollment-codes")
+    suspend fun createEnrollmentCode(@Path("branchId") branchId: String): Envelope<EnrollmentCodeDto>
+
+    @GET("branches/{branchId}/devices")
+    suspend fun listDevices(
+        @Path("branchId") branchId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<DeviceDto>
+
+    /** 204; final e idempotente. Solo cambia uno ACTIVE y cierra sus sesiones. */
+    @POST("branches/{branchId}/devices/{deviceId}/block")
+    suspend fun blockDevice(@Path("branchId") branchId: String, @Path("deviceId") deviceId: String, @Body body: ReasonRequest): Response<Unit>
+
+    /** 204; como bloquear, para un equipo que ya no se usa. */
+    @POST("branches/{branchId}/devices/{deviceId}/retire")
+    suspend fun retireDevice(@Path("branchId") branchId: String, @Path("deviceId") deviceId: String, @Body body: ReasonRequest): Response<Unit>
 }

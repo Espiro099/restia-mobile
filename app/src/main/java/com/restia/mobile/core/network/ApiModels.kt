@@ -30,7 +30,20 @@ data class ErrorBody(
 data class DeviceEnrollRequest(val code: String, val deviceUuid: String, val displayName: String)
 
 @Serializable
-data class DeviceDto(val id: String, val branchId: String, val status: String, val displayName: String)
+data class DeviceDto(
+    val id: String,
+    val branchId: String,
+    val status: String,
+    val displayName: String,
+    val type: String? = null,
+    val enrolledAt: String? = null,
+    val lastSeenAt: String? = null,
+    val version: Int = 0,
+)
+
+/** Código de un solo uso para dar de alta un teléfono; se escribe en la pantalla de alta. */
+@Serializable
+data class EnrollmentCodeDto(val code: String, val expiresAt: String)
 
 @Serializable
 data class DeviceEnrollData(val device: DeviceDto, val deviceCredential: String)

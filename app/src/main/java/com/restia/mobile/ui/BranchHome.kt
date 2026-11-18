@@ -14,6 +14,9 @@ import com.restia.mobile.ui.account.ChangePasswordScreen
 import com.restia.mobile.ui.account.ChangePasswordViewModel
 import com.restia.mobile.ui.account.SessionsScreen
 import com.restia.mobile.ui.account.SessionsViewModel
+import com.restia.mobile.ui.devices.DevicePermissions
+import com.restia.mobile.ui.devices.DevicesScreen
+import com.restia.mobile.ui.devices.DevicesViewModel
 import com.restia.mobile.ui.cash.CashPermissions
 import com.restia.mobile.ui.cash.CashScreen
 import com.restia.mobile.ui.cash.CashViewModel
@@ -77,6 +80,8 @@ fun BranchHome(
     var inReservations by rememberSaveable { mutableStateOf(false) }
     var inNotifications by rememberSaveable { mutableStateOf(false) }
     var inSessions by rememberSaveable { mutableStateOf(false) }
+    var inDevices by rememberSaveable { mutableStateOf(false) }
+    val showDevices = "devices.read" in permissions
     // Ver montos y movimientos exige cash.read; quien solo tiene cash.read_open (mesero) no entra.
     val showCash = "cash.read" in permissions
     var inPrinting by rememberSaveable { mutableStateOf(false) }
@@ -92,6 +97,20 @@ fun BranchHome(
                 ),
             ),
             onBack = { inPrinting = false },
+        )
+        return
+    }
+    if (inDevices && showDevices) {
+        DevicesScreen(
+            viewModel = viewModel(
+                key = "dispositivos-$userId-$branchId",
+                factory = DevicesViewModel.Factory(
+                    repositories.devices,
+                    branchId,
+                    DevicePermissions(enroll = "devices.enroll" in permissions, manage = "devices.manage" in permissions),
+                ),
+            ),
+            onBack = { inDevices = false },
         )
         return
     }
@@ -337,6 +356,7 @@ fun BranchHome(
                         if (showCash) add(MoreOption(R.drawable.ic_card, R.string.cash_title) { inCash = true })
                         if (showPrinting) add(MoreOption(R.drawable.ic_receipt, R.string.print_title) { inPrinting = true })
                         if (showStaff) add(MoreOption(R.drawable.ic_guests, R.string.staff_title) { inStaff = true })
+                        if (showDevices) add(MoreOption(R.drawable.ic_phone, R.string.devices_title) { inDevices = true })
                         if ("customers.read" in permissions) {
                             add(MoreOption(R.drawable.ic_person, R.string.customers_title) {
                                 customerId = null
