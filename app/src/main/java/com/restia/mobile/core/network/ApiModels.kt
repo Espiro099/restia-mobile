@@ -130,6 +130,29 @@ data class NotificationPageDto(val data: List<NotificationDto>, val meta: Notifi
 @Serializable
 data class NotificationsReadDto(val updated: Int, val unreadCount: Int)
 
+/** Una sesión propia: ANDROID o WEB, ACTIVE, REVOKED o EXPIRED. */
+@Serializable
+data class AuthSessionDto(
+    val id: String,
+    val clientType: String,
+    val status: String,
+    val current: Boolean = false,
+    val deviceId: String? = null,
+    val createdAt: String,
+    val lastActivityAt: String,
+    val absoluteExpiresAt: String,
+    val revokedAt: String? = null,
+)
+
+/** Solo lo que cambia; con explicitNulls = false lo null no se envía. Notas vacías las borran. */
+@Serializable
+data class ReservationUpdateRequest(
+    val startAt: String? = null,
+    val endAt: String? = null,
+    val partySize: Int? = null,
+    val notes: String? = null,
+)
+
 @Serializable
 data class ProductAvailabilityRequest(val availability: String)
 

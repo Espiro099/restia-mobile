@@ -8,6 +8,7 @@ import com.restia.mobile.core.network.QueueEntryDto
 import com.restia.mobile.core.network.ReasonRequest
 import com.restia.mobile.core.network.ReservationCreateRequest
 import com.restia.mobile.core.network.ReservationDto
+import com.restia.mobile.core.network.ReservationUpdateRequest
 import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.apiCall
 import kotlinx.serialization.json.JsonObject
@@ -35,6 +36,9 @@ class ReservationsRepository(private val api: SessionApi) {
 
     suspend fun create(branchId: String, idempotencyKey: String, body: ReservationCreateRequest): ApiResult<ReservationDto> =
         apiCall { api.createReservation(branchId, idempotencyKey, body).data }
+
+    suspend fun update(branchId: String, r: ReservationDto, key: String, body: ReservationUpdateRequest): ApiResult<ReservationDto> =
+        apiCall { api.updateReservation(branchId, r.id, "\"${r.version}\"", key, body).data }
 
     suspend fun confirm(branchId: String, r: ReservationDto, key: String) = action(branchId, r, "confirm", key, EMPTY)
 

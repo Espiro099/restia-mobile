@@ -12,6 +12,8 @@ import com.restia.mobile.R
 import com.restia.mobile.Repositories
 import com.restia.mobile.ui.account.ChangePasswordScreen
 import com.restia.mobile.ui.account.ChangePasswordViewModel
+import com.restia.mobile.ui.account.SessionsScreen
+import com.restia.mobile.ui.account.SessionsViewModel
 import com.restia.mobile.ui.cash.CashPermissions
 import com.restia.mobile.ui.cash.CashScreen
 import com.restia.mobile.ui.cash.CashViewModel
@@ -74,6 +76,7 @@ fun BranchHome(
     var inCash by rememberSaveable { mutableStateOf(false) }
     var inReservations by rememberSaveable { mutableStateOf(false) }
     var inNotifications by rememberSaveable { mutableStateOf(false) }
+    var inSessions by rememberSaveable { mutableStateOf(false) }
     // Ver montos y movimientos exige cash.read; quien solo tiene cash.read_open (mesero) no entra.
     val showCash = "cash.read" in permissions
     var inPrinting by rememberSaveable { mutableStateOf(false) }
@@ -89,6 +92,13 @@ fun BranchHome(
                 ),
             ),
             onBack = { inPrinting = false },
+        )
+        return
+    }
+    if (inSessions) {
+        SessionsScreen(
+            viewModel = viewModel(key = "sesiones-$userId", factory = SessionsViewModel.Factory(repositories.sessions)),
+            onBack = { inSessions = false },
         )
         return
     }
@@ -170,6 +180,7 @@ fun BranchHome(
                 seat = "reservations.check_in" in permissions,
                 cancel = "reservations.cancel" in permissions,
                 noShow = "reservations.mark_no_show" in permissions,
+                update = "reservations.update" in permissions,
                 overridePriority = "reservations.override_priority" in permissions,
             ),
             onBack = { inReservations = false },
@@ -334,6 +345,7 @@ fun BranchHome(
                         }
                     },
                     onChangePassword = { changingPassword = true },
+                    onSessions = { inSessions = true },
                     logoutEnabled = logoutEnabled,
                     onLogout = onLogout,
                 )
