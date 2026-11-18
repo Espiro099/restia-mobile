@@ -458,6 +458,23 @@ interface SessionApi {
         @Path("sessionId") sessionId: String,
     ): Envelope<TableSessionDto>
 
+    /** Avisos propios en la sucursal, los más recientes primero; `meta.unreadCount` da los no leídos. */
+    @GET("branches/{branchId}/notifications")
+    suspend fun listNotifications(
+        @Path("branchId") branchId: String,
+        @Query("perPage") perPage: Int,
+    ): NotificationPageDto
+
+    /** Sin If-Match: marcarlo dos veces deja lo mismo. */
+    @POST("branches/{branchId}/notifications/{notificationId}/read")
+    suspend fun readNotification(
+        @Path("branchId") branchId: String,
+        @Path("notificationId") notificationId: String,
+    ): Envelope<NotificationDto>
+
+    @POST("branches/{branchId}/notifications/read-all")
+    suspend fun readAllNotifications(@Path("branchId") branchId: String): Envelope<NotificationsReadDto>
+
     /** Con If-Match: repetirlo con la versión vieja responde 409, no se aplica dos veces. */
     @PATCH("branches/{branchId}/table-sessions/{sessionId}")
     suspend fun updateTableSession(

@@ -649,4 +649,17 @@
         <item quantity="one">Ahora la mesa tiene %1$d comensal.</item>
         <item quantity="other">Ahora la mesa tiene %1$d comensales.</item>
     </plurals>
+    <string name="notices_title">Avisos</string>
+    <string name="notices_pending">Por atender</string>
+    <string name="notices_mark_all">Marcar leídos</string>
+    <string name="notices_today">Hoy · %1$s</string>
+    <string name="notices_yesterday">Ayer · %1$s</string>
+    <string name="notices_earlier">Anteriores</string>
+    <string name="notices_empty">Sin avisos</string>
+    <string name="notices_empty_hint">Aquí verás cuando una orden esté lista, pidan una cuenta o se resuelva un pago con terminal.</string>
+    <string name="notices_bell">Avisos</string>
+    <plurals name="notices_bell_unread">
+        <item quantity="one">Avisos, %1$d sin leer</item>
+        <item quantity="other">Avisos, %1$d sin leer</item>
+    </plurals>
 </resources>
