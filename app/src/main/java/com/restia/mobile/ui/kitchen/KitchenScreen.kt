@@ -1,5 +1,15 @@
 package com.restia.mobile.ui.kitchen
 
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.semantics.Role
+import com.restia.mobile.core.network.StationDto
+import com.restia.mobile.ui.orders.REASON_MIN
+import kotlinx.coroutines.delay
 import androidx.annotation.StringRes
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -75,7 +85,7 @@ private fun ticketTime(iso: String): String? {
 }
 
 @Composable
-private fun LineRow(line: KitchenLine, canPrepare: Boolean, working: Boolean, onStart: () -> Unit, onReady: () -> Unit) {
+private fun LineRow(line: KitchenLine, canPrepare: Boolean, working: Boolean, onStart: () -> Unit, onReady: () -> Unit, onMove: (() -> Unit)? = null) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(line.units.size.toString(), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), modifier = Modifier.align(Alignment.Top))
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -92,21 +102,79 @@ private fun LineRow(line: KitchenLine, canPrepare: Boolean, working: Boolean, on
                 if (line.ready > 0) StatusPill(pluralStringResource(R.plurals.kitchen_ready_waiting, line.ready, line.ready), Restia.colors.free)
             }
         }
-        if (canPrepare) {
+        if (canPrepare || onMove != null) {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (line.pending.isNotEmpty()) {
+                if (canPrepare && line.pending.isNotEmpty()) {
                     OutlinedButton(onClick = onStart, enabled = !working, shape = MaterialTheme.shapes.medium) { Text(stringResource(R.string.kitchen_start)) }
                 }
-                if (line.preparing.isNotEmpty()) {
+                if (canPrepare && line.preparing.isNotEmpty()) {
                     Button(onClick = onReady, enabled = !working, shape = MaterialTheme.shapes.medium) { Text(stringResource(R.string.kitchen_ready)) }
+                }
+                // Solo lo que nadie ha empezado se puede mover de estación.
+                if (onMove != null && line.pending.isNotEmpty()) {
+                    TextButton(onClick = onMove, enabled = !working) { Text(stringResource(R.string.reassign_action)) }
                 }
             }
         }
     }
 }
 
+/** Texto de una falla al mover de estación. */
+@StringRes
+fun reassignFailureText(failure: ApiFailure): Int? = when {
+    failure == ApiFailure.Network -> R.string.error_network
+    failure !is ApiFailure.Server -> R.string.error_unexpected
+    failure.status >= 500 -> R.string.error_server
+    failure.code == "ORDER_UNIT_INVALID_STATE" || failure.code == "VERSION_CONFLICT" -> R.string.reassign_started
+    failure.status == 403 -> R.string.error_action_forbidden
+    else -> null
+}
+
 @Composable
-private fun TicketCard(ticket: KitchenTicket, canPrepare: Boolean, working: Boolean, viewModel: KitchenViewModel) {
+private fun ReassignDialog(state: ReassignState, stations: List<StationDto>, viewModel: KitchenViewModel) {
+    // Las estaciones a donde se puede mover: todas menos en la que ya está.
+    val current = state.line.units.map { it.stationId }.toSet()
+    val targets = stations.filter { it.id !in current }
+    AlertDialog(
+        onDismissRequest = viewModel::dismissReassign,
+        title = { Text(stringResource(R.string.reassign_title, state.line.productName)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(pluralStringResource(R.plurals.reassign_body, state.line.pending.size, state.line.pending.size))
+                targets.forEach { station ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .selectable(state.stationId == station.id, enabled = !state.submitting, role = Role.RadioButton) { viewModel.selectReassignStation(station.id) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = state.stationId == station.id, onClick = null, enabled = !state.submitting)
+                        Text(station.name, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                OutlinedTextField(
+                    value = state.reason,
+                    onValueChange = viewModel::setReassignReason,
+                    label = { Text(stringResource(R.string.cancel_reason)) },
+                    supportingText = { Text(stringResource(R.string.cancel_reason_hint, REASON_MIN)) },
+                    enabled = !state.submitting,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (state.moved > 0) Text(pluralStringResource(R.plurals.reassign_partial, state.moved, state.moved), style = MaterialTheme.typography.bodySmall)
+                state.failure?.let {
+                    Text(
+                        reassignFailureText(it)?.let { id -> stringResource(id) } ?: (it as? ApiFailure.Server)?.message ?: stringResource(R.string.error_unexpected),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = viewModel::confirmReassign, enabled = state.canConfirm) { Text(stringResource(R.string.reassign_confirm)) } },
+        dismissButton = { TextButton(onClick = viewModel::dismissReassign, enabled = !state.submitting) { Text(stringResource(R.string.cancel_back)) } },
+    )
+}
+
+@Composable
+private fun TicketCard(ticket: KitchenTicket, canPrepare: Boolean, working: Boolean, viewModel: KitchenViewModel, canMove: Boolean = false) {
     GroupCard {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -121,7 +189,7 @@ private fun TicketCard(ticket: KitchenTicket, canPrepare: Boolean, working: Bool
             }
             Separator()
             ticket.lines.forEach { line ->
-                LineRow(line, canPrepare, working, { viewModel.start(line) }, { viewModel.ready(line) })
+                LineRow(line, canPrepare, working, { viewModel.start(line) }, { viewModel.ready(line) }, if (canMove) ({ viewModel.startReassign(line) }) else null)
             }
             // Atajo para una comanda con varias partidas.
             if (canPrepare && ticket.lines.size > 1) {
@@ -153,12 +221,22 @@ fun KitchenScreen(
     onCash: () -> Unit = {},
     showPrinting: Boolean = false,
     onPrinting: () -> Unit = {},
+    /** `order_units.reassign`: mover lo pendiente a otra estación. */
+    canReassign: Boolean = false,
 ) {
     val state by viewModel.state.collectAsState()
     LifecycleStartEffect(viewModel) {
         viewModel.startPolling()
         onStopOrDispose { viewModel.stopPolling() }
     }
+    state.reassigning?.let { ReassignDialog(it, state.stations, viewModel) }
+    LaunchedEffect(state.reassigned) {
+        if (state.reassigned != null) {
+            delay(5_000)
+            viewModel.clearReassigned()
+        }
+    }
+    val canMove = canReassign && state.stations.size > 1
     Column(modifier = Modifier.fillMaxSize()) {
         ScreenHeader(stringResource(R.string.kitchen_title)) {
             if (!inTabs) {
@@ -195,6 +273,14 @@ fun KitchenScreen(
             state.actionFailure?.let {
                 Text(failureText(it), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
+            state.reassigned?.let { (count, station) ->
+                Text(
+                    pluralStringResource(R.plurals.reassign_done, count, count, station),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Restia.colors.free,
+                    modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 4.dp),
+                )
+            }
             when {
                 !state.loaded && state.failure == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 state.loaded && state.units.isEmpty() -> EmptyState(stringResource(R.string.kitchen_empty), stringResource(R.string.kitchen_empty_hint))
@@ -205,7 +291,7 @@ fun KitchenScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalItemSpacing = 12.dp,
                 ) {
-                    items(state.tickets, key = { it.orderId }) { ticket -> TicketCard(ticket, canPrepare, state.working, viewModel) }
+                    items(state.tickets, key = { it.orderId }) { ticket -> TicketCard(ticket, canPrepare, state.working, viewModel, canMove) }
                 }
             }
         }

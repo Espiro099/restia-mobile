@@ -3,6 +3,7 @@ package com.restia.mobile.data.kitchen
 import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.ApiResult
 import com.restia.mobile.core.network.KitchenUnitDto
+import com.restia.mobile.core.network.OrderUnitReassignRequest
 import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.StationDto
 import com.restia.mobile.core.network.UnitTransitionRequest
@@ -69,6 +70,10 @@ class KitchenRepository(private val api: SessionApi) {
     /** PREPARING → READY: el mesero ya puede llevarlo. */
     suspend fun ready(branchId: String, idempotencyKey: String, units: List<UnitVersion>): ApiResult<Unit> =
         transition(branchId, idempotencyKey, UnitTransitionRequest("READY", units))
+
+    /** Una unidad PENDING a otra estación; con If-Match, repetirla con la versión vieja responde 409. */
+    suspend fun reassign(branchId: String, unit: UnitVersion, stationId: String, reason: String): ApiResult<Unit> =
+        apiCall { api.reassignOrderUnitStation(branchId, unit.id, "\"${unit.version}\"", OrderUnitReassignRequest(stationId, reason)).close() }
 
     private suspend fun transition(branchId: String, idempotencyKey: String, body: UnitTransitionRequest): ApiResult<Unit> =
         apiCall { api.transitionUnits(branchId, idempotencyKey, body).close() }

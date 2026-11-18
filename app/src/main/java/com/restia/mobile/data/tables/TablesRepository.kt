@@ -7,6 +7,9 @@ import com.restia.mobile.core.network.CleaningConfirmationRequest
 import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.TableDto
 import com.restia.mobile.core.network.TableSessionDto
+import com.restia.mobile.core.network.ReasonRequest
+import com.restia.mobile.core.network.TableReleaseRequest
+import com.restia.mobile.core.network.TableSessionAddTablesRequest
 import com.restia.mobile.core.network.TableSessionOpenRequest
 import com.restia.mobile.core.network.TableSessionUpdateRequest
 import com.restia.mobile.core.network.apiCall
@@ -66,6 +69,16 @@ class TablesRepository(private val api: SessionApi, private val cache: BlobStore
 
     suspend fun session(branchId: String, sessionId: String): ApiResult<TableSessionDto> =
         apiCall { api.getTableSession(branchId, sessionId).data }
+
+    /** Junta mesas con la versión que se leyó; si la sesión cambió, responde 409 y se vuelve a intentar con lo nuevo. */
+    suspend fun addTables(branchId: String, sessionId: String, version: Int, tableIds: List<String>): ApiResult<TableSessionDto> =
+        apiCall { api.addTablesToSession(branchId, sessionId, "\"$version\"", TableSessionAddTablesRequest(tableIds)).data }
+
+    suspend fun releaseTable(branchId: String, sessionId: String, version: Int, tableId: String, requiresCleaning: Boolean): ApiResult<TableSessionDto> =
+        apiCall { api.releaseTableFromSession(branchId, sessionId, tableId, "\"$version\"", TableReleaseRequest(requiresCleaning)).data }
+
+    suspend fun cancelSession(branchId: String, sessionId: String, version: Int, reason: String): ApiResult<TableSessionDto> =
+        apiCall { api.cancelTableSession(branchId, sessionId, "\"$version\"", ReasonRequest(reason)).data }
 
     /** Cambia los comensales con la versión que se leyó; si otro empleado cambió la sesión, responde 409. */
     suspend fun updateGuests(branchId: String, sessionId: String, version: Int, guestCount: Int): ApiResult<TableSessionDto> =

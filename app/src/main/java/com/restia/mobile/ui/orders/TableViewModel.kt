@@ -86,6 +86,22 @@ data class VoidState(
 /** Confirmación de cierre (T-4): la mesa queda por limpiar. */
 data class CloseState(val submitting: Boolean = false, val failure: ApiFailure? = null)
 
+const val NOTES_MAX = 500
+
+/** Una partida admite cambios de nota mientras cocina no la empiece: todas sus unidades PENDING. */
+fun notesEditable(item: OrderItemDto): Boolean = item.units.isNotEmpty() && item.units.all { it.status == "PENDING" }
+
+/** Editar la nota de una partida; vacía la borra. */
+data class NotesState(
+    val orderId: String,
+    val item: OrderItemDto,
+    val text: String = item.notes.orEmpty(),
+    val submitting: Boolean = false,
+    val failure: ApiFailure? = null,
+) {
+    val canConfirm: Boolean get() = !submitting && text.trim() != item.notes.orEmpty().trim() && text.length <= NOTES_MAX
+}
+
 /**
  * Cambio de comensales. Se lee la sesión al abrir el diálogo para tener la versión que pide el
  * If-Match; sin ella no se puede enviar.
@@ -125,11 +141,14 @@ data class TableUiState(
     val guests: GuestsState? = null,
     /** A cuántos comensales se acaba de cambiar, para el aviso. */
     val guestsChanged: Int? = null,
+    val notes: NotesState? = null,
+    /** Nombre del platillo cuya nota se acaba de guardar, para el aviso. */
+    val notesSaved: String? = null,
 ) {
     val readyCount: Int get() = orders.sumOf { order -> readyUnits(order.items).size }
     val busy: Boolean
         get() = delivering || cancelling?.submitting == true || voiding?.submitting == true || closing?.submitting == true ||
-            guests?.submitting == true
+            guests?.submitting == true || notes?.submitting == true
 }
 
 class TableViewModel(
@@ -484,6 +503,46 @@ class TableViewModel(
                 }
             }
         }
+    }
+
+    fun startNotes(order: OrderDto, item: OrderItemDto) {
+        if (_state.value.busy || !notesEditable(item)) return
+        _state.value = _state.value.copy(notes = NotesState(order.id, item), notesSaved = null, actionFailure = null)
+    }
+
+    fun setNotes(text: String) {
+        val current = _state.value.notes ?: return
+        if (current.submitting) return
+        _state.value = _state.value.copy(notes = current.copy(text = text.take(NOTES_MAX), failure = null))
+    }
+
+    fun dismissNotes() {
+        if (_state.value.notes?.submitting == true) return
+        _state.value = _state.value.copy(notes = null)
+    }
+
+    fun confirmNotes() {
+        val current = _state.value.notes ?: return
+        if (!current.canConfirm) return
+        _state.value = _state.value.copy(notes = current.copy(submitting = true, failure = null))
+        viewModelScope.launch {
+            val text = current.text.trim().ifEmpty { null }
+            when (val r = repository.updateNotes(branchId, current.orderId, current.item.id, current.item.version, text)) {
+                is ApiResult.Success -> _state.value = _state.value.copy(notes = null, notesSaved = current.item.name)
+                // Cocina la empezó o alguien más la cambió: el diálogo lo explica y la lista se actualiza.
+                is ApiResult.Failure -> _state.value = _state.value.copy(notes = current.copy(submitting = false, failure = r.failure))
+            }
+            load()
+            // Con la versión nueva, el siguiente intento ya no choca.
+            _state.value.notes?.let { open ->
+                val fresh = _state.value.orders.firstOrNull { it.id == open.orderId }?.items?.firstOrNull { it.id == open.item.id }
+                if (fresh != null) _state.value = _state.value.copy(notes = open.copy(item = fresh))
+            }
+        }
+    }
+
+    fun clearNotesSaved() {
+        _state.value = _state.value.copy(notesSaved = null)
     }
 
     fun clearGuestsChanged() {

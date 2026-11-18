@@ -4,6 +4,11 @@ import com.restia.mobile.core.network.ApprovalData
 import com.restia.mobile.core.network.ApprovalRequest
 import com.restia.mobile.core.network.CleaningConfirmationRequest
 import com.restia.mobile.core.network.TableSessionUpdateRequest
+import com.restia.mobile.core.network.TableSessionAddTablesRequest
+import com.restia.mobile.core.network.TableReleaseRequest
+import com.restia.mobile.core.network.OrderUnitReassignRequest
+import com.restia.mobile.core.network.ProductAvailabilityRequest
+import com.restia.mobile.core.network.OrderItemUpdateRequest
 import com.restia.mobile.core.network.NotificationDto
 import com.restia.mobile.core.network.NotificationPageDto
 import com.restia.mobile.core.network.NotificationsReadDto
@@ -178,6 +183,15 @@ open class UnusedSessionApi : SessionApi {
     override suspend fun readAllNotifications(branchId: String): Envelope<NotificationsReadDto> = error("sin uso")
     override suspend fun updateTableSession(branchId: String, sessionId: String, ifMatch: String, body: TableSessionUpdateRequest): Envelope<TableSessionDto> =
         error("sin uso")
+    override suspend fun updateOrderItemNotes(branchId: String, orderId: String, itemId: String, ifMatch: String, body: OrderItemUpdateRequest): Envelope<OrderDto> =
+        error("sin uso")
+    override suspend fun setProductAvailability(branchId: String, productId: String, body: ProductAvailabilityRequest): ResponseBody = error("sin uso")
+    override suspend fun reassignOrderUnitStation(branchId: String, unitId: String, ifMatch: String, body: OrderUnitReassignRequest): ResponseBody = error("sin uso")
+    override suspend fun addTablesToSession(branchId: String, sessionId: String, ifMatch: String, body: TableSessionAddTablesRequest): Envelope<TableSessionDto> =
+        error("sin uso")
+    override suspend fun releaseTableFromSession(branchId: String, sessionId: String, tableId: String, ifMatch: String, body: TableReleaseRequest): Envelope<TableSessionDto> =
+        error("sin uso")
+    override suspend fun cancelTableSession(branchId: String, sessionId: String, ifMatch: String, body: ReasonRequest): Envelope<TableSessionDto> = error("sin uso")
     override suspend fun closeTableSession(branchId: String, sessionId: String, ifMatch: String): Envelope<TableSessionDto> = error("sin uso")
     override suspend fun confirmCleaning(branchId: String, sessionId: String, tableId: String, body: CleaningConfirmationRequest): Envelope<TableSessionDto> =
         error("sin uso")

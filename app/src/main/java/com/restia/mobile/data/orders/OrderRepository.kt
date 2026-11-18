@@ -5,6 +5,7 @@ import com.restia.mobile.core.network.ApiResult
 import com.restia.mobile.core.network.ApprovalData
 import com.restia.mobile.core.network.ApprovalRequest
 import com.restia.mobile.core.network.OrderCreateRequest
+import com.restia.mobile.core.network.OrderItemUpdateRequest
 import com.restia.mobile.core.network.OrderDto
 import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.UnitVersion
@@ -72,6 +73,10 @@ class OrderRepository(private val api: SessionApi) {
 
     private fun serverFailure(response: Response<*>) =
         parseError(response.code(), response.errorBody()?.string(), response.headers()["Retry-After"])
+
+    /** Cambia o borra (null) la nota de una partida con su versión; si cocina ya la empezó, 409. */
+    suspend fun updateNotes(branchId: String, orderId: String, itemId: String, version: Int, notes: String?): ApiResult<OrderDto> =
+        apiCall { api.updateOrderItemNotes(branchId, orderId, itemId, "\"$version\"", OrderItemUpdateRequest.of(notes)).data }
 
     suspend fun create(branchId: String, idempotencyKey: String, body: OrderCreateRequest): ApiResult<OrderDto> =
         apiCall { api.createOrder(branchId, idempotencyKey, body).data }

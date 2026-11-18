@@ -375,6 +375,7 @@ private fun ItemRow(
     onDeliver: () -> Unit,
     onCancel: () -> Unit,
     onVoid: () -> Unit,
+    onNotes: (() -> Unit)? = null,
 ) {
     val ready = readyUnits(listOf(item)).size
     val pending = pendingUnits(item).size
@@ -404,6 +405,9 @@ private fun ItemRow(
             if (canVoid && voidable > 0) {
                 TextButton(onClick = onVoid, enabled = !busy) { Text(stringResource(R.string.void_action)) }
             }
+            if (onNotes != null && notesEditable(item)) {
+                TextButton(onClick = onNotes, enabled = !busy) { Text(stringResource(R.string.notes_action)) }
+            }
         }
     }
 }
@@ -420,6 +424,7 @@ private fun RoundSection(
     onDeliver: (OrderItemDto) -> Unit,
     onCancel: (OrderItemDto) -> Unit,
     onVoid: (OrderItemDto) -> Unit,
+    onNotes: ((OrderDto, OrderItemDto) -> Unit)? = null,
 ) {
     val stage = roundStage(order)
     val time = roundTime(order.createdAt)
@@ -442,7 +447,7 @@ private fun RoundSection(
         }
         Separator()
         order.items.forEach { item ->
-            ItemRow(item, canDeliver, canCancel, canVoid, busy, { onDeliver(item) }, { onCancel(item) }, { onVoid(item) })
+            ItemRow(item, canDeliver, canCancel, canVoid, busy, { onDeliver(item) }, { onCancel(item) }, { onVoid(item) }, onNotes?.let { { it(order, item) } })
         }
         Separator()
         if (stage != null) {
@@ -498,6 +503,49 @@ private fun TableActionsSheet(tableNumber: Int, actions: List<TableAction>, onCl
             }
         }
     }
+}
+
+/** Texto de una falla al editar la nota. */
+@StringRes
+fun notesFailureText(failure: ApiFailure): Int? = when {
+    failure == ApiFailure.Network -> R.string.error_network
+    failure !is ApiFailure.Server -> R.string.error_unexpected
+    failure.status >= 500 -> R.string.error_server
+    failure.code == "ORDER_UNIT_INVALID_STATE" -> R.string.notes_started
+    failure.code == "VERSION_CONFLICT" -> R.string.notes_conflict
+    failure.status == 403 -> R.string.error_action_forbidden
+    else -> null
+}
+
+@Composable
+private fun NotesDialog(state: NotesState, viewModel: TableViewModel) {
+    AlertDialog(
+        onDismissRequest = viewModel::dismissNotes,
+        title = { Text(stringResource(R.string.notes_title, state.item.name)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.notes_body))
+                OutlinedTextField(
+                    value = state.text,
+                    onValueChange = viewModel::setNotes,
+                    label = { Text(stringResource(R.string.notes_label)) },
+                    supportingText = { Text("${state.text.length}/$NOTES_MAX") },
+                    enabled = !state.submitting && notesEditable(state.item),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                state.failure?.let {
+                    Text(
+                        notesFailureText(it)?.let { id -> stringResource(id) } ?: (it as? ApiFailure.Server)?.message ?: stringResource(R.string.error_unexpected),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = viewModel::confirmNotes, enabled = state.canConfirm && notesEditable(state.item)) { Text(stringResource(R.string.notes_confirm)) }
+        },
+        dismissButton = { TextButton(onClick = viewModel::dismissNotes, enabled = !state.submitting) { Text(stringResource(R.string.cancel_back)) } },
+    )
 }
 
 @Composable
@@ -617,8 +665,31 @@ fun TableScreen(
     canChangeGuests: Boolean = false,
     onAddOrder: () -> Unit,
     onCheck: () -> Unit,
+    /** Juntar, separar y anular; sin él, la hoja de acciones no los ofrece. */
+    session: SessionViewModel? = null,
+    canCancelSession: Boolean = false,
+    canEditNotes: Boolean = false,
 ) {
     val state by viewModel.state.collectAsState()
+    val sessionState = session?.state?.collectAsState()?.value
+    LaunchedEffect(session) { session?.load() }
+    LaunchedEffect(sessionState?.cancelled) {
+        if (sessionState?.cancelled == true) {
+            session.consumeCancelled()
+            onBack()
+        }
+    }
+    LaunchedEffect(sessionState?.joined, sessionState?.released) {
+        if (sessionState?.joined != null || sessionState?.released != null) {
+            delay(NOTICE_MILLIS)
+            session?.clearNotice()
+        }
+    }
+    if (session != null && sessionState != null) {
+        sessionState.joining?.let { JoinDialog(it, tableNumber, session) }
+        sessionState.releasing?.let { ReleaseDialog(it, sessionState.seated, session) }
+        sessionState.cancelling?.let { CancelSessionDialog(it, tableNumber, session) }
+    }
     BackHandler(onBack = onBack)
     LifecycleStartEffect(viewModel) {
         viewModel.startPolling()
@@ -657,6 +728,13 @@ fun TableScreen(
     }
     state.closing?.let { CloseDialog(it, tableNumber, viewModel) }
     state.guests?.let { GuestsDialog(it, tableNumber, viewModel) }
+    state.notes?.let { NotesDialog(it, viewModel) }
+    LaunchedEffect(state.notesSaved) {
+        if (state.notesSaved != null) {
+            delay(NOTICE_MILLIS)
+            viewModel.clearNotesSaved()
+        }
+    }
     state.cancelling?.let { CancelDialog(it, viewModel) }
     state.voiding?.let { VoidDialog(it, viewModel) }
     var showActions by rememberSaveable { mutableStateOf(false) }
@@ -664,6 +742,14 @@ fun TableScreen(
         if (canOrder) add(TableAction(R.drawable.ic_add, R.string.table_add_order, onAddOrder))
         if (canViewCheck) add(TableAction(R.drawable.ic_receipt, R.string.table_view_check, onCheck))
         if (canChangeGuests) add(TableAction(R.drawable.ic_guests, R.string.table_change_guests, viewModel::startGuests))
+        if (session != null && canChangeGuests) {
+            add(TableAction(R.drawable.ic_table, R.string.table_join, session::startJoin))
+            if (sessionState?.seated.orEmpty().size > 1) add(TableAction(R.drawable.ic_table, R.string.table_release, session::startRelease))
+        }
+        // Anular solo tiene sentido sin rondas; si las hay, el servidor responde SESSION_HAS_ACTIVITY.
+        if (session != null && canCancelSession && state.loaded && state.orders.isEmpty()) {
+            add(TableAction(R.drawable.ic_info, R.string.table_cancel_session, session::startCancel))
+        }
     }
     val closeAction = if (canClose && !state.busy) viewModel::startClose else null
     if (showActions) TableActionsSheet(tableNumber, actions, closeAction) { showActions = false }
@@ -698,8 +784,10 @@ fun TableScreen(
                 stage?.let { StatusPill(stringResource(ROUND_STEPS[it]), stageTone(it)) }
             }
             state.guestCount?.let {
+                val seated = sessionState?.seated.orEmpty()
+                val joined = if (seated.size > 1) " · " + stringResource(R.string.table_with, seated.joinToString(", ") { t -> t.number.toString() }) else ""
                 Text(
-                    pluralStringResource(R.plurals.table_guests, it, it),
+                    pluralStringResource(R.plurals.table_guests, it, it) + joined,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = ScreenPadding).padding(bottom = 12.dp),
@@ -712,6 +800,9 @@ fun TableScreen(
                 state.cancelled?.let { add(pluralStringResource(R.plurals.cancel_done, it, it) to false) }
                 state.voided?.let { add(pluralStringResource(R.plurals.void_done, it, it) to false) }
                 state.guestsChanged?.let { add(pluralStringResource(R.plurals.guests_changed, it, it) to false) }
+                sessionState?.joined?.let { add(pluralStringResource(R.plurals.join_done, it.size, it.joinToString(", ")) to false) }
+                sessionState?.released?.let { add(stringResource(R.string.release_done, it) to false) }
+                state.notesSaved?.let { add(stringResource(R.string.notes_saved, it) to false) }
             }
             notices.forEach { (text, error) ->
                 Text(
@@ -743,7 +834,10 @@ fun TableScreen(
                 ) {
                     val rounds = state.orders.withIndex().toList()
                     items(rounds, key = { it.value.id }) { (index, order) ->
-                        RoundSection(index + 1, order, canDeliver, canCancel, canVoid, state.busy, viewModel::deliverItem, viewModel::startCancel, viewModel::startVoid)
+                        RoundSection(
+                            index + 1, order, canDeliver, canCancel, canVoid, state.busy, viewModel::deliverItem, viewModel::startCancel, viewModel::startVoid,
+                            onNotes = if (canEditNotes) viewModel::startNotes else null,
+                        )
                     }
                 }
             }
