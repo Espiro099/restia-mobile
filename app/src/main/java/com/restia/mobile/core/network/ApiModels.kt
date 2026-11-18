@@ -101,6 +101,32 @@ data class TableSessionDto(
     val tables: List<SessionTableDto> = emptyList(),
 )
 
+/** Aviso de la campana: orden lista, cuenta solicitada o resultado de un pago con terminal. */
+@Serializable
+data class NotificationDto(
+    val id: String,
+    /** ORDER_READY, CHECK_REQUESTED, PAYMENT_CONFIRMED, PAYMENT_FAILED o PAYMENT_UNKNOWN. */
+    val type: String,
+    val title: String,
+    val body: String,
+    val tableNumber: Int = 0,
+    val sessionId: String? = null,
+    val checkId: String? = null,
+    val count: Int = 1,
+    val readAt: String? = null,
+    val createdAt: String,
+    val updatedAt: String,
+)
+
+@Serializable
+data class NotificationMetaDto(val unreadCount: Int = 0, val pagination: PaginationDto? = null)
+
+@Serializable
+data class NotificationPageDto(val data: List<NotificationDto>, val meta: NotificationMetaDto = NotificationMetaDto())
+
+@Serializable
+data class NotificationsReadDto(val updated: Int, val unreadCount: Int)
+
 /** PATCH de la sesión: por ahora solo cambia cuántos comensales hay. */
 @Serializable
 data class TableSessionUpdateRequest(val guestCount: Int)

@@ -26,7 +26,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -259,6 +262,23 @@ private fun ReadyNotice(orders: TableOrders, onClick: (() -> Unit)?) {
     }
 }
 
+/** Campana de avisos con la cantidad sin leer (9+ a partir de diez). */
+@Composable
+private fun NoticesBell(unread: Int, onClick: () -> Unit) {
+    val description = if (unread > 0) pluralStringResource(R.plurals.notices_bell_unread, unread, unread) else stringResource(R.string.notices_bell)
+    IconButton(onClick = onClick, modifier = Modifier.semantics { contentDescription = description }) {
+        BadgedBox(badge = {
+            if (unread > 0) {
+                Badge(containerColor = Restia.colors.brand, contentColor = MaterialTheme.colorScheme.onPrimary) {
+                    Text(if (unread > 9) "9+" else unread.toString())
+                }
+            }
+        }) {
+            Icon(painterResource(R.drawable.ic_bell), contentDescription = null, tint = Restia.colors.heading, modifier = Modifier.size(24.dp))
+        }
+    }
+}
+
 private fun localTime(iso: String): String? = runCatching {
     OffsetDateTime.parse(iso).atZoneSameInstant(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm"))
 }.getOrNull()
@@ -343,6 +363,9 @@ fun TablesScreen(
     activeOrders: List<TableOrders> = emptyList(),
     onViewTable: (sessionId: String, tableNumber: Int) -> Unit,
     onOrder: (sessionId: String, tableNumber: Int) -> Unit,
+    /** Avisos sin leer, para la marca de la campana; sin [onNotices] la campana no aparece. */
+    unreadNotices: Int = 0,
+    onNotices: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsState()
     LifecycleStartEffect(viewModel) {
@@ -383,6 +406,8 @@ fun TablesScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RestiaLogo(height = 33.dp)
+            Spacer(Modifier.weight(1f))
+            if (onNotices != null) NoticesBell(unreadNotices, onNotices)
         }
         PullToRefreshBox(isRefreshing = state.refreshing && state.loaded, onRefresh = viewModel::refresh, modifier = Modifier.fillMaxSize()) {
             LazyVerticalGrid(

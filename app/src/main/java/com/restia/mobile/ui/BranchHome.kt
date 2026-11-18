@@ -37,6 +37,8 @@ import com.restia.mobile.ui.orders.TableViewModel
 import com.restia.mobile.ui.printing.PrintJobsScreen
 import com.restia.mobile.ui.printing.PrintJobsViewModel
 import com.restia.mobile.ui.printing.PrintPermissions
+import com.restia.mobile.ui.notifications.NotificationsScreen
+import com.restia.mobile.ui.notifications.NotificationsViewModel
 import com.restia.mobile.ui.reservations.ReservationPermissions
 import com.restia.mobile.ui.reservations.ReservationsScreen
 import com.restia.mobile.ui.reservations.ReservationsViewModel
@@ -69,6 +71,7 @@ fun BranchHome(
     val showStaff = "members.read" in permissions
     var inCash by rememberSaveable { mutableStateOf(false) }
     var inReservations by rememberSaveable { mutableStateOf(false) }
+    var inNotifications by rememberSaveable { mutableStateOf(false) }
     // Ver montos y movimientos exige cash.read; quien solo tiene cash.read_open (mesero) no entra.
     val showCash = "cash.read" in permissions
     var inPrinting by rememberSaveable { mutableStateOf(false) }
@@ -194,6 +197,28 @@ fun BranchHome(
         key = "mesas-$userId-$branchId",
         factory = TablesViewModel.Factory(repositories.tables, branchId, repositories.drafts, userId),
     )
+    val notices: NotificationsViewModel = viewModel(
+        key = "avisos-$userId-$branchId",
+        factory = NotificationsViewModel.Factory(repositories.notifications, branchId),
+    )
+    if (inNotifications && sessionId == null) {
+        NotificationsScreen(
+            viewModel = notices,
+            onBack = { inNotifications = false },
+            // Un aviso lleva a su mesa; si es de una cuenta o un pago, directo a la cuenta.
+            onOpen = { notice ->
+                val session = notice.sessionId
+                if (session != null && "orders.read" in permissions) {
+                    inNotifications = false
+                    sessionId = session
+                    tableNumber = notice.tableNumber
+                    capturing = false
+                    viewingCheck = notice.checkId != null && "checks.read" in permissions
+                }
+            },
+        )
+        return
+    }
     val current = sessionId
     if (current == null) {
         // Secciones de la barra inferior, según los permisos; "Más" siempre está.
@@ -232,6 +257,12 @@ fun BranchHome(
                             onStopOrDispose { active.stopPolling() }
                         }
                     }
+                    // Y los avisos, para la marca de la campana.
+                    LifecycleStartEffect(notices) {
+                        notices.startPolling()
+                        onStopOrDispose { notices.stopPolling() }
+                    }
+                    val noticeState by notices.state.collectAsState()
                     TablesScreen(
                         viewModel = tables,
                         userName = userName,
@@ -253,6 +284,8 @@ fun BranchHome(
                             capturing = canOrder
                             viewingCheck = false
                         },
+                        unreadNotices = noticeState.unread,
+                        onNotices = { inNotifications = true },
                     )
                 }
                 HomeTab.ORDERS -> if (active != null) {
