@@ -52,7 +52,9 @@ class OpenTableTest {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.start()
-        val api = Retrofit.Builder().baseUrl(server.url("/")).client(OkHttpClient.Builder().readTimeout(2, TimeUnit.SECONDS).retryOnConnectionFailure(false).build())
+        // 127.0.0.1 y no "localhost": en Linux localhost también es ::1, y si la primera petición de una
+        // conexión falla, OkHttp prueba ::1 en el reintento y (sin retryOnConnectionFailure) no envía nada.
+        val api = Retrofit.Builder().baseUrl("http://127.0.0.1:${server.port}/").client(OkHttpClient.Builder().readTimeout(2, TimeUnit.SECONDS).retryOnConnectionFailure(false).build())
             .addConverterFactory(ApiJson.asConverterFactory("application/json".toMediaType())).build()
             .create(SessionApi::class.java)
         vm = TablesViewModel(TablesRepository(api), "b1", newKey = { "clave-${++uuids}" })
@@ -122,9 +124,7 @@ class OpenTableTest {
 
     @Test
     fun `reintentar tras perder la respuesta repite la clave`() {
-        // Respuesta perdida: el servidor recibe la petición y no contesta; el cliente agota su espera.
-        // (DISCONNECT_AFTER_REQUEST deja en Linux la siguiente conexión sin enviar nada.)
-        respond(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE), MockResponse().setResponseCode(201).setBody(SESSION))
+        respond(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST), MockResponse().setResponseCode(201).setBody(SESSION))
         vm.selectTable(mesa)
         submitAndWait()
         assertEquals(ApiFailure.Network, vm.state.value.opening?.failure)

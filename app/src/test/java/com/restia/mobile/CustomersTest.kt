@@ -96,7 +96,9 @@ class CustomersFlowTest {
             }
         }
         server.start()
-        api = Retrofit.Builder().baseUrl(server.url("/"))
+        // 127.0.0.1 y no "localhost": en Linux localhost también es ::1, y si la primera petición de una
+        // conexión falla, OkHttp prueba ::1 en el reintento y (sin retryOnConnectionFailure) no envía nada.
+        api = Retrofit.Builder().baseUrl("http://127.0.0.1:${server.port}/")
             .client(OkHttpClient.Builder().readTimeout(2, TimeUnit.SECONDS).retryOnConnectionFailure(false).build())
             .addConverterFactory(ApiJson.asConverterFactory("application/json".toMediaType())).build()
             .create(SessionApi::class.java)
@@ -140,8 +142,7 @@ class CustomersFlowTest {
         assertEquals("+523312345678", vm.state.value.form!!.phone)
         vm.setName("Ana López")
         vm.setPreferences("Terraza")
-        // Respuesta perdida: el servidor recibe la petición y no contesta; el cliente agota su espera.
-        answers += MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
+        answers += MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)
         answers += MockResponse().setResponseCode(201).setBody("""{"data":${customer()}}""")
         vm.submit()
         waitFor { vm.state.value.form?.failure != null }
