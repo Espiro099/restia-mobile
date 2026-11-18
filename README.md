@@ -25,6 +25,8 @@ Con un emulador abierto, para probar el cifrado en Android Keystore:
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
+**CI:** cada pull request y cada cambio en `main` corren las pruebas unitarias y lint en GitHub Actions (`.github/workflows/ci.yml`). Los reportes quedan como artefacto de la ejecución. Las pruebas con emulador no corren ahí.
+
 ## Backend local
 
 La versión debug usa `restia-api` en `http://127.0.0.1:8000/api/v1/`; la versión release usa HTTPS. En el repositorio de la API, con MongoDB corriendo, carga una sucursal de prueba y arranca el servidor:
