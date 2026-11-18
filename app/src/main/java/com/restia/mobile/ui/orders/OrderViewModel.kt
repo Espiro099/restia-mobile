@@ -50,7 +50,16 @@ data class OrderUiState(
     val readOnly: Boolean = false,
     val failure: ApiFailure? = null,
     val sent: Boolean = false,
+    /** Confirmar que un platillo se agota o vuelve a estar disponible. */
+    val availability: AvailabilityState? = null,
+    /** Platillo que acaba de cambiar y si quedó disponible, para el aviso. */
+    val availabilityChanged: Pair<String, Boolean>? = null,
 )
+
+data class AvailabilityState(val product: MenuProductDto, val submitting: Boolean = false, val failure: ApiFailure? = null) {
+    /** Lo que se va a marcar: lo contrario de lo que tiene ahora. */
+    val toAvailable: Boolean get() = product.availability != "AVAILABLE"
+}
 
 class OrderViewModel(
     private val menuRepository: MenuRepository,
@@ -109,6 +118,39 @@ class OrderViewModel(
     fun selectProduct(product: MenuProductDto) {
         if (product.availability != "AVAILABLE" || !editable) return
         _state.value = _state.value.copy(editor = ProductEditor(product))
+    }
+
+    fun startAvailability(product: MenuProductDto) {
+        if (_state.value.availability?.submitting == true) return
+        _state.value = _state.value.copy(availability = AvailabilityState(product), availabilityChanged = null)
+    }
+
+    fun dismissAvailability() {
+        if (_state.value.availability?.submitting == true) return
+        _state.value = _state.value.copy(availability = null)
+    }
+
+    fun confirmAvailability() {
+        val current = _state.value.availability ?: return
+        if (current.submitting) return
+        _state.value = _state.value.copy(availability = current.copy(submitting = true, failure = null))
+        viewModelScope.launch {
+            val available = current.toAvailable
+            when (val r = menuRepository.setAvailability(branchId, current.product.id, available)) {
+                is ApiResult.Success -> {
+                    val value = if (available) "AVAILABLE" else "SOLD_OUT"
+                    val menu = _state.value.menu?.let { m -> m.copy(products = m.products.map { if (it.id == current.product.id) it.copy(availability = value) else it }) }
+                    // Si se estaba armando ese platillo y se agotó, el editor se cierra.
+                    val editor = _state.value.editor?.takeUnless { !available && it.product.id == current.product.id }
+                    _state.value = _state.value.copy(menu = menu, editor = editor, availability = null, availabilityChanged = current.product.name to available)
+                }
+                is ApiResult.Failure -> _state.value = _state.value.copy(availability = current.copy(submitting = false, failure = r.failure))
+            }
+        }
+    }
+
+    fun clearAvailabilityChanged() {
+        _state.value = _state.value.copy(availabilityChanged = null)
     }
 
     fun dismissEditor() {

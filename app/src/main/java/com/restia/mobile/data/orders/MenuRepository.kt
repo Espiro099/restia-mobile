@@ -3,6 +3,7 @@ package com.restia.mobile.data.orders
 import com.restia.mobile.core.network.ApiJson
 import com.restia.mobile.core.network.ApiResult
 import com.restia.mobile.core.network.MenuDto
+import com.restia.mobile.core.network.ProductAvailabilityRequest
 import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.core.network.apiCall
 import com.restia.mobile.core.network.parseError
@@ -43,6 +44,22 @@ class MenuRepository(private val api: SessionApi, private val cache: BlobStore? 
                 if (known != null && failure.status >= 500) ApiResult.Success(MenuLoad(known.menu, stale = true)) else ApiResult.Failure(failure)
             }
         }
+    }
+
+    /**
+     * Marca un platillo agotado o disponible. La copia local se actualiza al momento y pierde su ETag, así
+     * que la siguiente carga trae la carta completa del servidor.
+     */
+    suspend fun setAvailability(branchId: String, productId: String, available: Boolean): ApiResult<Unit> {
+        val value = if (available) "AVAILABLE" else "SOLD_OUT"
+        val r = apiCall { api.setProductAvailability(branchId, productId, ProductAvailabilityRequest(value)).close() }
+        if (r is ApiResult.Success) {
+            cached?.let { known ->
+                val menu = known.menu.copy(products = known.menu.products.map { if (it.id == productId) it.copy(availability = value) else it })
+                cached = CachedMenu(menu, etag = null)
+            }
+        }
+        return r
     }
 
     private suspend fun readCache(branchId: String): CachedMenu? = withContext(Dispatchers.IO) {

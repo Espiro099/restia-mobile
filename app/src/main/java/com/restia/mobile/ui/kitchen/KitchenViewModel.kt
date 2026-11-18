@@ -11,6 +11,8 @@ import com.restia.mobile.core.network.StationDto
 import com.restia.mobile.core.network.UnitVersion
 import com.restia.mobile.data.kitchen.KitchenRepository
 import com.restia.mobile.ui.orders.MAX_UNITS_PER_BATCH
+import com.restia.mobile.ui.orders.REASON_MAX
+import com.restia.mobile.ui.orders.isValidReason
 import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -48,6 +50,18 @@ fun tickets(units: List<KitchenUnitDto>): List<KitchenTicket> =
         KitchenTicket(orderId, rows.first().tableNumbers, rows.minOf { it.unit.createdAt }, lines)
     }
 
+/** Mover a otra estación lo pendiente de una partida, con motivo. `moved` cuenta lo que ya se movió. */
+data class ReassignState(
+    val line: KitchenLine,
+    val stationId: String? = null,
+    val reason: String = "",
+    val submitting: Boolean = false,
+    val moved: Int = 0,
+    val failure: ApiFailure? = null,
+) {
+    val canConfirm: Boolean get() = !submitting && stationId != null && isValidReason(reason) && line.pending.isNotEmpty()
+}
+
 data class KitchenUiState(
     val stations: List<StationDto> = emptyList(),
     /** null: todas las estaciones. */
@@ -58,6 +72,9 @@ data class KitchenUiState(
     val failure: ApiFailure? = null,
     val working: Boolean = false,
     val actionFailure: ApiFailure? = null,
+    val reassigning: ReassignState? = null,
+    /** Cuántas unidades se acaban de mover y a qué estación, para el aviso. */
+    val reassigned: Pair<Int, String>? = null,
 ) {
     val tickets: List<KitchenTicket> get() = tickets(units)
 }
@@ -154,6 +171,69 @@ class KitchenViewModel(
             _state.value = _state.value.copy(working = false, actionFailure = failure)
             load()
         }
+    }
+
+    fun startReassign(line: KitchenLine) {
+        if (_state.value.working || line.pending.isEmpty()) return
+        _state.value = _state.value.copy(reassigning = ReassignState(line), reassigned = null, actionFailure = null)
+    }
+
+    fun selectReassignStation(stationId: String) {
+        val current = _state.value.reassigning ?: return
+        if (current.submitting) return
+        _state.value = _state.value.copy(reassigning = current.copy(stationId = stationId, failure = null))
+    }
+
+    fun setReassignReason(reason: String) {
+        val current = _state.value.reassigning ?: return
+        if (current.submitting) return
+        _state.value = _state.value.copy(reassigning = current.copy(reason = reason.take(REASON_MAX), failure = null))
+    }
+
+    fun dismissReassign() {
+        if (_state.value.reassigning?.submitting == true) return
+        _state.value = _state.value.copy(reassigning = null)
+    }
+
+    /**
+     * Una petición por unidad, en orden. Si una falla, se detiene: lo ya movido queda movido, y el diálogo
+     * sigue abierto con la partida actualizada para reintentar el resto.
+     */
+    fun confirmReassign() {
+        val current = _state.value.reassigning ?: return
+        val stationId = current.stationId ?: return
+        if (!current.canConfirm) return
+        _state.value = _state.value.copy(reassigning = current.copy(submitting = true, failure = null), working = true)
+        viewModelScope.launch {
+            val reason = current.reason.trim()
+            var moved = current.moved
+            var failure: ApiFailure? = null
+            for (unit in current.line.pending) {
+                when (val r = repository.reassign(branchId, unit, stationId, reason)) {
+                    is ApiResult.Success -> moved++
+                    is ApiResult.Failure -> {
+                        failure = r.failure
+                        break
+                    }
+                }
+            }
+            load()
+            val name = _state.value.stations.firstOrNull { it.id == stationId }?.name.orEmpty()
+            _state.value = if (failure == null) {
+                _state.value.copy(reassigning = null, reassigned = moved to name, working = false)
+            } else {
+                // La partida con lo que siga pendiente, ya con sus versiones nuevas.
+                val units = _state.value.units.filter { it.unit.orderItemId == current.line.orderItemId }.map { it.unit }
+                _state.value.copy(
+                    reassigning = current.copy(line = current.line.copy(units = units), submitting = false, moved = moved, failure = failure),
+                    working = false,
+                )
+            }
+        }
+    }
+
+    fun clearReassigned() {
+        _state.value = _state.value.copy(reassigned = null)
     }
 
     private fun isRetryable(failure: ApiFailure): Boolean =

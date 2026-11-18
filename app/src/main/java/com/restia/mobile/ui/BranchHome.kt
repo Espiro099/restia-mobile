@@ -33,6 +33,7 @@ import com.restia.mobile.ui.orders.ActiveOrdersViewModel
 import com.restia.mobile.ui.orders.OrderScreen
 import com.restia.mobile.ui.orders.OrderViewModel
 import com.restia.mobile.ui.orders.TableScreen
+import com.restia.mobile.ui.orders.SessionViewModel
 import com.restia.mobile.ui.orders.TableViewModel
 import com.restia.mobile.ui.printing.PrintJobsScreen
 import com.restia.mobile.ui.printing.PrintJobsViewModel
@@ -300,6 +301,7 @@ fun BranchHome(
                     branchName = branchName,
                     canPrepare = canPrepare,
                     showTables = false,
+                    canReassign = "order_units.reassign" in permissions,
                     inTabs = true,
                     logoutEnabled = logoutEnabled,
                     onTables = {},
@@ -389,6 +391,7 @@ fun BranchHome(
             ),
             tableNumber = tableNumber,
             onBack = { capturing = false },
+            canSetAvailability = "menu.set_availability" in permissions,
             onSent = {
                 table.notifySent()
                 capturing = false
@@ -409,6 +412,9 @@ fun BranchHome(
             canChangeGuests = "table_sessions.update" in permissions,
             onAddOrder = { capturing = true },
             onCheck = { viewingCheck = true },
+            session = viewModel(key = "sesion-$userId-$current", factory = SessionViewModel.Factory(repositories.tables, branchId, current)),
+            canCancelSession = "table_sessions.cancel" in permissions,
+            canEditNotes = "orders.update" in permissions,
         )
     }
 }

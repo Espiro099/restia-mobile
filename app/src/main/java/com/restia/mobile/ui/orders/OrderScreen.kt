@@ -1,5 +1,7 @@
 package com.restia.mobile.ui.orders
 
+import androidx.annotation.StringRes
+import kotlinx.coroutines.delay
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -134,13 +136,14 @@ private fun DishThumb(product: MenuProductDto, available: Boolean) {
 
 /** Platillo de la carta (propuesta 03): foto, nombre, descripción, precio y el botón cuadrado para agregar. */
 @Composable
-private fun ProductRow(product: MenuProductDto, onClick: () -> Unit) {
+private fun ProductRow(product: MenuProductDto, onClick: () -> Unit, onSoldOut: (() -> Unit)? = null) {
     val available = product.availability == "AVAILABLE"
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
-            .clickable(enabled = available, role = Role.Button, onClick = onClick)
+            // Agotado no se puede pedir; quien puede, lo toca para volverlo a ofrecer.
+            .clickable(enabled = available || onSoldOut != null, role = Role.Button, onClick = if (available) onClick else onSoldOut ?: {})
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -190,7 +193,7 @@ fun matchesSearch(product: MenuProductDto, query: String): Boolean {
 }
 
 @Composable
-private fun EditorDialog(viewModel: OrderViewModel, editor: ProductEditor) {
+private fun EditorDialog(viewModel: OrderViewModel, editor: ProductEditor, canSetAvailability: Boolean) {
     val modifiers = viewModel.modifiersOf(editor.product)
     val invalid = invalidModifiers(modifiers, editor.selected)
     AlertDialog(
@@ -228,10 +231,51 @@ private fun EditorDialog(viewModel: OrderViewModel, editor: ProductEditor) {
                     label = { Text(stringResource(R.string.order_notes)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (canSetAvailability) {
+                    TextButton(onClick = { viewModel.startAvailability(editor.product) }, contentPadding = PaddingValues(0.dp)) {
+                        Text(stringResource(R.string.availability_mark_sold_out), color = MaterialTheme.colorScheme.error)
+                    }
+                }
             }
         },
         confirmButton = { TextButton(onClick = viewModel::addEditorToCart) { Text(stringResource(R.string.order_add)) } },
         dismissButton = { TextButton(onClick = viewModel::dismissEditor) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}
+
+@StringRes
+fun availabilityFailureText(failure: ApiFailure): Int? = when {
+    failure == ApiFailure.Network -> R.string.error_network
+    failure !is ApiFailure.Server -> R.string.error_unexpected
+    failure.status >= 500 -> R.string.error_server
+    failure.status == 403 -> R.string.error_action_forbidden
+    else -> null
+}
+
+@Composable
+private fun AvailabilityDialog(state: AvailabilityState, viewModel: OrderViewModel) {
+    AlertDialog(
+        onDismissRequest = viewModel::dismissAvailability,
+        title = {
+            Text(stringResource(if (state.toAvailable) R.string.availability_title_on else R.string.availability_title_off, state.product.name))
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(if (state.toAvailable) R.string.availability_body_on else R.string.availability_body_off))
+                state.failure?.let {
+                    Text(
+                        availabilityFailureText(it)?.let { id -> stringResource(id) } ?: (it as? ApiFailure.Server)?.message ?: stringResource(R.string.error_unexpected),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = viewModel::confirmAvailability, enabled = !state.submitting) {
+                Text(stringResource(if (state.toAvailable) R.string.availability_confirm_on else R.string.availability_confirm_off))
+            }
+        },
+        dismissButton = { TextButton(onClick = viewModel::dismissAvailability, enabled = !state.submitting) { Text(stringResource(R.string.cancel_back)) } },
     )
 }
 
@@ -286,7 +330,7 @@ private fun ReviewDialog(viewModel: OrderViewModel, state: OrderUiState) {
 
 /** Menú digital (propuesta 03): buscar, filtrar por categoría y agregar platillos a la comanda. */
 @Composable
-fun OrderScreen(viewModel: OrderViewModel, tableNumber: Int, onBack: () -> Unit, onSent: () -> Unit) {
+fun OrderScreen(viewModel: OrderViewModel, tableNumber: Int, onBack: () -> Unit, onSent: () -> Unit, canSetAvailability: Boolean = false) {
     val state by viewModel.state.collectAsState()
     BackHandler(onBack = onBack)
     LaunchedEffect(state.sent) {
@@ -298,7 +342,14 @@ fun OrderScreen(viewModel: OrderViewModel, tableNumber: Int, onBack: () -> Unit,
     // null = todas las categorías.
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
-    state.editor?.let { EditorDialog(viewModel, it) }
+    state.editor?.let { EditorDialog(viewModel, it, canSetAvailability) }
+    state.availability?.let { AvailabilityDialog(it, viewModel) }
+    LaunchedEffect(state.availabilityChanged) {
+        if (state.availabilityChanged != null) {
+            delay(4_000)
+            viewModel.clearAvailabilityChanged()
+        }
+    }
     if (state.reviewing) ReviewDialog(viewModel, state)
     Column(modifier = Modifier.fillMaxSize().imePadding()) {
         BackHeader(stringResource(R.string.table_title, tableNumber), onBack)
@@ -338,6 +389,13 @@ fun OrderScreen(viewModel: OrderViewModel, tableNumber: Int, onBack: () -> Unit,
                                     }
                                 }
                                 if (state.menuStale) Text(stringResource(R.string.order_menu_stale), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                state.availabilityChanged?.let { (name, available) ->
+                                    Text(
+                                        stringResource(if (available) R.string.availability_done_on else R.string.availability_done_off, name),
+                                        color = Restia.colors.free,
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
                                 if (state.readOnly) Text(stringResource(R.string.order_read_only), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                             }
                         }
@@ -352,7 +410,7 @@ fun OrderScreen(viewModel: OrderViewModel, tableNumber: Int, onBack: () -> Unit,
                             }
                         }
                         items(shown.sortedWith(compareBy({ categories.indexOf(it.category) }, { it.displayOrder })), key = { it.id }) { product ->
-                            ProductRow(product) { viewModel.selectProduct(product) }
+                            ProductRow(product, { viewModel.selectProduct(product) }, if (canSetAvailability) ({ viewModel.startAvailability(product) }) else null)
                         }
                     }
                 }

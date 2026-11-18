@@ -662,4 +662,64 @@
         <item quantity="one">Avisos, %1$d sin leer</item>
         <item quantity="other">Avisos, %1$d sin leer</item>
     </plurals>
+    <string name="table_join">Juntar mesas</string>
+    <string name="table_release">Separar una mesa</string>
+    <string name="table_cancel_session">Anular apertura</string>
+    <string name="join_title">Juntar con la mesa %1$d</string>
+    <string name="join_body">Elige las mesas libres que se suman a esta cuenta.</string>
+    <string name="join_none">No hay mesas libres.</string>
+    <plurals name="join_seats">
+        <item quantity="one">%1$d lugar</item>
+        <item quantity="other">%1$d lugares</item>
+    </plurals>
+    <string name="join_confirm">Juntar (%1$d)</string>
+    <string name="join_taken">Una de esas mesas ya no está libre. Revisa la lista.</string>
+    <plurals name="join_done">
+        <item quantity="one">Se juntó la mesa %1$s.</item>
+        <item quantity="other">Se juntaron las mesas %1$s.</item>
+    </plurals>
+    <string name="release_title">Separar una mesa</string>
+    <string name="release_body">La mesa sale de esta cuenta; lo que ya se pidió se queda aquí.</string>
+    <string name="release_cleaning">Queda por limpiar</string>
+    <string name="release_confirm">Separar</string>
+    <string name="release_last">Es la última mesa de la cuenta: ciérrala en lugar de separarla.</string>
+    <string name="release_done">Se separó la mesa %1$d.</string>
+    <string name="cancel_session_title">¿Anular la apertura de la mesa %1$d?</string>
+    <string name="cancel_session_body">Úsalo si la mesa se abrió por error. Solo se puede sin platillos ni pagos; la mesa queda libre.</string>
+    <string name="cancel_session_confirm">Anular</string>
+    <string name="cancel_session_activity">La mesa ya tiene platillos o pagos: ciérrala en lugar de anularla.</string>
+    <string name="table_with">Mesas %1$s</string>
+    <string name="notes_action">Nota</string>
+    <string name="notes_title">Nota de %1$s</string>
+    <string name="notes_body">Cocina la verá en la comanda. Se puede cambiar mientras no la empiecen.</string>
+    <string name="notes_label">Nota para cocina</string>
+    <string name="notes_confirm">Guardar</string>
+    <string name="notes_saved">Se guardó la nota de %1$s.</string>
+    <string name="notes_started">Cocina ya empezó este platillo; la nota ya no se puede cambiar.</string>
+    <string name="notes_conflict">Alguien más cambió este platillo. Ya ves lo actual; guarda de nuevo.</string>
+    <string name="reassign_action">Mover</string>
+    <string name="reassign_title">Mover %1$s</string>
+    <plurals name="reassign_body">
+        <item quantity="one">Elige a qué estación va el platillo pendiente.</item>
+        <item quantity="other">Elige a qué estación van los %1$d platillos pendientes.</item>
+    </plurals>
+    <string name="reassign_confirm">Mover</string>
+    <string name="reassign_started">Alguien ya empezó o movió este platillo. Revisa la cola.</string>
+    <plurals name="reassign_partial">
+        <item quantity="one">Ya se movió %1$d.</item>
+        <item quantity="other">Ya se movieron %1$d.</item>
+    </plurals>
+    <plurals name="reassign_done">
+        <item quantity="one">Se movió %1$d platillo a %2$s.</item>
+        <item quantity="other">Se movieron %1$d platillos a %2$s.</item>
+    </plurals>
+    <string name="availability_mark_sold_out">Marcar agotado</string>
+    <string name="availability_title_off">¿%1$s se agotó?</string>
+    <string name="availability_title_on">¿Ya hay %1$s?</string>
+    <string name="availability_body_off">Nadie podrá pedirlo hasta que se marque disponible otra vez. Lo ya pedido no cambia.</string>
+    <string name="availability_body_on">Vuelve a aparecer en la carta para todos.</string>
+    <string name="availability_confirm_off">Marcar agotado</string>
+    <string name="availability_confirm_on">Marcar disponible</string>
+    <string name="availability_done_off">%1$s quedó agotado.</string>
+    <string name="availability_done_on">%1$s está disponible otra vez.</string>
 </resources>

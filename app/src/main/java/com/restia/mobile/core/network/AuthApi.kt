@@ -82,6 +82,23 @@ interface SessionApi {
         @Header("If-None-Match") etag: String?,
     ): Response<PagedEnvelope<KitchenUnitDto>>
 
+    /** AVAILABLE o SOLD_OUT; sin If-Match: marcarlo dos veces deja lo mismo. */
+    @POST("branches/{branchId}/products/{productId}/availability")
+    suspend fun setProductAvailability(
+        @Path("branchId") branchId: String,
+        @Path("productId") productId: String,
+        @Body body: ProductAvailabilityRequest,
+    ): ResponseBody
+
+    /** Mueve una unidad PENDING a otra estación activa, con motivo. */
+    @POST("branches/{branchId}/order-units/{unitId}/station")
+    suspend fun reassignOrderUnitStation(
+        @Path("branchId") branchId: String,
+        @Path("unitId") unitId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: OrderUnitReassignRequest,
+    ): ResponseBody
+
     @POST("branches/{branchId}/order-units/transitions")
     suspend fun transitionUnits(
         @Path("branchId") branchId: String,
@@ -482,6 +499,44 @@ interface SessionApi {
         @Path("sessionId") sessionId: String,
         @Header("If-Match") ifMatch: String,
         @Body body: TableSessionUpdateRequest,
+    ): Envelope<TableSessionDto>
+
+    /** Nota de una partida mientras todas sus unidades sigan PENDING. */
+    @PATCH("branches/{branchId}/orders/{orderId}/items/{itemId}")
+    suspend fun updateOrderItemNotes(
+        @Path("branchId") branchId: String,
+        @Path("orderId") orderId: String,
+        @Path("itemId") itemId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: OrderItemUpdateRequest,
+    ): Envelope<OrderDto>
+
+    /** Junta mesas libres a la sesión (T-2). */
+    @POST("branches/{branchId}/table-sessions/{sessionId}/tables")
+    suspend fun addTablesToSession(
+        @Path("branchId") branchId: String,
+        @Path("sessionId") sessionId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: TableSessionAddTablesRequest,
+    ): Envelope<TableSessionDto>
+
+    /** Separa una mesa de la sesión; la última no se puede liberar (SESSION_LAST_TABLE). */
+    @POST("branches/{branchId}/table-sessions/{sessionId}/tables/{tableId}/release")
+    suspend fun releaseTableFromSession(
+        @Path("branchId") branchId: String,
+        @Path("sessionId") sessionId: String,
+        @Path("tableId") tableId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: TableReleaseRequest,
+    ): Envelope<TableSessionDto>
+
+    /** Anula una apertura sin actividad (sin platillos ni pagos), con motivo. */
+    @POST("branches/{branchId}/table-sessions/{sessionId}/cancel")
+    suspend fun cancelTableSession(
+        @Path("branchId") branchId: String,
+        @Path("sessionId") sessionId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: ReasonRequest,
     ): Envelope<TableSessionDto>
 
     /** T-4: sin cuerpo; las mesas quedan por limpiar y la sesión en PENDING_CLEANING. */

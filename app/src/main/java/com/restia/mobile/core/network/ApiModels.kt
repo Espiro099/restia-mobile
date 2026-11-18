@@ -1,6 +1,9 @@
 package com.restia.mobile.core.network
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
@@ -127,6 +130,18 @@ data class NotificationPageDto(val data: List<NotificationDto>, val meta: Notifi
 @Serializable
 data class NotificationsReadDto(val updated: Int, val unreadCount: Int)
 
+@Serializable
+data class ProductAvailabilityRequest(val availability: String)
+
+@Serializable
+data class OrderUnitReassignRequest(val stationId: String, val reason: String)
+
+@Serializable
+data class TableSessionAddTablesRequest(val tableIds: List<String>)
+
+@Serializable
+data class TableReleaseRequest(val requiresCleaning: Boolean)
+
 /** PATCH de la sesión: por ahora solo cambia cuántos comensales hay. */
 @Serializable
 data class TableSessionUpdateRequest(val guestCount: Int)
@@ -203,7 +218,20 @@ data class OrderItemDto(
     val modifiers: List<OrderModifierDto> = emptyList(),
     val notes: String? = null,
     val units: List<OrderUnitDto> = emptyList(),
+    /** Para el If-Match al editar las notas. */
+    val version: Int = 0,
 )
+
+/**
+ * La API exige `notes` presente, también para borrarla. Con explicitNulls = false un String? null no
+ * se enviaría, así que va como JsonElement: JsonNull se escribe como `null`.
+ */
+@Serializable
+data class OrderItemUpdateRequest(val notes: JsonElement) {
+    companion object {
+        fun of(notes: String?): OrderItemUpdateRequest = OrderItemUpdateRequest(notes?.let { JsonPrimitive(it) } ?: JsonNull)
+    }
+}
 
 @Serializable
 data class OrderModifierDto(val name: String)
