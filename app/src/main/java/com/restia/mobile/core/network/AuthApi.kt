@@ -39,6 +39,18 @@ interface SessionApi {
     @POST("auth/logout")
     suspend fun logout(): Response<Unit>
 
+    /** Sesiones propias (Android y web); `current` marca la que hace la petición. */
+    @GET("auth/sessions")
+    suspend fun listOwnSessions(
+        @Query("status") status: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<AuthSessionDto>
+
+    /** 204; una sesión ajena responde 404 y una ya cerrada no cambia. */
+    @POST("auth/sessions/{sessionId}/revoke")
+    suspend fun revokeOwnSession(@Path("sessionId") sessionId: String): Response<Unit>
+
     /** Cierra las demás sesiones del usuario; esta sigue abierta. */
     @POST("auth/password/change")
     suspend fun changePassword(@Body body: PasswordChangeRequest): Response<Unit>
@@ -447,6 +459,16 @@ interface SessionApi {
         @Body body: ReservationCreateRequest,
     ): Envelope<ReservationDto>
 
+    /** Cambia horario, personas o notas de una reserva PENDING o CONFIRMED; replanea las mesas. */
+    @PATCH("branches/{branchId}/reservations/{reservationId}")
+    suspend fun updateReservation(
+        @Path("branchId") branchId: String,
+        @Path("reservationId") reservationId: String,
+        @Header("If-Match") ifMatch: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: ReservationUpdateRequest,
+    ): Envelope<ReservationDto>
+
     /** confirm, arrive, check-in, cancel o no-show: todas con If-Match e Idempotency-Key (R-12). */
     @POST("branches/{branchId}/reservations/{reservationId}/{action}")
     suspend fun reservationAction(
@@ -601,4 +623,23 @@ interface SessionApi {
     /** Solo un ADMIN de todas las sucursales del usuario; invalida el enlace anterior. */
     @POST("users/{userId}/password-setup-link")
     suspend fun passwordSetupLink(@Path("userId") userId: String): Envelope<PasswordSetupLinkDto>
+
+    /** 201; vence en 15 min y sirve una sola vez. Límite de 10 por usuario. */
+    @POST("branches/{branchId}/devices/enrollment-codes")
+    suspend fun createEnrollmentCode(@Path("branchId") branchId: String): Envelope<EnrollmentCodeDto>
+
+    @GET("branches/{branchId}/devices")
+    suspend fun listDevices(
+        @Path("branchId") branchId: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<DeviceDto>
+
+    /** 204; final e idempotente. Solo cambia uno ACTIVE y cierra sus sesiones. */
+    @POST("branches/{branchId}/devices/{deviceId}/block")
+    suspend fun blockDevice(@Path("branchId") branchId: String, @Path("deviceId") deviceId: String, @Body body: ReasonRequest): Response<Unit>
+
+    /** 204; como bloquear, para un equipo que ya no se usa. */
+    @POST("branches/{branchId}/devices/{deviceId}/retire")
+    suspend fun retireDevice(@Path("branchId") branchId: String, @Path("deviceId") deviceId: String, @Body body: ReasonRequest): Response<Unit>
 }
