@@ -722,4 +722,13 @@
     <string name="availability_confirm_on">Marcar disponible</string>
     <string name="availability_done_off">%1$s quedó agotado.</string>
     <string name="availability_done_on">%1$s está disponible otra vez.</string>
+    <string name="availability_sheet_open">Agotados</string>
+    <string name="availability_sheet_title">Agotados</string>
+    <string name="availability_sheet_none">Todo está disponible. Apaga un platillo cuando se acabe.</string>
+    <plurals name="availability_sheet_count">
+        <item quantity="one">%1$d platillo agotado. Nadie puede pedirlo hasta que lo vuelvas a prender.</item>
+        <item quantity="other">%1$d platillos agotados. Nadie puede pedirlos hasta que los vuelvas a prender.</item>
+    </plurals>
+    <string name="availability_on">Disponible</string>
+    <string name="availability_failed">No se pudo cambiar %1$s.</string>
 </resources>

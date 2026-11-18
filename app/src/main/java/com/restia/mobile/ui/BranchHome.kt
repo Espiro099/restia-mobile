@@ -20,6 +20,7 @@ import com.restia.mobile.ui.checks.CheckScreen
 import com.restia.mobile.ui.checks.CheckViewModel
 import com.restia.mobile.ui.customers.CustomersScreen
 import com.restia.mobile.ui.customers.CustomersViewModel
+import com.restia.mobile.ui.kitchen.AvailabilityViewModel
 import com.restia.mobile.ui.kitchen.KitchenScreen
 import com.restia.mobile.ui.kitchen.KitchenViewModel
 import com.restia.mobile.ui.members.MembersScreen
@@ -302,6 +303,11 @@ fun BranchHome(
                     canPrepare = canPrepare,
                     showTables = false,
                     canReassign = "order_units.reassign" in permissions,
+                    availability = if ("menu.set_availability" in permissions) {
+                        viewModel(key = "agotados-$userId-$branchId", factory = AvailabilityViewModel.Factory(repositories.menu, branchId))
+                    } else {
+                        null
+                    },
                     inTabs = true,
                     logoutEnabled = logoutEnabled,
                     onTables = {},
