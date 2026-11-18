@@ -731,4 +731,29 @@
     </plurals>
     <string name="availability_on">Disponible</string>
     <string name="availability_failed">No se pudo cambiar %1$s.</string>
+    <string name="reports_title">Reportes</string>
+    <string name="reports_today">Hoy</string>
+    <string name="reports_week">7 días</string>
+    <string name="reports_month">30 días</string>
+    <string name="reports_as_of">Calculado a las %1$s; se actualiza unos segundos después de cada cobro.</string>
+    <string name="reports_net">Venta neta</string>
+    <string name="reports_checks">Cuentas cobradas</string>
+    <string name="reports_ticket">Ticket promedio</string>
+    <string name="reports_guests">Personas</string>
+    <string name="reports_extras">Propinas %1$s · Reembolsos %2$s · Cortesías %3$s</string>
+    <string name="reports_by_day">Venta por día</string>
+    <string name="reports_by_day_description">Venta por día del periodo; el mejor fue el %1$s con %2$s.</string>
+    <string name="reports_day_value">%1$s: %2$s</string>
+    <string name="reports_best_day">Mejor día: %1$s con %2$s. Toca una barra para ver otro día.</string>
+    <string name="reports_by_method">Por método de pago</string>
+    <string name="reports_by_hour">Mesas ocupadas por hora</string>
+    <string name="reports_peak">Hora más llena: %1$d h, con %2$s mesas ocupadas. Toca una barra para ver otra hora.</string>
+    <plurals name="reports_hour_value">
+        <item quantity="one">%1$d h: %2$s mesas ocupadas, %3$d mesa abierta.</item>
+        <item quantity="other">%1$d h: %2$s mesas ocupadas, %3$d mesas abiertas.</item>
+    </plurals>
+    <string name="reports_average_note">En 7 y 30 días, las mesas ocupadas son el promedio por día.</string>
+    <string name="reports_no_occupancy">Sin mesas abiertas en este periodo.</string>
+    <string name="reports_empty">Sin ventas en este periodo</string>
+    <string name="reports_empty_hint">Los cobros aparecen aquí unos segundos después de confirmarse.</string>
 </resources>

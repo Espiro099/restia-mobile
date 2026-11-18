@@ -41,6 +41,8 @@ import com.restia.mobile.ui.printing.PrintJobsViewModel
 import com.restia.mobile.ui.printing.PrintPermissions
 import com.restia.mobile.ui.notifications.NotificationsScreen
 import com.restia.mobile.ui.notifications.NotificationsViewModel
+import com.restia.mobile.ui.reports.ReportsScreen
+import com.restia.mobile.ui.reports.ReportsViewModel
 import com.restia.mobile.ui.reservations.ReservationPermissions
 import com.restia.mobile.ui.reservations.ReservationsScreen
 import com.restia.mobile.ui.reservations.ReservationsViewModel
@@ -74,6 +76,7 @@ fun BranchHome(
     var inCash by rememberSaveable { mutableStateOf(false) }
     var inReservations by rememberSaveable { mutableStateOf(false) }
     var inNotifications by rememberSaveable { mutableStateOf(false) }
+    var inReports by rememberSaveable { mutableStateOf(false) }
     // Ver montos y movimientos exige cash.read; quien solo tiene cash.read_open (mesero) no entra.
     val showCash = "cash.read" in permissions
     var inPrinting by rememberSaveable { mutableStateOf(false) }
@@ -89,6 +92,13 @@ fun BranchHome(
                 ),
             ),
             onBack = { inPrinting = false },
+        )
+        return
+    }
+    if (inReports && "reports.read" in permissions) {
+        ReportsScreen(
+            viewModel = viewModel(key = "reportes-$userId-$branchId", factory = ReportsViewModel.Factory(repositories.reports, branchId)),
+            onBack = { inReports = false },
         )
         return
     }
@@ -324,6 +334,7 @@ fun BranchHome(
                     tools = buildList {
                         if ("reservations.read" in permissions) add(MoreOption(R.drawable.ic_calendar, R.string.reservations_title) { inReservations = true })
                         if (showCash) add(MoreOption(R.drawable.ic_card, R.string.cash_title) { inCash = true })
+                        if ("reports.read" in permissions) add(MoreOption(R.drawable.ic_chart, R.string.reports_title) { inReports = true })
                         if (showPrinting) add(MoreOption(R.drawable.ic_receipt, R.string.print_title) { inPrinting = true })
                         if (showStaff) add(MoreOption(R.drawable.ic_guests, R.string.staff_title) { inStaff = true })
                         if ("customers.read" in permissions) {

@@ -152,6 +152,35 @@ data class CleaningConfirmationRequest(val membershipVersion: Int)
 @Serializable
 data class MoneyDto(val amount: String, val currency: String)
 
+/** Ventas de un día de negocio, por el día en que se confirmó el pago (RP-2). */
+@Serializable
+data class DailySalesDto(
+    val businessDate: String,
+    val netSales: MoneyDto,
+    val refunds: MoneyDto,
+    val tips: MoneyDto,
+    val courtesies: MoneyDto,
+    val invoiced: MoneyDto,
+    val checkCount: Int,
+    val guestCount: Int,
+    val byMethod: List<DailySalesMethodDto> = emptyList(),
+    val asOf: String,
+)
+
+@Serializable
+data class DailySalesMethodDto(val method: String, val sales: MoneyDto, val tips: MoneyDto, val refunds: MoneyDto)
+
+/** Actividad de una hora local del día de negocio; solo vienen las horas con actividad. */
+@Serializable
+data class HourlyOccupancyDto(
+    val businessDate: String,
+    val hour: Int,
+    val sessionsOpened: Int,
+    val tablesOccupied: Int,
+    val guestCount: Int,
+    val asOf: String,
+)
+
 @Serializable
 data class MenuProductDto(
     val id: String,

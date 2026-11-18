@@ -31,6 +31,7 @@ import com.restia.mobile.data.members.MembersRepository
 import com.restia.mobile.data.orders.DraftRepository
 import com.restia.mobile.data.notifications.NotificationsRepository
 import com.restia.mobile.data.printing.PrintingRepository
+import com.restia.mobile.data.reports.ReportsRepository
 import com.restia.mobile.data.reservations.ReservationsRepository
 import com.restia.mobile.data.orders.MenuRepository
 import com.restia.mobile.data.orders.OrderRepository
@@ -58,6 +59,7 @@ class Repositories(
     val cash: CashRepository,
     val printing: PrintingRepository,
     val notifications: NotificationsRepository,
+    val reports: ReportsRepository,
 )
 
 fun buildRepositories(
@@ -103,6 +105,7 @@ fun buildRepositories(
         CashRepository(sessionApi),
         PrintingRepository(sessionApi),
         NotificationsRepository(sessionApi),
+        ReportsRepository(sessionApi),
     )
 }
 
