@@ -8,6 +8,7 @@ import com.restia.mobile.core.network.OrderUnitDto
 import com.restia.mobile.ui.checks.tableBalance
 import com.restia.mobile.ui.checks.tableTotal
 import com.restia.mobile.ui.orders.roundStage
+import com.restia.mobile.ui.orders.routeFraction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -85,5 +86,13 @@ class ProgressTest {
     fun `sin una sola moneda no hay saldo que mostrar`() {
         assertNull(tableBalance(listOf(check("OPEN", "10.00"), check("OPEN", "3.00", "USD"))))
         assertNull(tableBalance(emptyList()))
+    }
+
+    @Test
+    fun `la ruta del seguimiento va de 0 a 1 por parada`() {
+        assertEquals(listOf(0f, 1f / 3, 2f / 3, 1f), (0..3).map { routeFraction(it, 4) })
+        assertEquals(1f, routeFraction(9, 4))
+        assertEquals(0f, routeFraction(-1, 4))
+        assertEquals(1f, routeFraction(0, 1))
     }
 }
