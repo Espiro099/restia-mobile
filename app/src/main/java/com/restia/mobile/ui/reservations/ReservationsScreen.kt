@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -149,7 +150,9 @@ private fun ReservationCard(
 @Composable
 private fun Stepper(label: String, value: String, onMinus: () -> Unit, onPlus: () -> Unit, enabled: Boolean, onPick: (() -> Unit)? = null) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(label, modifier = Modifier.weight(1f))
+        // La etiqueta se mide primero y en una línea: con weight se encogía detrás de la fecha y "Día" se partía.
+        Text(label, maxLines = 1, softWrap = false)
+        Spacer(Modifier.weight(1f))
         OutlinedButton(onClick = onMinus, enabled = enabled) { Text("−") }
         if (onPick != null) {
             TextButton(onClick = onPick, enabled = enabled) { Text(value, style = MaterialTheme.typography.titleMedium) }

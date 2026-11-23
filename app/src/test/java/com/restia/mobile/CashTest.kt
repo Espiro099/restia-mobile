@@ -359,6 +359,22 @@ class CashFlowTest {
     }
 
     @Test
+    fun `mientras recarga el turno no se puede reembolsar`() {
+        shiftPayments = page(payment("p1", "CONFIRMED", method = "CASH"))
+        val vm = loaded(all)
+        vm.view(vm.state.value.registers.first { it.register.id == "r1" })
+        waitFor { vm.state.value.detail?.payments?.size == 1 && vm.state.value.detail?.loading == false }
+        vm.loadDetail()
+        assertTrue(vm.state.value.detail!!.loading)
+        // Lo que se ve puede estar por cambiar (por ejemplo, justo después de otro reembolso).
+        vm.startRefund(vm.state.value.detail!!.payments.single())
+        assertNull(vm.state.value.resolving)
+        waitFor { vm.state.value.detail?.loading == false }
+        vm.startRefund(vm.state.value.detail!!.payments.single())
+        assertEquals(ResolveKind.REFUND, vm.state.value.resolving!!.kind)
+    }
+
+    @Test
     fun `resuelve los reembolsos del turno y deja fuera los de otros`() {
         refundsPending = page(refund("f1", "PENDING"), refund("f9", "PENDING", shift = "s7"))
         refundsUnknown = page(refund("f2", "UNKNOWN", version = 2))
