@@ -12,6 +12,13 @@ import com.restia.mobile.core.network.OrderUnitReassignRequest
 import com.restia.mobile.core.network.ProductAvailabilityRequest
 import com.restia.mobile.core.network.OrderItemUpdateRequest
 import com.restia.mobile.core.network.NotificationDto
+import com.restia.mobile.core.network.FoodSafetyRequest
+import com.restia.mobile.core.network.IngredientDto
+import com.restia.mobile.core.network.InventoryCountCreateRequest
+import com.restia.mobile.core.network.InventoryCountDto
+import com.restia.mobile.core.network.InventoryCountLinesRequest
+import com.restia.mobile.core.network.InventoryMovementRequest
+import com.restia.mobile.core.network.InventoryReceiptRequest
 import com.restia.mobile.core.network.NotificationPageDto
 import com.restia.mobile.core.network.NotificationsReadDto
 import com.restia.mobile.core.network.CashRegisterDto
@@ -173,6 +180,13 @@ open class UnusedSessionApi : SessionApi {
         error("sin uso")
     override suspend fun createCustomer(branchId: String, idempotencyKey: String, body: CustomerCreateRequest): Envelope<CustomerDto> = error("sin uso")
     override suspend fun getTableSession(branchId: String, sessionId: String): Envelope<TableSessionDto> = error("sin uso")
+    override suspend fun listIngredients(branchId: String, status: String, page: Int, perPage: Int): PagedEnvelope<IngredientDto> = error("sin uso")
+    override suspend fun createInventoryMovement(branchId: String, idempotencyKey: String, body: InventoryMovementRequest): ResponseBody = error("sin uso")
+    override suspend fun createInventoryReceipt(branchId: String, idempotencyKey: String, body: InventoryReceiptRequest): ResponseBody = error("sin uso")
+    override suspend fun listInventoryCounts(branchId: String, status: String, perPage: Int): PagedEnvelope<InventoryCountDto> = error("sin uso")
+    override suspend fun createInventoryCount(branchId: String, idempotencyKey: String, body: InventoryCountCreateRequest): Envelope<InventoryCountDto> = error("sin uso")
+    override suspend fun replaceInventoryCountLines(branchId: String, countId: String, ifMatch: String, body: InventoryCountLinesRequest): Envelope<InventoryCountDto> = error("sin uso")
+    override suspend fun setFoodSafety(branchId: String, ingredientId: String, body: FoodSafetyRequest): ResponseBody = error("sin uso")
     override suspend fun listNotifications(branchId: String, perPage: Int): NotificationPageDto = error("sin uso")
     override suspend fun readNotification(branchId: String, notificationId: String): Envelope<NotificationDto> = error("sin uso")
     override suspend fun readAllNotifications(branchId: String): Envelope<NotificationsReadDto> = error("sin uso")

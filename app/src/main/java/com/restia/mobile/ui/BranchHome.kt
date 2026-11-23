@@ -21,6 +21,9 @@ import com.restia.mobile.ui.checks.CheckPermissions
 import com.restia.mobile.ui.checks.CheckScreen
 import com.restia.mobile.ui.checks.CheckViewModel
 import com.restia.mobile.ui.kitchen.AvailabilityViewModel
+import com.restia.mobile.ui.inventory.InventoryPermissions
+import com.restia.mobile.ui.inventory.InventoryScreen
+import com.restia.mobile.ui.inventory.InventoryViewModel
 import com.restia.mobile.ui.kitchen.KitchenScreen
 import com.restia.mobile.ui.kitchen.KitchenViewModel
 import com.restia.mobile.ui.more.HomeScaffold
@@ -186,7 +189,7 @@ fun BranchHome(
                 if (session != null && "orders.read" in permissions) {
                     inNotifications = false
                     sessionId = session
-                    tableNumber = notice.tableNumber
+                    tableNumber = notice.tableNumber ?: 0
                     capturing = false
                     viewingCheck = notice.checkId != null && "checks.read" in permissions
                 }
@@ -281,6 +284,16 @@ fun BranchHome(
                     onTables = {},
                     onLogout = onLogout,
                     onChangePassword = {},
+                )
+                HomeTab.INVENTORY -> InventoryScreen(
+                    viewModel = viewModel(key = "inventario-$userId-$branchId", factory = InventoryViewModel.Factory(repositories.inventory, branchId)),
+                    branchName = branchName,
+                    permissions = InventoryPermissions(
+                        waste = "inventory.record_waste" in permissions,
+                        receive = "inventory.receive" in permissions,
+                        count = "inventory.count" in permissions,
+                        block = "inventory.food_safety" in permissions,
+                    ),
                 )
                 HomeTab.MORE -> MoreScreen(
                     userName = userName,

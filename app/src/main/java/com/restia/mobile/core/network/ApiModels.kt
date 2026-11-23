@@ -117,11 +117,12 @@ data class TableSessionDto(
 @Serializable
 data class NotificationDto(
     val id: String,
-    /** ORDER_READY, CHECK_REQUESTED, PAYMENT_CONFIRMED, PAYMENT_FAILED o PAYMENT_UNKNOWN. */
+    /** ORDER_READY, CHECK_REQUESTED, PAYMENT_CONFIRMED, PAYMENT_FAILED, PAYMENT_UNKNOWN o LOW_STOCK. */
     val type: String,
     val title: String,
     val body: String,
-    val tableNumber: Int = 0,
+    /** Null en los avisos que no son de una mesa (LOW_STOCK). */
+    val tableNumber: Int? = null,
     val sessionId: String? = null,
     val checkId: String? = null,
     val count: Int = 1,
@@ -640,3 +641,56 @@ data class CheckMoveUnitsRequest(val unitIds: List<String>, val targetCheckId: S
 /** C-7: solo cortesía de la unidad completa. Sin valor por omisión: el serializador no enviaría `type`. */
 @Serializable
 data class CheckAdjustmentRequest(val unitId: String, val type: String, val reason: String)
+
+// ---------------------------------------------------------------- Inventario de cocina
+
+@Serializable
+data class FoodSafetyBlockDto(val reason: String, val blockedAt: String? = null)
+
+@Serializable
+data class IngredientDto(
+    val id: String,
+    val code: String,
+    val name: String,
+    /** G, KG, ML, L o PIECE. */
+    val baseUnit: String,
+    val minStock: String,
+    val stock: String,
+    val status: String = "ACTIVE",
+    val foodSafetyBlock: FoodSafetyBlockDto? = null,
+    val version: Int = 0,
+)
+
+@Serializable
+data class InventoryMovementRequest(val ingredientId: String, val type: String, val quantity: String, val reason: String)
+
+@Serializable
+data class InventoryReceiptLineRequest(val ingredientId: String, val quantity: String, val unitCost: MoneyDto)
+
+@Serializable
+data class InventoryReceiptRequest(
+    val supplierName: String,
+    val reference: String? = null,
+    val receivedAt: String,
+    val lines: List<InventoryReceiptLineRequest>,
+)
+
+@Serializable
+data class InventoryCountLineDto(val ingredientId: String, val counted: String, val countedAt: String)
+
+@Serializable
+data class InventoryCountDto(
+    val id: String,
+    val status: String,
+    val lines: List<InventoryCountLineDto> = emptyList(),
+    val version: Int = 0,
+)
+
+@Serializable
+data class InventoryCountCreateRequest(val notes: String? = null)
+
+@Serializable
+data class InventoryCountLinesRequest(val lines: List<InventoryCountLineDto>)
+
+@Serializable
+data class FoodSafetyRequest(val blocked: Boolean, val reason: String)

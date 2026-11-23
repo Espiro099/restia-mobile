@@ -88,6 +88,7 @@ private fun noticeLook(type: String): NoticeLook {
         "CHECK_REQUESTED" -> NoticeLook(R.drawable.ic_receipt, tones.noOrder)
         "PAYMENT_CONFIRMED" -> NoticeLook(R.drawable.ic_state_check, tones.eating)
         "PAYMENT_FAILED" -> NoticeLook(R.drawable.ic_info, tones.waiting)
+        "LOW_STOCK" -> NoticeLook(R.drawable.ic_box, tones.waiting)
         else -> NoticeLook(R.drawable.ic_info, tones.noOrder)
     }
 }

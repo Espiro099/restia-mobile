@@ -5,7 +5,7 @@ import com.restia.mobile.ui.more.HomeTab
 /**
  * Pestañas de la barra inferior según el rol, y dentro de él, según los permisos que da la API.
  *
- * - Cocina: solo su cola (Cocina) y Más. No ve mesas ni comandas del salón.
+ * - Cocina: su cola (Cocina), Inventario y Más. No ve mesas ni comandas del salón.
  * - Mesero: Mesas, Comandas, Entregas (la cola vista para llevar lo que ya está listo) y Más.
  * - Gerente y administrador: todo lo del piso, como hasta ahora.
  *
@@ -17,7 +17,10 @@ fun homeTabs(role: String, permissions: Collection<String>): List<HomeTab> {
     val delivers = "order_units.deliver" in permissions
     return buildList {
         when (role) {
-            "KITCHEN" -> if (readsOrders && prepares) add(HomeTab.KITCHEN)
+            "KITCHEN" -> {
+                if (readsOrders && prepares) add(HomeTab.KITCHEN)
+                if ("inventory.read" in permissions) add(HomeTab.INVENTORY)
+            }
             "WAITER" -> {
                 if ("tables.read" in permissions) add(HomeTab.TABLES)
                 if (readsOrders) add(HomeTab.ORDERS)

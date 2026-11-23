@@ -67,6 +67,7 @@ enum class HomeTab(@DrawableRes val icon: Int, @StringRes val label: Int) {
     ORDERS(R.drawable.ic_receipt, R.string.tab_orders),
     KITCHEN(R.drawable.ic_kitchen, R.string.kitchen_title),
     DELIVERIES(R.drawable.ic_cloche, R.string.tab_deliveries),
+    INVENTORY(R.drawable.ic_box, R.string.tab_inventory),
     MORE(R.drawable.ic_more, R.string.tab_more),
 }
 
