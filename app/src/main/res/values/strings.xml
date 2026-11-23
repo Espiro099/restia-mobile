@@ -556,6 +556,7 @@
         <item quantity="other">Ver comanda · %1$d productos</item>
     </plurals>
     <string name="track_pending">Pendiente</string>
+    <string name="track_a11y">Seguimiento de la ronda: %1$s, paso %2$d de %3$d.</string>
     <string name="track_kitchen">Estado de la cocina</string>
     <string name="track_elapsed">%1$s transcurridos</string>
     <string name="track_time_ago">%1$s · hace %2$s</string>

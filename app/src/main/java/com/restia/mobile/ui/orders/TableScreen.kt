@@ -5,10 +5,8 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -296,74 +294,6 @@ private fun unitTone(status: String): Color = when (status) {
 }
 
 /** Verde de un paso ya cumplido del seguimiento (propuesta 04). */
-private val StepDone = Color(0xFF2F9E5B)
-
-/**
- * Estado de la cocina (propuesta 04): cuatro círculos unidos por una línea. Cumplido en verde, el actual en
- * naranja (ambos con palomita) y lo pendiente en crema con un reloj. Debajo, el nombre del paso y, para lo
- * pendiente, "Pendiente".
- */
-@Composable
-private fun RoundStepper(stage: Int, startedAt: String?) {
-    val line = MaterialTheme.colorScheme.outlineVariant
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        // La línea va detrás de los círculos, del centro del primero al del último (un octavo del ancho a cada lado).
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = maxWidth / (ROUND_STEPS.size * 2))
-                .padding(top = 22.dp)
-                .height(1.dp)
-                .background(line),
-        )
-        Row(modifier = Modifier.fillMaxWidth()) {
-            ROUND_STEPS.forEachIndexed { i, label ->
-                val done = i < stage || (i == stage && i == ROUND_STEPS.lastIndex)
-                val current = i == stage && !done
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(7.dp),
-                ) {
-                    val fill = when {
-                        done -> StepDone
-                        current -> MaterialTheme.colorScheme.primary
-                        else -> MaterialTheme.colorScheme.background
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(fill)
-                            .border(1.dp, if (done || current) fill else Color(0xFFD5B79C), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            painterResource(if (done || current) R.drawable.ic_state_check else R.drawable.ic_clock),
-                            contentDescription = null,
-                            tint = if (done || current) Color(0xFFFFFCF9) else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                    Text(
-                        stringResource(label),
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = if (current) FontWeight.Bold else FontWeight.Normal),
-                        textAlign = TextAlign.Center,
-                    )
-                    val detail = when {
-                        i == 0 -> startedAt
-                        i > stage -> stringResource(R.string.track_pending)
-                        else -> null
-                    }
-                    detail?.let {
-                        Text(it, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Normal), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
-    }
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ItemRow(
@@ -457,7 +387,7 @@ private fun RoundSection(
                     Text(stringResource(R.string.track_elapsed, waitText(minutes)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            RoundStepper(stage, time)
+            RoundTracker(stage, time)
         }
         Row {
             Text(stringResource(R.string.table_round_subtotal), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
