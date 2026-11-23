@@ -20,12 +20,8 @@ import com.restia.mobile.ui.orders.canJoin
 import com.restia.mobile.ui.orders.notesEditable
 import com.restia.mobile.ui.orders.sessionFailureText
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -39,6 +35,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -88,6 +85,8 @@ class FloorOpsPureTest {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FloorOpsFlowTest {
+    @get:Rule val main = MainDispatcherRule()
+
     private lateinit var server: MockWebServer
     private lateinit var api: SessionApi
     private val routes = mutableMapOf<String, () -> MockResponse>()
@@ -95,7 +94,6 @@ class FloorOpsFlowTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -113,7 +111,6 @@ class FloorOpsFlowTest {
     @After
     fun tearDown() {
         server.shutdown()
-        Dispatchers.resetMain()
     }
 
     private fun waitFor(condition: () -> Boolean) {
@@ -124,7 +121,7 @@ class FloorOpsFlowTest {
 
     private fun writes(method: String = "POST") = requests.filter { it.first.method == method }
 
-    private fun session() = SessionViewModel(TablesRepository(api), "b1", "s1")
+    private fun session() = main.track(SessionViewModel(TablesRepository(api), "b1", "s1"))
 
     @Test
     fun `juntar ofrece solo mesas libres y manda la version actual`() {
@@ -225,7 +222,7 @@ class FloorOpsFlowTest {
         routes["PATCH /branches/b1/orders/o1/items/i1"] = {
             MockResponse().setBody("""{"data":{"id":"o1","clientOrderUuid":"c1","status":"OPEN","total":{"amount":"10.00","currency":"MXN"},"items":[]}}""")
         }
-        val vm = TableViewModel(OrderRepository(api), "b1", "s1", pollMillis = 3_600_000)
+        val vm = main.track(TableViewModel(OrderRepository(api), "b1", "s1", pollMillis = 3_600_000))
         vm.refresh()
         waitFor { vm.state.value.loaded }
         val order = vm.state.value.orders.single()
@@ -243,7 +240,7 @@ class FloorOpsFlowTest {
     @Test
     fun `no se edita la nota de algo que cocina ya empezo`() {
         routes["GET /branches/b1/orders"] = { MockResponse().setBody(orders(null, "PENDING", "PREPARING")) }
-        val vm = TableViewModel(OrderRepository(api), "b1", "s1", pollMillis = 3_600_000)
+        val vm = main.track(TableViewModel(OrderRepository(api), "b1", "s1", pollMillis = 3_600_000))
         vm.refresh()
         waitFor { vm.state.value.loaded }
         val order = vm.state.value.orders.single()
@@ -259,7 +256,7 @@ class FloorOpsFlowTest {
         routes["GET /branches/b1/order-units"] = { MockResponse().setBody("""{"data":[],"meta":{"pagination":{"page":1,"perPage":100,"total":0,"lastPage":1}}}""") }
         routes["POST /branches/b1/order-units/u1/station"] = { MockResponse().setBody("{}") }
         routes["POST /branches/b1/order-units/u2/station"] = { error("ORDER_UNIT_INVALID_STATE") }
-        val vm = KitchenViewModel(KitchenRepository(api), "b1", pollMillis = 3_600_000)
+        val vm = main.track(KitchenViewModel(KitchenRepository(api), "b1", pollMillis = 3_600_000))
         vm.refresh()
         waitFor { vm.state.value.stations.size == 2 }
         val line = KitchenLine(

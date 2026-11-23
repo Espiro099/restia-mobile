@@ -9,11 +9,7 @@ import com.restia.mobile.ui.orders.GuestsState
 import com.restia.mobile.ui.orders.TableViewModel
 import com.restia.mobile.ui.orders.guestsFailureText
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -27,6 +23,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -64,6 +61,8 @@ class GuestsPureTest {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GuestsFlowTest {
+    @get:Rule val main = MainDispatcherRule()
+
     private lateinit var server: MockWebServer
     private lateinit var vm: TableViewModel
     private val routes = mutableMapOf<String, () -> MockResponse>()
@@ -71,7 +70,6 @@ class GuestsFlowTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -84,13 +82,12 @@ class GuestsFlowTest {
             .client(OkHttpClient.Builder().readTimeout(2, TimeUnit.SECONDS).retryOnConnectionFailure(false).build())
             .addConverterFactory(ApiJson.asConverterFactory("application/json".toMediaType())).build()
             .create(SessionApi::class.java)
-        vm = TableViewModel(OrderRepository(api), "b1", "s1", pollMillis = 3_600_000, sessions = TablesRepository(api))
+        vm = main.track(TableViewModel(OrderRepository(api), "b1", "s1", pollMillis = 3_600_000, sessions = TablesRepository(api)))
     }
 
     @After
     fun tearDown() {
         server.shutdown()
-        Dispatchers.resetMain()
     }
 
     private fun waitFor(condition: () -> Boolean) {

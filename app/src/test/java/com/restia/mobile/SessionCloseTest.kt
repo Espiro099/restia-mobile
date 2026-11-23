@@ -11,11 +11,7 @@ import com.restia.mobile.ui.orders.closeFailureText
 import com.restia.mobile.ui.tables.TablesViewModel
 import com.restia.mobile.ui.tables.needsCleaning
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -28,6 +24,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -65,6 +62,8 @@ class SessionClosePureTest {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionCloseFlowTest {
+    @get:Rule val main = MainDispatcherRule()
+
     private lateinit var server: MockWebServer
     private lateinit var tables: TablesRepository
     private lateinit var orders: OrderRepository
@@ -73,7 +72,6 @@ class SessionCloseFlowTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -94,7 +92,6 @@ class SessionCloseFlowTest {
     @After
     fun tearDown() {
         server.shutdown()
-        Dispatchers.resetMain()
     }
 
     private fun waitFor(condition: () -> Boolean) {
@@ -105,7 +102,7 @@ class SessionCloseFlowTest {
 
     private fun posts() = requests.filter { it.first.method == "POST" }
 
-    private fun table() = TableViewModel(orders, "b1", "s1", pollMillis = 3_600_000, sessions = tables)
+    private fun table() = main.track(TableViewModel(orders, "b1", "s1", pollMillis = 3_600_000, sessions = tables))
 
     @Test
     fun `cierra con la version actual de la sesion y vuelve a las mesas`() {
@@ -154,7 +151,7 @@ class SessionCloseFlowTest {
         assertTrue(posts().isEmpty())
     }
 
-    private fun floor(): TablesViewModel = TablesViewModel(tables, "b1", pollMillis = 3_600_000)
+    private fun floor(): TablesViewModel = main.track(TablesViewModel(tables, "b1", pollMillis = 3_600_000))
 
     private val dirty = TableDto("t1", 4, 4, status = "ACTIVE", operationalState = "POR_LIMPIAR", currentSessionId = "s1")
 
