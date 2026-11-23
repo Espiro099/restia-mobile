@@ -11,11 +11,7 @@ import com.restia.mobile.ui.kitchen.KitchenViewModel
 import com.restia.mobile.ui.kitchen.kitchenFailureText
 import com.restia.mobile.ui.kitchen.tickets
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -29,6 +25,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -82,6 +79,8 @@ class KitchenPureTest {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class KitchenFlowTest {
+    @get:Rule val main = MainDispatcherRule()
+
     private lateinit var server: MockWebServer
     private lateinit var vm: KitchenViewModel
     private var queue: (RecordedRequest) -> MockResponse = { MockResponse().setBody(page()) }
@@ -91,7 +90,6 @@ class KitchenFlowTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -109,14 +107,12 @@ class KitchenFlowTest {
             .client(OkHttpClient.Builder().readTimeout(2, TimeUnit.SECONDS).retryOnConnectionFailure(false).build())
             .addConverterFactory(ApiJson.asConverterFactory("application/json".toMediaType())).build()
             .create(SessionApi::class.java)
-        vm = KitchenViewModel(KitchenRepository(api), "b1", pollMillis = 3_600_000, newKey = { "clave-${++keys}" })
+        vm = main.track(KitchenViewModel(KitchenRepository(api), "b1", pollMillis = 3_600_000, newKey = { "clave-${++keys}" }))
     }
 
     @After
     fun tearDown() {
-        vm.stopPolling()
         server.shutdown()
-        Dispatchers.resetMain()
     }
 
     private fun waitFor(condition: () -> Boolean) {

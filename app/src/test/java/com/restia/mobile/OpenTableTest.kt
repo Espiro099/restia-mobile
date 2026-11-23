@@ -10,11 +10,7 @@ import com.restia.mobile.ui.tables.OpenedSession
 import com.restia.mobile.ui.tables.TablesViewModel
 import com.restia.mobile.ui.tables.isOpenable
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -29,6 +25,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -41,6 +38,8 @@ private fun conflict(code: String, details: String = "") =
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class OpenTableTest {
+    @get:Rule val main = MainDispatcherRule()
+
     private lateinit var server: MockWebServer
     private lateinit var vm: TablesViewModel
     private val mesa = TableDto("t1", 1, 4, null, "ACTIVE", "LIBRE")
@@ -49,7 +48,6 @@ class OpenTableTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.start()
         // 127.0.0.1 y no "localhost": en Linux localhost también es ::1, y si la primera petición de una
@@ -57,13 +55,12 @@ class OpenTableTest {
         val api = Retrofit.Builder().baseUrl("http://127.0.0.1:${server.port}/").client(OkHttpClient.Builder().readTimeout(2, TimeUnit.SECONDS).retryOnConnectionFailure(false).build())
             .addConverterFactory(ApiJson.asConverterFactory("application/json".toMediaType())).build()
             .create(SessionApi::class.java)
-        vm = TablesViewModel(TablesRepository(api), "b1", newKey = { "clave-${++uuids}" })
+        vm = main.track(TablesViewModel(TablesRepository(api), "b1", newKey = { "clave-${++uuids}" }))
     }
 
     @After
     fun tearDown() {
         server.shutdown()
-        Dispatchers.resetMain()
     }
 
     private fun respond(vararg answers: MockResponse) {

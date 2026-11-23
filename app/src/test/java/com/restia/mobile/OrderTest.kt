@@ -25,12 +25,8 @@ import com.restia.mobile.ui.tables.hasSession
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -46,6 +42,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -105,6 +102,8 @@ class OrderCartTest {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class OrderFlowTest {
+    @get:Rule val main = MainDispatcherRule()
+
     private lateinit var server: MockWebServer
     private lateinit var api: SessionApi
     private lateinit var vm: OrderViewModel
@@ -119,7 +118,6 @@ class OrderFlowTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -139,7 +137,6 @@ class OrderFlowTest {
     @After
     fun tearDown() {
         server.shutdown()
-        Dispatchers.resetMain()
     }
 
     private fun waitFor(condition: () -> Boolean) {
@@ -153,10 +150,10 @@ class OrderFlowTest {
         waitFor { vm.state.value.ready && (vm.state.value.menu != null || vm.state.value.menuFailure != null) }
     }
 
-    private fun newViewModel(user: String = "u1") = OrderViewModel(
+    private fun newViewModel(user: String = "u1") = main.track(OrderViewModel(
         MenuRepository(api), OrderRepository(api), DraftRepository(blobs), contact, "b1", user, "s1", 7,
         newUuid = { "uuid-${++uuids}" }, now = { Instant.parse("2026-11-03T10:00:00Z") },
-    )
+    ))
 
     private fun addAgua(quantity: Int = 1) {
         vm.selectProduct(vm.state.value.menu!!.products.first { it.id == "p1" })

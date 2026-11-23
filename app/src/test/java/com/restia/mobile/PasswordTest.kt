@@ -12,12 +12,8 @@ import com.restia.mobile.ui.account.PasswordProblem
 import com.restia.mobile.ui.account.isValidEmail
 import com.restia.mobile.ui.account.passwordProblem
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -30,6 +26,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -54,6 +51,8 @@ class PasswordPureTest {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PasswordFlowTest {
+    @get:Rule val main = MainDispatcherRule()
+
     private lateinit var server: MockWebServer
     private lateinit var api: SessionApi
     private lateinit var publicApi: PublicAuthApi
@@ -62,7 +61,6 @@ class PasswordFlowTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -81,7 +79,6 @@ class PasswordFlowTest {
     @After
     fun tearDown() {
         server.shutdown()
-        Dispatchers.resetMain()
     }
 
     private fun waitFor(condition: () -> Boolean) {
@@ -94,7 +91,7 @@ class PasswordFlowTest {
 
     @Test
     fun `cambiar la contrasena muestra el error del campo y luego borra lo escrito`() {
-        val vm = ChangePasswordViewModel(PasswordRepository(publicApi, api))
+        val vm = main.track(ChangePasswordViewModel(PasswordRepository(publicApi, api)))
         vm.edit { it.copy(current = "mala", new = "una frase larga", confirm = "una frase larga") }
         answers += MockResponse().setResponseCode(422).setBody(
             """{"error":{"code":"VALIDATION_FAILED","message":"Datos inválidos.","details":{"fields":{"currentPassword":["La contraseña actual no es correcta."]}}}}""",
@@ -113,7 +110,7 @@ class PasswordFlowTest {
 
     @Test
     fun `olvide mi contrasena siempre confirma igual`() {
-        val vm = ForgotPasswordViewModel(PasswordRepository(publicApi, api))
+        val vm = main.track(ForgotPasswordViewModel(PasswordRepository(publicApi, api)))
         vm.open(" ana@demo.mx ")
         assertEquals("ana@demo.mx", vm.state.value.email)
         answers += MockResponse().setResponseCode(204)

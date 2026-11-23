@@ -9,11 +9,7 @@ import com.restia.mobile.ui.reservations.ReservationsViewModel
 import java.time.Instant
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -25,6 +21,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -38,6 +35,8 @@ private fun customers(vararg rows: String) = """{"data":[${rows.joinToString()}]
 @OptIn(ExperimentalCoroutinesApi::class)
 /** Clientes desde una reserva: buscar por teléfono y registrar al reservar. La ficha completa está en el panel web. */
 class ReservationCustomersTest {
+    @get:Rule val main = MainDispatcherRule()
+
     private lateinit var server: MockWebServer
     private lateinit var api: SessionApi
     private val answers = ArrayDeque<MockResponse>()
@@ -46,7 +45,6 @@ class ReservationCustomersTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -72,7 +70,6 @@ class ReservationCustomersTest {
     @After
     fun tearDown() {
         server.shutdown()
-        Dispatchers.resetMain()
     }
 
     private fun waitFor(condition: () -> Boolean) {
@@ -83,10 +80,10 @@ class ReservationCustomersTest {
 
     private fun sent(path: String) = requests.filter { it.first.requestUrl!!.encodedPath == path }
 
-    private fun reservationsVm() = ReservationsViewModel(
+    private fun reservationsVm() = main.track(ReservationsViewModel(
         ReservationsRepository(api), TablesRepository(api), "b1", ZoneId.of("America/Mexico_City"), { Instant.parse("2026-11-20T16:00:00Z") },
         pollMillis = 3_600_000, newKey = { "clave-${++keys}" }, customers = CustomersRepository(api), canRegisterCustomers = true,
-    )
+    ))
 
     private val reservation = """{"data":{"id":"r1","status":"PENDING","startAt":"2026-11-20T20:00:00Z","endAt":"2026-11-20T21:30:00Z","partySize":2,
         "customer":{"customerId":"c1","name":"Ana López","phone":"+523312345678"},"confirmationCode":"ABCD2345","version":1}}"""

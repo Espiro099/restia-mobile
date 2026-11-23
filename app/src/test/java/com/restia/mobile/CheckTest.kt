@@ -14,11 +14,7 @@ import com.restia.mobile.ui.checks.isPayable
 import com.restia.mobile.ui.checks.parseAmount
 import java.math.BigDecimal
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -34,6 +30,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -108,6 +105,8 @@ class CheckPureTest {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CheckFlowTest {
+    @get:Rule val main = MainDispatcherRule()
+
     private lateinit var server: MockWebServer
     private lateinit var vm: CheckViewModel
     private val gets = mutableMapOf<String, () -> MockResponse>()
@@ -117,7 +116,6 @@ class CheckFlowTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -132,7 +130,7 @@ class CheckFlowTest {
             .client(OkHttpClient.Builder().readTimeout(2, TimeUnit.SECONDS).retryOnConnectionFailure(false).build())
             .addConverterFactory(ApiJson.asConverterFactory("application/json".toMediaType())).build()
             .create(SessionApi::class.java)
-        vm = CheckViewModel(CheckRepository(api), "b1", "s1", pollMillis = 3_600_000, newKey = { "clave-${++keys}" })
+        vm = main.track(CheckViewModel(CheckRepository(api), "b1", "s1", pollMillis = 3_600_000, newKey = { "clave-${++keys}" }))
         gets["/branches/b1/checks"] = { MockResponse().setBody(pageOf(checkJson())) }
         gets["/branches/b1/cash-shifts"] = { MockResponse().setBody(pageOf("""{"id":"sh1","branchId":"b1","cashRegisterId":"r1","status":"OPEN","businessDate":"2026-11-10","openedBy":"m","openedAt":"2026-11-10T12:00:00Z","version":1}""")) }
         gets["/branches/b1/cash-registers"] = { MockResponse().setBody(pageOf("""{"id":"r1","branchId":"b1","code":"C1","name":"Caja principal","status":"ACTIVE","version":1}""")) }
@@ -140,9 +138,7 @@ class CheckFlowTest {
 
     @After
     fun tearDown() {
-        vm.stopPolling()
         server.shutdown()
-        Dispatchers.resetMain()
     }
 
     private fun waitFor(condition: () -> Boolean) {

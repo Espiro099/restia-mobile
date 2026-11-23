@@ -15,11 +15,7 @@ import com.restia.mobile.ui.printing.canReprint
 import com.restia.mobile.ui.printing.canResolve
 import com.restia.mobile.ui.printing.canRetry
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -33,6 +29,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -75,6 +72,8 @@ class PrintJobsPureTest {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PrintJobsFlowTest {
+    @get:Rule val main = MainDispatcherRule()
+
     private lateinit var server: MockWebServer
     private lateinit var api: SessionApi
     private val answers = ArrayDeque<MockResponse>()
@@ -88,7 +87,6 @@ class PrintJobsFlowTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -120,7 +118,6 @@ class PrintJobsFlowTest {
     @After
     fun tearDown() {
         server.shutdown()
-        Dispatchers.resetMain()
     }
 
     /** Copia tomada con el bloqueo: el servidor simulado agrega peticiones desde otro hilo. */
@@ -135,7 +132,7 @@ class PrintJobsFlowTest {
     private fun posts(path: String) = sent().filter { it.first.method == "POST" && it.first.requestUrl!!.encodedPath == path }
 
     private fun loaded(can: PrintPermissions = PrintPermissions(resolve = true, reprint = true)): PrintJobsViewModel {
-        val vm = PrintJobsViewModel(PrintingRepository(api), "b1", can, newKey = { "clave-${++keys}" })
+        val vm = main.track(PrintJobsViewModel(PrintingRepository(api), "b1", can, newKey = { "clave-${++keys}" }))
         vm.refresh()
         waitFor { vm.state.value.loaded }
         return vm

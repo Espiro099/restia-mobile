@@ -17,12 +17,8 @@ import com.restia.mobile.ui.orders.readyUnits
 import com.restia.mobile.ui.orders.unitStatusLabel
 import com.restia.mobile.ui.orders.voidableUnits
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -37,6 +33,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -112,6 +109,8 @@ class TableViewPureTest {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TableViewFlowTest {
+    @get:Rule val main = MainDispatcherRule()
+
     private lateinit var server: MockWebServer
     private lateinit var repo: OrderRepository
     private lateinit var vm: TableViewModel
@@ -123,7 +122,6 @@ class TableViewFlowTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -139,14 +137,12 @@ class TableViewFlowTest {
             .addConverterFactory(ApiJson.asConverterFactory("application/json".toMediaType())).build()
             .create(SessionApi::class.java)
         repo = OrderRepository(api)
-        vm = TableViewModel(repo, "b1", "s1", pollMillis = 3_600_000, newKey = { "clave-${++keys}" })
+        vm = main.track(TableViewModel(repo, "b1", "s1", pollMillis = 3_600_000, newKey = { "clave-${++keys}" }))
     }
 
     @After
     fun tearDown() {
-        vm.stopPolling()
         server.shutdown()
-        Dispatchers.resetMain()
     }
 
     private fun waitFor(condition: () -> Boolean) {
@@ -441,7 +437,7 @@ class TableViewFlowTest {
 
     private fun voidVm(direct: Boolean) {
         vm.stopPolling()
-        vm = TableViewModel(repo, "b1", "s1", canVoidDirectly = direct, pollMillis = 3_600_000, newKey = { "clave-${++keys}" }, now = { clock })
+        vm = main.track(TableViewModel(repo, "b1", "s1", canVoidDirectly = direct, pollMillis = 3_600_000, newKey = { "clave-${++keys}" }, now = { clock }))
     }
 
     private fun approvalOk(expiresIn: Int = 120) = MockResponse().setResponseCode(201).setBody("""{"data":{"approvalToken":"token-1","expiresIn":$expiresIn},"meta":{}}""")

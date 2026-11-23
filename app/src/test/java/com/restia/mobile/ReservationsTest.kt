@@ -15,11 +15,7 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import okhttp3.MediaType.Companion.toMediaType
@@ -34,6 +30,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -85,6 +82,8 @@ class ReservationsPureTest {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReservationsFlowTest {
+    @get:Rule val main = MainDispatcherRule()
+
     private lateinit var server: MockWebServer
     private lateinit var vm: ReservationsViewModel
     private val gets = mutableMapOf<String, () -> MockResponse>()
@@ -94,7 +93,6 @@ class ReservationsFlowTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -111,14 +109,12 @@ class ReservationsFlowTest {
             .create(SessionApi::class.java)
         gets["/branches/b1/tables"] = { MockResponse().setBody(TABLES) }
         gets["/branches/b1/reservations/waiting-queue"] = { MockResponse().setBody("""{"data":[]}""") }
-        vm = ReservationsViewModel(ReservationsRepository(api), TablesRepository(api), "b1", ZONE, { NOW }, pollMillis = 3_600_000, newKey = { "clave-${++keys}" })
+        vm = main.track(ReservationsViewModel(ReservationsRepository(api), TablesRepository(api), "b1", ZONE, { NOW }, pollMillis = 3_600_000, newKey = { "clave-${++keys}" }))
     }
 
     @After
     fun tearDown() {
-        vm.stopPolling()
         server.shutdown()
-        Dispatchers.resetMain()
     }
 
     private fun waitFor(condition: () -> Boolean) {

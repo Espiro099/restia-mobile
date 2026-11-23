@@ -8,11 +8,7 @@ import com.restia.mobile.data.orders.MenuRepository
 import com.restia.mobile.ui.kitchen.AvailabilityViewModel
 import com.restia.mobile.ui.kitchen.availabilityOrder
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -24,6 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -51,6 +48,8 @@ class AvailabilityPureTest {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AvailabilityFlowTest {
+    @get:Rule val main = MainDispatcherRule()
+
     private lateinit var server: MockWebServer
     private lateinit var vm: AvailabilityViewModel
     private val routes = mutableMapOf<String, () -> MockResponse>()
@@ -58,7 +57,6 @@ class AvailabilityFlowTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -76,13 +74,12 @@ class AvailabilityFlowTest {
                 """{"data":{"menuVersion":1,"products":[${productJson("p1", "Agua", "AVAILABLE")},${productJson("p2", "Limonada", "SOLD_OUT")}],"modifiers":[]}}""",
             )
         }
-        vm = AvailabilityViewModel(MenuRepository(api), "b1")
+        vm = main.track(AvailabilityViewModel(MenuRepository(api), "b1"))
     }
 
     @After
     fun tearDown() {
         server.shutdown()
-        Dispatchers.resetMain()
     }
 
     private fun waitFor(condition: () -> Boolean) {

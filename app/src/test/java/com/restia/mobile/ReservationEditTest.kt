@@ -16,11 +16,7 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -34,6 +30,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -83,6 +80,8 @@ class ReservationEditPureTest {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReservationEditFlowTest {
+    @get:Rule val main = MainDispatcherRule()
+
     private lateinit var server: MockWebServer
     private lateinit var api: SessionApi
     private val gets = mutableMapOf<String, () -> MockResponse>()
@@ -92,7 +91,6 @@ class ReservationEditFlowTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
@@ -116,7 +114,6 @@ class ReservationEditFlowTest {
     @After
     fun tearDown() {
         server.shutdown()
-        Dispatchers.resetMain()
     }
 
     private fun waitFor(condition: () -> Boolean) {
@@ -129,7 +126,7 @@ class ReservationEditFlowTest {
         gets["/branches/b1/reservations"] = {
             MockResponse().setBody("""{"data":[${reservationJson(3)}],"meta":{"pagination":{"page":1,"perPage":100,"total":1,"lastPage":1}}}""")
         }
-        val vm = ReservationsViewModel(ReservationsRepository(api), TablesRepository(api), "b1", MX, { TODAY }, pollMillis = 3_600_000, newKey = { "clave-${++keys}" })
+        val vm = main.track(ReservationsViewModel(ReservationsRepository(api), TablesRepository(api), "b1", MX, { TODAY }, pollMillis = 3_600_000, newKey = { "clave-${++keys}" }))
         vm.refresh()
         waitFor { vm.state.value.loaded }
         return vm
@@ -180,7 +177,7 @@ class ReservationEditFlowTest {
             )
         }
         answers += MockResponse().setResponseCode(204)
-        val vm = SessionsViewModel(SessionsRepository(api))
+        val vm = main.track(SessionsViewModel(SessionsRepository(api)))
         vm.load()
         waitFor { vm.state.value.loaded }
         assertEquals(listOf("a1", "w1"), vm.state.value.sessions.map { it.id })
@@ -201,7 +198,7 @@ class ReservationEditFlowTest {
             MockResponse().setBody("""{"data":[${session("a1", true)},${session("a2", false)}],"meta":{"pagination":{"page":1,"perPage":50,"total":2,"lastPage":1}}}""")
         }
         answers += MockResponse().setResponseCode(404).setBody("""{"error":{"code":"NOT_FOUND","message":"x"}}""")
-        val vm = SessionsViewModel(SessionsRepository(api))
+        val vm = main.track(SessionsViewModel(SessionsRepository(api)))
         vm.load()
         waitFor { vm.state.value.loaded }
         vm.ask(vm.state.value.sessions.last())
