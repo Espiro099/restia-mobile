@@ -22,6 +22,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -284,7 +285,7 @@ private fun ResolveDialog(form: ResolveForm, viewModel: CashViewModel) {
 private fun tipSuffix(tip: MoneyDto): String = if (amountOf(tip).signum() > 0) " " + stringResource(R.string.cash_plus_tip, money(tip)) else ""
 
 @Composable
-private fun PaymentRow(payment: PaymentDto, shiftOpen: Boolean, viewModel: CashViewModel) {
+private fun PaymentRow(payment: PaymentDto, shiftOpen: Boolean, viewModel: CashViewModel, enabled: Boolean = true) {
     val can = viewModel.can
     val alert = payment.status == "UNKNOWN" || payment.status == "PENDING"
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -300,9 +301,9 @@ private fun PaymentRow(payment: PaymentDto, shiftOpen: Boolean, viewModel: CashV
         }
         when {
             payment.status == "UNKNOWN" && can.reconcilePayments ->
-                TextButton(onClick = { viewModel.startReconcilePayment(payment) }) { Text(stringResource(R.string.cash_reconcile)) }
+                TextButton(onClick = { viewModel.startReconcilePayment(payment) }, enabled = enabled) { Text(stringResource(R.string.cash_reconcile)) }
             isRefundable(payment) && shiftOpen && can.refund ->
-                TextButton(onClick = { viewModel.startRefund(payment) }) { Text(stringResource(R.string.cash_refund)) }
+                TextButton(onClick = { viewModel.startRefund(payment) }, enabled = enabled) { Text(stringResource(R.string.cash_refund)) }
         }
     }
 }
@@ -406,6 +407,8 @@ private fun ShiftDetailScreen(state: CashUiState, detail: ShiftDetail, viewModel
                 )
                 if (closing) Text(stringResource(R.string.cash_closing_hint), style = MaterialTheme.typography.bodySmall)
             }
+            // Al recargar se ve que lo mostrado puede cambiar, y no se ofrece reembolsar lo que quizá ya se reembolsó.
+            if (detail.loading && detail.summary != null) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             detail.failure?.let { item { Text(stringResource(R.string.tables_stale) + " " + failureText(it), color = MaterialTheme.colorScheme.error) } }
             state.actionFailure?.let { item { Text(failureText(it), color = MaterialTheme.colorScheme.error) } }
             state.notice?.let { n -> item { Text(stringResource(n.text, n.arg ?: "")) } }
@@ -450,7 +453,7 @@ private fun ShiftDetailScreen(state: CashUiState, detail: ShiftDetail, viewModel
                 val payments = detail.payments.sortedBy { if (it.status == "UNKNOWN" || it.status == "PENDING") 0 else 1 }
                 item { Text(stringResource(R.string.cash_payments), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
                 if (payments.isEmpty() && !detail.loading) item { Text(stringResource(R.string.cash_no_payments), style = MaterialTheme.typography.bodySmall) }
-                items(payments, key = { "p-" + it.id }) { PaymentRow(it, open, viewModel) }
+                items(payments, key = { "p-" + it.id }) { PaymentRow(it, open, viewModel, enabled = !detail.loading) }
             }
             item { Text(stringResource(R.string.cash_movements), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
             if (detail.movements.isEmpty() && !detail.loading) item { Text(stringResource(R.string.cash_no_movements), style = MaterialTheme.typography.bodySmall) }

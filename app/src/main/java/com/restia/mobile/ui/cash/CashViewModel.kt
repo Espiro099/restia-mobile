@@ -23,6 +23,7 @@ import com.restia.mobile.ui.checks.parseAmount
 import com.restia.mobile.ui.orders.moneyText
 import java.math.BigDecimal
 import java.util.UUID
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -269,11 +270,19 @@ class CashViewModel(
         val detail = _state.value.detail ?: return
         _state.value = _state.value.copy(detail = detail.copy(loading = true))
         viewModelScope.launch {
-            val shift = repository.shift(branchId, detail.shift.id)
-            val summary = repository.summary(branchId, detail.shift.id)
-            val movements = repository.movements(branchId, detail.shift.id)
-            val payments = if (can.readPayments) repository.payments(branchId, detail.shift.id) else ApiResult.Success(emptyList())
-            val refunds = if (can.readRefunds) repository.unresolvedRefunds(branchId, detail.shift.id) else ApiResult.Success(emptyList())
+            // En paralelo: una tras otra eran cinco viajes y, con la API lenta, la pantalla seguía mostrando lo
+            // anterior (y el botón de reembolsar) varios segundos después de reembolsar.
+            val id = detail.shift.id
+            val shiftCall = async { repository.shift(branchId, id) }
+            val summaryCall = async { repository.summary(branchId, id) }
+            val movementsCall = async { repository.movements(branchId, id) }
+            val paymentsCall = async { if (can.readPayments) repository.payments(branchId, id) else ApiResult.Success(emptyList()) }
+            val refundsCall = async { if (can.readRefunds) repository.unresolvedRefunds(branchId, id) else ApiResult.Success(emptyList()) }
+            val shift = shiftCall.await()
+            val summary = summaryCall.await()
+            val movements = movementsCall.await()
+            val payments = paymentsCall.await()
+            val refunds = refundsCall.await()
             val current = _state.value.detail ?: return@launch
             val failure = listOf(shift, summary, movements, payments, refunds).filterIsInstance<ApiResult.Failure>().firstOrNull()?.failure
             _state.value = _state.value.copy(
@@ -299,6 +308,7 @@ class CashViewModel(
 
     /** El reembolso va al turno que se está viendo, que debe estar OPEN. */
     fun startRefund(payment: PaymentDto) {
+        if (_state.value.detail?.loading == true) return
         if (!can.refund || !isRefundable(payment) || _state.value.detail?.shift?.status != "OPEN") return
         _state.value = _state.value.copy(resolving = ResolveForm(ResolveKind.REFUND, payment = payment), notice = null)
     }
