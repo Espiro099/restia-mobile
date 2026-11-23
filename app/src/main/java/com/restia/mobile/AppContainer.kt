@@ -27,13 +27,10 @@ import com.restia.mobile.data.cash.CashRepository
 import com.restia.mobile.data.checks.CheckRepository
 import com.restia.mobile.data.kitchen.KitchenRepository
 import com.restia.mobile.data.customers.CustomersRepository
-import com.restia.mobile.data.members.MembersRepository
 import com.restia.mobile.data.orders.DraftRepository
 import com.restia.mobile.data.account.SessionsRepository
-import com.restia.mobile.data.devices.DevicesRepository
 import com.restia.mobile.data.notifications.NotificationsRepository
 import com.restia.mobile.data.printing.PrintingRepository
-import com.restia.mobile.data.reports.ReportsRepository
 import com.restia.mobile.data.reservations.ReservationsRepository
 import com.restia.mobile.data.orders.MenuRepository
 import com.restia.mobile.data.orders.OrderRepository
@@ -56,14 +53,11 @@ class Repositories(
     val checks: CheckRepository,
     val reservations: ReservationsRepository,
     val customers: CustomersRepository,
-    val members: MembersRepository,
     val passwords: PasswordRepository,
     val cash: CashRepository,
     val printing: PrintingRepository,
     val notifications: NotificationsRepository,
-    val reports: ReportsRepository,
     val sessions: SessionsRepository,
-    val devices: DevicesRepository,
 )
 
 fun buildRepositories(
@@ -106,14 +100,11 @@ fun buildRepositories(
         CheckRepository(sessionApi),
         ReservationsRepository(sessionApi),
         CustomersRepository(sessionApi),
-        MembersRepository(sessionApi),
         PasswordRepository(publicApi, sessionApi),
         CashRepository(sessionApi),
         PrintingRepository(sessionApi),
         NotificationsRepository(sessionApi),
-        ReportsRepository(sessionApi),
         SessionsRepository(sessionApi),
-        DevicesRepository(sessionApi),
     )
 }
 

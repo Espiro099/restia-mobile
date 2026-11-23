@@ -48,7 +48,6 @@ import androidx.lifecycle.compose.LifecycleStartEffect
 import com.restia.mobile.R
 import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.ReservationDto
-import com.restia.mobile.ui.customers.CustomerSummary
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -115,7 +114,6 @@ private fun ReservationCard(
     zone: ZoneId,
     position: Int?,
     viewModel: ReservationsViewModel,
-    onCustomer: (String) -> Unit,
 ) {
     val waiting = r.status == "ARRIVED_WAITING"
     val colors = if (waiting) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else CardDefaults.cardColors()
@@ -142,8 +140,6 @@ private fun ReservationCard(
                 if (can.noShow && canMarkNoShow(r, Instant.now())) TextButton(onClick = { viewModel.markNoShow(r) }, enabled = !busy) { Text(stringResource(R.string.reservation_mark_no_show)) }
                 if (can.update && canEdit(r)) TextButton(onClick = { viewModel.startEdit(r) }, enabled = !busy) { Text(stringResource(R.string.reservation_edit)) }
                 if (can.cancel && canCancel(r)) TextButton(onClick = { viewModel.startCancel(r) }, enabled = !busy) { Text(stringResource(R.string.reservation_cancel)) }
-                val customerId = r.customer.customerId
-                if (can.readCustomers && customerId != null) TextButton(onClick = { onCustomer(customerId) }) { Text(stringResource(R.string.reservation_view_customer)) }
             }
         }
     }
@@ -331,8 +327,6 @@ fun ReservationsScreen(
     can: ReservationPermissions,
     onBack: () -> Unit,
     onSeated: (sessionId: String, tableNumber: Int) -> Unit,
-    onCustomers: () -> Unit = {},
-    onCustomer: (customerId: String) -> Unit = {},
     zone: ZoneId = ZoneId.systemDefault(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -364,7 +358,6 @@ fun ReservationsScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.reservations_title)) },
                 actions = {
-                    if (can.readCustomers) TextButton(onClick = onCustomers) { Text(stringResource(R.string.customers_title)) }
                     TextButton(onClick = onBack) { Text(stringResource(R.string.order_back)) }
                 },
             )
@@ -405,7 +398,7 @@ fun ReservationsScreen(
                     if (state.queue.isNotEmpty()) {
                         item { Text(stringResource(R.string.reservation_queue, state.queue.size), style = MaterialTheme.typography.titleSmall) }
                         items(state.queue, key = { "fila-" + it.reservation.id }) { entry ->
-                            ReservationCard(entry.reservation, state, can, zone, entry.position, viewModel, onCustomer)
+                            ReservationCard(entry.reservation, state, can, zone, entry.position, viewModel)
                         }
                     }
                     val rest = state.reservations.filter { r -> state.queue.none { it.reservation.id == r.id } }
@@ -413,7 +406,7 @@ fun ReservationsScreen(
                     if (rest.isEmpty()) {
                         item { Text(stringResource(if (state.queue.isEmpty()) R.string.reservations_empty else R.string.reservations_only_waiting)) }
                     }
-                    items(rest, key = { it.id }) { r -> ReservationCard(r, state, can, zone, null, viewModel, onCustomer) }
+                    items(rest, key = { it.id }) { r -> ReservationCard(r, state, can, zone, null, viewModel) }
                 }
             }
         }

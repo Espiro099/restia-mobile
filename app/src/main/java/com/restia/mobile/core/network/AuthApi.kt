@@ -62,21 +62,6 @@ interface SessionApi {
         @Query("perPage") perPage: Int,
     ): PagedEnvelope<TableDto>
 
-    /** Hasta 92 días; `from` y `to` son días de negocio (YYYY-MM-DD), ambos incluidos. */
-    @GET("branches/{branchId}/reports/daily-sales")
-    suspend fun dailySales(
-        @Path("branchId") branchId: String,
-        @Query("from") from: String,
-        @Query("to") to: String,
-    ): Envelope<List<DailySalesDto>>
-
-    @GET("branches/{branchId}/reports/hourly-occupancy")
-    suspend fun hourlyOccupancy(
-        @Path("branchId") branchId: String,
-        @Query("from") from: String,
-        @Query("to") to: String,
-    ): Envelope<List<HourlyOccupancyDto>>
-
     @GET("branches/{branchId}/menu")
     suspend fun getMenu(
         @Path("branchId") branchId: String,
@@ -495,17 +480,6 @@ interface SessionApi {
         @Body body: CustomerCreateRequest,
     ): Envelope<CustomerDto>
 
-    @GET("branches/{branchId}/customers/{customerId}")
-    suspend fun getCustomer(@Path("branchId") branchId: String, @Path("customerId") customerId: String): Envelope<CustomerDto>
-
-    @PATCH("branches/{branchId}/customers/{customerId}")
-    suspend fun updateCustomer(
-        @Path("branchId") branchId: String,
-        @Path("customerId") customerId: String,
-        @Header("If-Match") ifMatch: String,
-        @Body body: CustomerUpdateRequest,
-    ): Envelope<CustomerDto>
-
     @GET("branches/{branchId}/table-sessions/{sessionId}")
     suspend fun getTableSession(
         @Path("branchId") branchId: String,
@@ -592,54 +566,4 @@ interface SessionApi {
         @Path("tableId") tableId: String,
         @Body body: CleaningConfirmationRequest,
     ): Envelope<TableSessionDto>
-
-    @GET("branches/{branchId}/members")
-    suspend fun listMembers(
-        @Path("branchId") branchId: String,
-        @Query("page") page: Int,
-        @Query("perPage") perPage: Int,
-    ): PagedEnvelope<MemberDto>
-
-    /** Sin Idempotency-Key: el backend rechaza un alta repetida con MEMBERSHIP_ALREADY_EXISTS. */
-    @POST("branches/{branchId}/members")
-    suspend fun createMember(@Path("branchId") branchId: String, @Body body: MemberCreateRequest): Envelope<MemberCreatedDto>
-
-    @PATCH("branches/{branchId}/members/{userId}")
-    suspend fun changeMemberRole(
-        @Path("branchId") branchId: String,
-        @Path("userId") userId: String,
-        @Header("If-Match") ifMatch: String,
-        @Body body: MemberRoleRequest,
-    ): Envelope<MemberDto>
-
-    @POST("branches/{branchId}/members/{userId}/revoke")
-    suspend fun revokeMember(
-        @Path("branchId") branchId: String,
-        @Path("userId") userId: String,
-        @Header("If-Match") ifMatch: String,
-        @Body body: ReasonRequest,
-    ): Envelope<MemberDto>
-
-    /** Solo un ADMIN de todas las sucursales del usuario; invalida el enlace anterior. */
-    @POST("users/{userId}/password-setup-link")
-    suspend fun passwordSetupLink(@Path("userId") userId: String): Envelope<PasswordSetupLinkDto>
-
-    /** 201; vence en 15 min y sirve una sola vez. Límite de 10 por usuario. */
-    @POST("branches/{branchId}/devices/enrollment-codes")
-    suspend fun createEnrollmentCode(@Path("branchId") branchId: String): Envelope<EnrollmentCodeDto>
-
-    @GET("branches/{branchId}/devices")
-    suspend fun listDevices(
-        @Path("branchId") branchId: String,
-        @Query("page") page: Int,
-        @Query("perPage") perPage: Int,
-    ): PagedEnvelope<DeviceDto>
-
-    /** 204; final e idempotente. Solo cambia uno ACTIVE y cierra sus sesiones. */
-    @POST("branches/{branchId}/devices/{deviceId}/block")
-    suspend fun blockDevice(@Path("branchId") branchId: String, @Path("deviceId") deviceId: String, @Body body: ReasonRequest): Response<Unit>
-
-    /** 204; como bloquear, para un equipo que ya no se usa. */
-    @POST("branches/{branchId}/devices/{deviceId}/retire")
-    suspend fun retireDevice(@Path("branchId") branchId: String, @Path("deviceId") deviceId: String, @Body body: ReasonRequest): Response<Unit>
 }

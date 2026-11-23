@@ -41,10 +41,6 @@ data class DeviceDto(
     val version: Int = 0,
 )
 
-/** Código de un solo uso para dar de alta un teléfono; se escribe en la pantalla de alta. */
-@Serializable
-data class EnrollmentCodeDto(val code: String, val expiresAt: String)
-
 @Serializable
 data class DeviceEnrollData(val device: DeviceDto, val deviceCredential: String)
 
@@ -187,35 +183,6 @@ data class CleaningConfirmationRequest(val membershipVersion: Int)
 
 @Serializable
 data class MoneyDto(val amount: String, val currency: String)
-
-/** Ventas de un día de negocio, por el día en que se confirmó el pago (RP-2). */
-@Serializable
-data class DailySalesDto(
-    val businessDate: String,
-    val netSales: MoneyDto,
-    val refunds: MoneyDto,
-    val tips: MoneyDto,
-    val courtesies: MoneyDto,
-    val invoiced: MoneyDto,
-    val checkCount: Int,
-    val guestCount: Int,
-    val byMethod: List<DailySalesMethodDto> = emptyList(),
-    val asOf: String,
-)
-
-@Serializable
-data class DailySalesMethodDto(val method: String, val sales: MoneyDto, val tips: MoneyDto, val refunds: MoneyDto)
-
-/** Actividad de una hora local del día de negocio; solo vienen las horas con actividad. */
-@Serializable
-data class HourlyOccupancyDto(
-    val businessDate: String,
-    val hour: Int,
-    val sessionsOpened: Int,
-    val tablesOccupied: Int,
-    val guestCount: Int,
-    val asOf: String,
-)
 
 @Serializable
 data class MenuProductDto(
@@ -545,16 +512,6 @@ data class CustomerCreateRequest(
     val preferences: List<String>? = null,
 )
 
-/** Solo los campos que cambian; con explicitNulls = false los null no se envían. */
-@Serializable
-data class CustomerUpdateRequest(
-    val name: String? = null,
-    val phone: String? = null,
-    val email: String? = null,
-    val notes: String? = null,
-    val preferences: List<String>? = null,
-)
-
 /** CU-3: por POST, para que el teléfono no viaje en la URL. */
 @Serializable
 data class CustomerSearchRequest(val phone: String? = null, val name: String? = null)
@@ -576,27 +533,6 @@ data class ApprovalRequest(
 
 @Serializable
 data class ApprovalData(val approvalToken: String, val expiresIn: Int)
-
-/** Usuario global; INVITED mientras no define su contraseña (U-2). */
-@Serializable
-data class MemberUserDto(val id: String, val email: String, val name: String, val status: String, val version: Int)
-
-/** Empleado de una sucursal: usuario más su membresía (U-1, U-4). */
-@Serializable
-data class MemberDto(val user: MemberUserDto, val branchId: String, val role: String, val active: Boolean, val version: Int)
-
-@Serializable
-data class MemberCreateRequest(val email: String, val name: String, val role: String)
-
-/** El enlace solo llega si esta alta creó al usuario, y se muestra una sola vez. */
-@Serializable
-data class MemberCreatedDto(val member: MemberDto, val setupUrl: String? = null, val setupExpiresAt: String? = null)
-
-@Serializable
-data class MemberRoleRequest(val role: String)
-
-@Serializable
-data class PasswordSetupLinkDto(val setupUrl: String, val expiresAt: String)
 
 @Serializable
 data class PasswordForgotRequest(val email: String)

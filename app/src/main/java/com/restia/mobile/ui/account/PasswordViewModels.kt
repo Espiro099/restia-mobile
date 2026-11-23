@@ -6,10 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.ApiResult
 import com.restia.mobile.data.account.PasswordRepository
-import com.restia.mobile.ui.members.isValidEmail
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+
+fun isValidEmail(email: String): Boolean = Regex("""^[^@\s]+@[^@\s]+\.[^@\s]+$""").matches(email.trim())
 
 const val MIN_PASSWORD = 12
 const val MAX_PASSWORD = 128

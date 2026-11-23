@@ -56,12 +56,10 @@ private fun failureText(failure: ApiFailure): String = when {
     else -> stringResource(R.string.error_unexpected)
 }
 
-/** Menú de la barra superior: personal (si puede verlo), cambiar contraseña y cerrar sesión. */
+/** Menú de la barra superior: impresión y caja (si puede verlas), cambiar contraseña y cerrar sesión. */
 @Composable
 fun AccountMenu(
-    showStaff: Boolean,
     logoutEnabled: Boolean,
-    onStaff: () -> Unit,
     onChangePassword: () -> Unit,
     onLogout: () -> Unit,
     showCash: Boolean = false,
@@ -78,9 +76,6 @@ fun AccountMenu(
             }
             if (showCash) {
                 DropdownMenuItem(text = { Text(stringResource(R.string.cash_title)) }, onClick = { open = false; onCash() })
-            }
-            if (showStaff) {
-                DropdownMenuItem(text = { Text(stringResource(R.string.staff_title)) }, onClick = { open = false; onStaff() })
             }
             DropdownMenuItem(text = { Text(stringResource(R.string.password_change_title)) }, onClick = { open = false; onChangePassword() })
             DropdownMenuItem(
