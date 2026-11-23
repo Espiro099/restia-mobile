@@ -173,20 +173,27 @@ class InventoryFlowTest {
     }
 
     @Test
-    fun `registra merma con clave de idempotencia y vuelve a cargar`() {
+    fun `registra merma con clave de idempotencia y vuelve a cargar hasta ver el stock nuevo`() {
         routes["POST /branches/b1/inventory-movements"] = { MockResponse().setResponseCode(201).setBody("""{"data":{"id":"m1"}}""") }
         loaded()
+        // El servidor proyecta la merma tras dos consultas más: se deja de preguntar al ver el stock nuevo.
+        var calls = 0
+        routes["GET /branches/b1/ingredients"] = {
+            calls++
+            MockResponse().setBody(if (calls < 3) ingredientsJson else ingredientsJson.replace("\"stock\":\"1.5\"", "\"stock\":\"1\""))
+        }
         vm.select(vm.state.value.ingredients.first())
         vm.start(InventoryAction.WASTE)
         vm.edit(InventoryForm(quantity = "0,5", reason = "Se echó a perder"))
         vm.save()
-        waitFor { vm.state.value.done != null && !vm.state.value.refreshing }
+        waitFor { vm.state.value.ingredients.first { it.id == "i1" }.stock == "1" && !vm.state.value.refreshing }
         val (request, body) = sent("POST", "/branches/b1/inventory-movements")
         assertEquals("""{"ingredientId":"i1","type":"WASTE","quantity":"0.5","reason":"Se echó a perder"}""", body)
         assertNotNull(request.getHeader("Idempotency-Key"))
         assertEquals(InventoryAction.WASTE to "Jitomate", vm.state.value.done)
         assertNull(vm.state.value.selected)
-        assertEquals(2, requests.count { it.first.requestUrl!!.encodedPath == "/branches/b1/ingredients" })
+        Thread.sleep(200)
+        assertEquals(4, requests.count { it.first.requestUrl!!.encodedPath == "/branches/b1/ingredients" })
     }
 
     @Test
@@ -253,5 +260,18 @@ class InventoryFlowTest {
         assertEquals(InventoryAction.BLOCK, vm.state.value.action)
         assertFalse(vm.state.value.saving)
         assertNull(vm.state.value.done)
+    }
+
+    @Test
+    fun `si el stock nunca cambia deja de preguntar tras cinco intentos`() {
+        routes["POST /branches/b1/inventory-receipts"] = { MockResponse().setResponseCode(201).setBody("""{"data":{"id":"r1"}}""") }
+        loaded()
+        vm.select(vm.state.value.ingredients.first())
+        vm.start(InventoryAction.RECEIVE)
+        vm.edit(InventoryForm(quantity = "1", unitCost = "10", supplier = "Proveedor"))
+        vm.save()
+        waitFor { requests.count { it.first.requestUrl!!.encodedPath == "/branches/b1/ingredients" } == 6 && !vm.state.value.refreshing }
+        Thread.sleep(200)
+        assertEquals(6, requests.count { it.first.requestUrl!!.encodedPath == "/branches/b1/ingredients" })
     }
 }

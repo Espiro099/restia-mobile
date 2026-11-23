@@ -102,11 +102,20 @@ class InventoryViewModel(
 
     fun load() {
         if (_state.value.refreshing) return
+        viewModelScope.launch { fetch() }
+    }
+
+    /** Pide la lista; devuelve el stock del insumo [watch] tal como llegó, o null si falló. */
+    private suspend fun fetch(watch: String? = null): String? {
         _state.value = _state.value.copy(refreshing = true)
-        viewModelScope.launch {
-            _state.value = when (val r = repo.ingredients(branchId)) {
-                is ApiResult.Success -> _state.value.copy(ingredients = r.value, loaded = true, refreshing = false, failure = null)
-                is ApiResult.Failure -> _state.value.copy(refreshing = false, failure = r.failure)
+        return when (val r = repo.ingredients(branchId)) {
+            is ApiResult.Success -> {
+                _state.value = _state.value.copy(ingredients = r.value, loaded = true, refreshing = false, failure = null)
+                r.value.firstOrNull { it.id == watch }?.stock
+            }
+            is ApiResult.Failure -> {
+                _state.value = _state.value.copy(refreshing = false, failure = r.failure)
+                null
             }
         }
     }
@@ -150,11 +159,24 @@ class InventoryViewModel(
                 is ApiResult.Success -> {
                     _state.value = _state.value.copy(saving = false, selected = null, action = null, form = InventoryForm(), done = action to ingredient.name)
                     // El conteo no mueve el stock hasta que el gerente lo aplica; el bloqueo se ve al momento.
-                    if (action == InventoryAction.WASTE || action == InventoryAction.RECEIVE) delay(settleMillis)
-                    load()
+                    if (action == InventoryAction.WASTE || action == InventoryAction.RECEIVE) {
+                        // El servidor proyecta el movimiento unos segundos después: se vuelve a pedir hasta ver
+                        // el stock nuevo, unas cuantas veces como mucho.
+                        repeat(SETTLE_TRIES) {
+                            delay(settleMillis)
+                            val now = fetch(watch = ingredient.id)
+                            if (now != null && now != ingredient.stock) return@launch
+                        }
+                    } else {
+                        fetch()
+                    }
                 }
             }
         }
+    }
+
+    private companion object {
+        const val SETTLE_TRIES = 5
     }
 
     class Factory(private val repo: InventoryRepository, private val branchId: String) : ViewModelProvider.Factory {
