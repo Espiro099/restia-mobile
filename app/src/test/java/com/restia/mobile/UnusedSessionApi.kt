@@ -6,11 +6,7 @@ import com.restia.mobile.core.network.CleaningConfirmationRequest
 import com.restia.mobile.core.network.TableSessionUpdateRequest
 import com.restia.mobile.core.network.TableSessionAddTablesRequest
 import com.restia.mobile.core.network.TableReleaseRequest
-import com.restia.mobile.core.network.DailySalesDto
-import com.restia.mobile.core.network.HourlyOccupancyDto
 import com.restia.mobile.core.network.AuthSessionDto
-import com.restia.mobile.core.network.DeviceDto
-import com.restia.mobile.core.network.EnrollmentCodeDto
 import com.restia.mobile.core.network.ReservationUpdateRequest
 import com.restia.mobile.core.network.OrderUnitReassignRequest
 import com.restia.mobile.core.network.ProductAvailabilityRequest
@@ -33,14 +29,8 @@ import com.restia.mobile.core.network.AvailabilityDto
 import com.restia.mobile.core.network.CustomerCreateRequest
 import com.restia.mobile.core.network.CustomerDto
 import com.restia.mobile.core.network.CustomerSearchRequest
-import com.restia.mobile.core.network.CustomerUpdateRequest
 import com.restia.mobile.core.network.Envelope
-import com.restia.mobile.core.network.MemberCreateRequest
-import com.restia.mobile.core.network.MemberCreatedDto
-import com.restia.mobile.core.network.MemberDto
-import com.restia.mobile.core.network.MemberRoleRequest
 import com.restia.mobile.core.network.PasswordChangeRequest
-import com.restia.mobile.core.network.PasswordSetupLinkDto
 import com.restia.mobile.core.network.ReasonRequest
 import com.restia.mobile.core.network.ReconcileRequest
 import com.restia.mobile.core.network.RefundCreateRequest
@@ -182,9 +172,6 @@ open class UnusedSessionApi : SessionApi {
     override suspend fun searchCustomers(branchId: String, page: Int, perPage: Int, body: CustomerSearchRequest): PagedEnvelope<CustomerDto> =
         error("sin uso")
     override suspend fun createCustomer(branchId: String, idempotencyKey: String, body: CustomerCreateRequest): Envelope<CustomerDto> = error("sin uso")
-    override suspend fun getCustomer(branchId: String, customerId: String): Envelope<CustomerDto> = error("sin uso")
-    override suspend fun updateCustomer(branchId: String, customerId: String, ifMatch: String, body: CustomerUpdateRequest): Envelope<CustomerDto> =
-        error("sin uso")
     override suspend fun getTableSession(branchId: String, sessionId: String): Envelope<TableSessionDto> = error("sin uso")
     override suspend fun listNotifications(branchId: String, perPage: Int): NotificationPageDto = error("sin uso")
     override suspend fun readNotification(branchId: String, notificationId: String): Envelope<NotificationDto> = error("sin uso")
@@ -194,8 +181,6 @@ open class UnusedSessionApi : SessionApi {
     override suspend fun updateOrderItemNotes(branchId: String, orderId: String, itemId: String, ifMatch: String, body: OrderItemUpdateRequest): Envelope<OrderDto> =
         error("sin uso")
     override suspend fun setProductAvailability(branchId: String, productId: String, body: ProductAvailabilityRequest): ResponseBody = error("sin uso")
-    override suspend fun dailySales(branchId: String, from: String, to: String): Envelope<List<DailySalesDto>> = error("sin uso")
-    override suspend fun hourlyOccupancy(branchId: String, from: String, to: String): Envelope<List<HourlyOccupancyDto>> = error("sin uso")
     override suspend fun reassignOrderUnitStation(branchId: String, unitId: String, ifMatch: String, body: OrderUnitReassignRequest): ResponseBody = error("sin uso")
     override suspend fun addTablesToSession(branchId: String, sessionId: String, ifMatch: String, body: TableSessionAddTablesRequest): Envelope<TableSessionDto> =
         error("sin uso")
@@ -208,14 +193,4 @@ open class UnusedSessionApi : SessionApi {
     override suspend fun changePassword(body: PasswordChangeRequest): Response<Unit> = error("sin uso")
     override suspend fun listOwnSessions(status: String, page: Int, perPage: Int): PagedEnvelope<AuthSessionDto> = error("sin uso")
     override suspend fun revokeOwnSession(sessionId: String): Response<Unit> = error("sin uso")
-    override suspend fun listMembers(branchId: String, page: Int, perPage: Int): PagedEnvelope<MemberDto> = error("sin uso")
-    override suspend fun createMember(branchId: String, body: MemberCreateRequest): Envelope<MemberCreatedDto> = error("sin uso")
-    override suspend fun changeMemberRole(branchId: String, userId: String, ifMatch: String, body: MemberRoleRequest): Envelope<MemberDto> =
-        error("sin uso")
-    override suspend fun revokeMember(branchId: String, userId: String, ifMatch: String, body: ReasonRequest): Envelope<MemberDto> = error("sin uso")
-    override suspend fun passwordSetupLink(userId: String): Envelope<PasswordSetupLinkDto> = error("sin uso")
-    override suspend fun createEnrollmentCode(branchId: String): Envelope<EnrollmentCodeDto> = error("sin uso")
-    override suspend fun listDevices(branchId: String, page: Int, perPage: Int): PagedEnvelope<DeviceDto> = error("sin uso")
-    override suspend fun blockDevice(branchId: String, deviceId: String, body: ReasonRequest): Response<Unit> = error("sin uso")
-    override suspend fun retireDevice(branchId: String, deviceId: String, body: ReasonRequest): Response<Unit> = error("sin uso")
 }

@@ -14,22 +14,15 @@ import com.restia.mobile.ui.account.ChangePasswordScreen
 import com.restia.mobile.ui.account.ChangePasswordViewModel
 import com.restia.mobile.ui.account.SessionsScreen
 import com.restia.mobile.ui.account.SessionsViewModel
-import com.restia.mobile.ui.devices.DevicePermissions
-import com.restia.mobile.ui.devices.DevicesScreen
-import com.restia.mobile.ui.devices.DevicesViewModel
 import com.restia.mobile.ui.cash.CashPermissions
 import com.restia.mobile.ui.cash.CashScreen
 import com.restia.mobile.ui.cash.CashViewModel
 import com.restia.mobile.ui.checks.CheckPermissions
 import com.restia.mobile.ui.checks.CheckScreen
 import com.restia.mobile.ui.checks.CheckViewModel
-import com.restia.mobile.ui.customers.CustomersScreen
-import com.restia.mobile.ui.customers.CustomersViewModel
 import com.restia.mobile.ui.kitchen.AvailabilityViewModel
 import com.restia.mobile.ui.kitchen.KitchenScreen
 import com.restia.mobile.ui.kitchen.KitchenViewModel
-import com.restia.mobile.ui.members.MembersScreen
-import com.restia.mobile.ui.members.MembersViewModel
 import com.restia.mobile.ui.more.HomeScaffold
 import com.restia.mobile.ui.more.HomeTab
 import com.restia.mobile.ui.more.MoreOption
@@ -46,8 +39,6 @@ import com.restia.mobile.ui.printing.PrintJobsViewModel
 import com.restia.mobile.ui.printing.PrintPermissions
 import com.restia.mobile.ui.notifications.NotificationsScreen
 import com.restia.mobile.ui.notifications.NotificationsViewModel
-import com.restia.mobile.ui.reports.ReportsScreen
-import com.restia.mobile.ui.reports.ReportsViewModel
 import com.restia.mobile.ui.reservations.ReservationPermissions
 import com.restia.mobile.ui.reservations.ReservationsScreen
 import com.restia.mobile.ui.reservations.ReservationsViewModel
@@ -72,19 +63,11 @@ fun BranchHome(
     var tableNumber by rememberSaveable { mutableStateOf(0) }
     var capturing by rememberSaveable { mutableStateOf(false) }
     var viewingCheck by rememberSaveable { mutableStateOf(false) }
-    var inCustomers by rememberSaveable { mutableStateOf(false) }
-    // Cliente abierto desde una reserva; null para la búsqueda.
-    var customerId by rememberSaveable { mutableStateOf<String?>(null) }
-    var inStaff by rememberSaveable { mutableStateOf(false) }
     var changingPassword by rememberSaveable { mutableStateOf(false) }
-    val showStaff = "members.read" in permissions
     var inCash by rememberSaveable { mutableStateOf(false) }
     var inReservations by rememberSaveable { mutableStateOf(false) }
     var inNotifications by rememberSaveable { mutableStateOf(false) }
-    var inReports by rememberSaveable { mutableStateOf(false) }
     var inSessions by rememberSaveable { mutableStateOf(false) }
-    var inDevices by rememberSaveable { mutableStateOf(false) }
-    val showDevices = "devices.read" in permissions
     // Ver montos y movimientos exige cash.read; quien solo tiene cash.read_open (mesero) no entra.
     val showCash = "cash.read" in permissions
     var inPrinting by rememberSaveable { mutableStateOf(false) }
@@ -100,27 +83,6 @@ fun BranchHome(
                 ),
             ),
             onBack = { inPrinting = false },
-        )
-        return
-    }
-    if (inReports && "reports.read" in permissions) {
-        ReportsScreen(
-            viewModel = viewModel(key = "reportes-$userId-$branchId", factory = ReportsViewModel.Factory(repositories.reports, branchId)),
-            onBack = { inReports = false },
-        )
-        return
-    }
-    if (inDevices && showDevices) {
-        DevicesScreen(
-            viewModel = viewModel(
-                key = "dispositivos-$userId-$branchId",
-                factory = DevicesViewModel.Factory(
-                    repositories.devices,
-                    branchId,
-                    DevicePermissions(enroll = "devices.enroll" in permissions, manage = "devices.manage" in permissions),
-                ),
-            ),
-            onBack = { inDevices = false },
         )
         return
     }
@@ -167,27 +129,6 @@ fun BranchHome(
         )
         return
     }
-    if (inStaff && showStaff) {
-        MembersScreen(
-            viewModel = viewModel(key = "personal-$userId-$branchId", factory = MembersViewModel.Factory(repositories.members, branchId, userId, role)),
-            canResendLink = "users.manage" in permissions,
-            onBack = { inStaff = false },
-        )
-        return
-    }
-    if (inCustomers && "customers.read" in permissions) {
-        CustomersScreen(
-            viewModel = viewModel(key = "clientes-$userId-$branchId-${customerId ?: "busqueda"}", factory = CustomersViewModel.Factory(repositories.customers, branchId)),
-            canCreate = "customers.create" in permissions,
-            canUpdate = "customers.update" in permissions,
-            openCustomerId = customerId,
-            onBack = {
-                inCustomers = false
-                customerId = null
-            },
-        )
-        return
-    }
     if (inReservations && "reservations.read" in permissions) {
         ReservationsScreen(
             viewModel = viewModel(
@@ -213,14 +154,6 @@ fun BranchHome(
                 overridePriority = "reservations.override_priority" in permissions,
             ),
             onBack = { inReservations = false },
-            onCustomers = {
-                customerId = null
-                inCustomers = true
-            },
-            onCustomer = {
-                customerId = it
-                inCustomers = true
-            },
             // Al sentar, la mesa se abre: se pasa directo a su vista.
             onSeated = { session, number ->
                 inReservations = false
@@ -352,8 +285,6 @@ fun BranchHome(
                     logoutEnabled = logoutEnabled,
                     onTables = {},
                     onLogout = onLogout,
-                    showStaff = false,
-                    onStaff = {},
                     onChangePassword = {},
                 )
                 HomeTab.MORE -> MoreScreen(
@@ -364,16 +295,7 @@ fun BranchHome(
                     tools = buildList {
                         if ("reservations.read" in permissions) add(MoreOption(R.drawable.ic_calendar, R.string.reservations_title) { inReservations = true })
                         if (showCash) add(MoreOption(R.drawable.ic_card, R.string.cash_title) { inCash = true })
-                        if ("reports.read" in permissions) add(MoreOption(R.drawable.ic_chart, R.string.reports_title) { inReports = true })
                         if (showPrinting) add(MoreOption(R.drawable.ic_receipt, R.string.print_title) { inPrinting = true })
-                        if (showStaff) add(MoreOption(R.drawable.ic_guests, R.string.staff_title) { inStaff = true })
-                        if (showDevices) add(MoreOption(R.drawable.ic_phone, R.string.devices_title) { inDevices = true })
-                        if ("customers.read" in permissions) {
-                            add(MoreOption(R.drawable.ic_person, R.string.customers_title) {
-                                customerId = null
-                                inCustomers = true
-                            })
-                        }
                     },
                     onChangePassword = { changingPassword = true },
                     onSessions = { inSessions = true },

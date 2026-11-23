@@ -217,8 +217,6 @@ fun KitchenScreen(
     logoutEnabled: Boolean,
     onTables: () -> Unit,
     onLogout: () -> Unit,
-    showStaff: Boolean,
-    onStaff: () -> Unit,
     onChangePassword: () -> Unit,
     showCash: Boolean = false,
     onCash: () -> Unit = {},
@@ -248,7 +246,7 @@ fun KitchenScreen(
         ScreenHeader(stringResource(R.string.kitchen_title)) {
             if (!inTabs) {
                 if (showTables) TextButton(onClick = onTables) { Text(stringResource(R.string.order_back)) }
-                AccountMenu(showStaff, logoutEnabled, onStaff, onChangePassword, onLogout, showCash, onCash, showPrinting, onPrinting)
+                AccountMenu(logoutEnabled, onChangePassword, onLogout, showCash, onCash, showPrinting, onPrinting)
             }
             if (availability != null) {
                 TextButton(onClick = { showAvailability = true }) { Text(stringResource(R.string.availability_sheet_open)) }
