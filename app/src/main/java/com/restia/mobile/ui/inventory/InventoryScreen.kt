@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.restia.mobile.R
 import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.IngredientDto
@@ -260,6 +261,8 @@ private fun ActionDialog(ingredient: IngredientDto, action: InventoryAction, sta
             }
         },
         dismissButton = { TextButton(onClick = viewModel::cancel, enabled = !state.saving) { Text(stringResource(R.string.action_cancel)) } },
+        // Un toque fuera (fácil con el teclado abierto) no debe borrar lo capturado: se cierra con Cancelar.
+        properties = DialogProperties(dismissOnClickOutside = false),
     )
 }
 
