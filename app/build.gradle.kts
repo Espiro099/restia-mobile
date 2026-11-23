@@ -30,11 +30,26 @@ android {
             // Anclaje opcional en debug: con el proxy TLS local (restia-api/deploy/apache) se pone
             // restia.apiBaseUrl=https://127.0.0.1:8443/api/v1/ y restia.apiPins=<huella SPKI>.
             buildConfigField("String", "API_CERT_PINS", "\"${localProperty("restia.apiPins") ?: ""}\"")
+            buildConfigField("int", "API_TIMEOUT_SECONDS", "15")
+        }
+        // Ambiente de pruebas publicado en Render (restia-api/docs/Despliegue_Staging.md). Se instala junto a la
+        // de debug. Las huellas son de la intermedia WE1 y la raíz GTS Root R4 de Google Trust Services, que
+        // firman los certificados de onrender.com; el certificado final cambia en cada renovación.
+        create("staging") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".staging"
+            versionNameSuffix = "-staging"
+            matchingFallbacks += listOf("debug")
+            buildConfigField("String", "API_BASE_URL", "\"https://restia-api-staging.onrender.com/api/v1/\"")
+            buildConfigField("String", "API_CERT_PINS", "\"sha256/kIdp6NNEd8wsugYyyIYFsi1ylMCED3hZbSR8ZFsa/A4=,sha256/mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=\"")
+            // El plan gratuito se duerme: la primera petición puede tardar cerca de un minuto.
+            buildConfigField("int", "API_TIMEOUT_SECONDS", "60")
         }
         release {
             buildConfigField("String", "API_BASE_URL", "\"https://api.restia.com/api/v1/\"")
             // Obligatorio en release: huella actual y de respaldo del certificado de api.restia.com.
             buildConfigField("String", "API_CERT_PINS", "\"${localProperty("restia.releaseApiPins") ?: providers.gradleProperty("restia.releaseApiPins").orNull ?: ""}\"")
+            buildConfigField("int", "API_TIMEOUT_SECONDS", "15")
         }
     }
 

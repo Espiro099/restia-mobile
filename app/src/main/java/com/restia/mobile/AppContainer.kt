@@ -72,14 +72,16 @@ fun buildRepositories(
     blobs: BlobStore,
     certificatePins: List<String> = emptyList(),
     pinsRequired: Boolean = false,
+    timeoutSeconds: Long = 15,
 ): Repositories {
     val accessToken = AccessTokenHolder()
     val state = AuthStateHolder()
     val converter = ApiJson.asConverterFactory("application/json".toMediaType())
     // Todas las llamadas (públicas y con sesión) salen de este cliente, así que todas llevan el anclaje.
     val base = CertificatePinning.apply(OkHttpClient.Builder(), baseUrl, certificatePins, pinsRequired)
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
+        // En staging la API gratuita tarda hasta un minuto en despertar: ver API_TIMEOUT_SECONDS.
+        .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
+        .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
         .addInterceptor(RequestIdInterceptor())
         .build()
     val publicApi = Retrofit.Builder().baseUrl(baseUrl).client(base).addConverterFactory(converter).build()
@@ -125,6 +127,7 @@ class AppContainer(context: Context) {
         certificatePins = pins,
         // En release, sin HTTPS o sin huellas la app no se conecta (falla cerrado).
         pinsRequired = !BuildConfig.DEBUG,
+        timeoutSeconds = BuildConfig.API_TIMEOUT_SECONDS.toLong(),
     )
 
     /** Cargador de las fotos del menú: su propio cliente, sin la sesión. */
