@@ -539,6 +539,7 @@
     <string name="legend_attention">En atención</string>
     <string name="legend_check">Cuenta</string>
     <string name="tab_orders">Comandas</string>
+    <string name="tab_deliveries">Entregas</string>
     <string name="orders_not_loaded">No se pudieron cargar las comandas.</string>
     <string name="orders_empty_title">Todo listo para empezar</string>
     <string name="orders_empty_body">Las comandas de tus mesas aparecerán aquí cuando las envíes a cocina.</string>

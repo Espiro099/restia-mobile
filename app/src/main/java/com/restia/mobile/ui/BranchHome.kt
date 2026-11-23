@@ -196,15 +196,9 @@ fun BranchHome(
     }
     val current = sessionId
     if (current == null) {
-        // Secciones de la barra inferior, según los permisos; "Más" siempre está.
-        val tabs = buildList {
-            if ("tables.read" in permissions) add(HomeTab.TABLES)
-            if ("orders.read" in permissions) add(HomeTab.ORDERS)
-            if ("orders.read" in permissions && (canPrepare || "order_units.deliver" in permissions)) add(HomeTab.KITCHEN)
-            add(HomeTab.MORE)
-        }
-        // Quien prepara pero no toma comandas (cocina) empieza en la cola; el resto, en las mesas.
-        val start = if (canPrepare && !canOrder && HomeTab.KITCHEN in tabs) HomeTab.KITCHEN else tabs.first()
+        // Secciones de la barra inferior según el rol (HomeTabs.kt); "Más" siempre está.
+        val tabs = homeTabs(role, permissions)
+        val start = startTab(tabs)
         var tabName by rememberSaveable { mutableStateOf(start.name) }
         val tab = HomeTab.entries.firstOrNull { it.name == tabName }?.takeIf { it in tabs } ?: start
         // La cola vista desde el salón: la pestaña Comandas y el aviso de "orden lista" en Mesas.
@@ -270,7 +264,7 @@ fun BranchHome(
                         onGoToTables = if (HomeTab.TABLES in tabs) ({ tabName = HomeTab.TABLES.name }) else null,
                     )
                 }
-                HomeTab.KITCHEN -> KitchenScreen(
+                HomeTab.KITCHEN, HomeTab.DELIVERIES -> KitchenScreen(
                     viewModel = viewModel(key = "cocina-$userId-$branchId", factory = KitchenViewModel.Factory(repositories.kitchen, branchId)),
                     branchName = branchName,
                     canPrepare = canPrepare,
@@ -282,6 +276,7 @@ fun BranchHome(
                         null
                     },
                     inTabs = true,
+                    title = tab.label,
                     logoutEnabled = logoutEnabled,
                     onTables = {},
                     onLogout = onLogout,

@@ -226,6 +226,8 @@ fun KitchenScreen(
     canReassign: Boolean = false,
     /** Con `menu.set_availability`: abre la lista de agotados. */
     availability: AvailabilityViewModel? = null,
+    /** Título del encabezado: "Cocina" para quien prepara, "Entregas" para el mesero. */
+    @StringRes title: Int = R.string.kitchen_title,
 ) {
     val state by viewModel.state.collectAsState()
     var showAvailability by rememberSaveable { mutableStateOf(false) }
@@ -243,7 +245,7 @@ fun KitchenScreen(
     }
     val canMove = canReassign && state.stations.size > 1
     Column(modifier = Modifier.fillMaxSize()) {
-        ScreenHeader(stringResource(R.string.kitchen_title)) {
+        ScreenHeader(stringResource(title)) {
             if (!inTabs) {
                 if (showTables) TextButton(onClick = onTables) { Text(stringResource(R.string.order_back)) }
                 AccountMenu(logoutEnabled, onChangePassword, onLogout, showCash, onCash, showPrinting, onPrinting)
