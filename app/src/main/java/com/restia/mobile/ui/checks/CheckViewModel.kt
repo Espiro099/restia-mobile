@@ -99,6 +99,7 @@ data class CheckUiState(
     val failure: ApiFailure? = null,
     val shifts: List<ShiftOption>? = null,
     val shiftsFailure: ApiFailure? = null,
+    val shiftsLoading: Boolean = false,
     val paying: PayState? = null,
     val recording: ResultState? = null,
     val moving: MoveUnitsState? = null,
@@ -225,22 +226,27 @@ class CheckViewModel(
             actionFailure = null,
             notice = null,
         )
-        if (shifts == null) loadShifts()
+        // Sin caja o tras un error se vuelve a preguntar: un gerente pudo abrir el turno desde el panel.
+        if (shifts.isNullOrEmpty() || _state.value.shiftsFailure != null) loadShifts()
     }
 
     private fun loadShifts() {
+        if (_state.value.shiftsLoading) return
+        _state.value = _state.value.copy(shiftsLoading = true)
         viewModelScope.launch {
             when (val r = repository.openShifts(branchId)) {
                 is ApiResult.Success -> {
                     val paying = _state.value.paying
+                    // Una caja elegida que ya cerró no sirve; con una sola abierta no hay nada que elegir.
+                    val kept = paying?.shiftId?.takeIf { id -> r.value.any { it.id == id } }
                     _state.value = _state.value.copy(
                         shifts = r.value,
                         shiftsFailure = null,
-                        // Con una sola caja abierta no hay nada que elegir.
-                        paying = paying?.copy(shiftId = paying.shiftId ?: r.value.singleOrNull()?.id),
+                        shiftsLoading = false,
+                        paying = paying?.copy(shiftId = kept ?: r.value.singleOrNull()?.id),
                     )
                 }
-                is ApiResult.Failure -> _state.value = _state.value.copy(shiftsFailure = r.failure)
+                is ApiResult.Failure -> _state.value = _state.value.copy(shiftsFailure = r.failure, shiftsLoading = false)
             }
         }
     }

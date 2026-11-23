@@ -457,7 +457,13 @@ private fun AmountField(value: String, onChange: (String) -> Unit, @StringRes la
  * y, en efectivo, lo recibido y el cambio. Confirmar registra el pago en la caja abierta.
  */
 @Composable
-private fun PayReview(state: PayState, shifts: List<com.restia.mobile.data.checks.ShiftOption>?, shiftsFailure: ApiFailure?, viewModel: CheckViewModel) {
+private fun PayReview(
+    state: PayState,
+    shifts: List<com.restia.mobile.data.checks.ShiftOption>?,
+    shiftsFailure: ApiFailure?,
+    shiftsLoading: Boolean,
+    viewModel: CheckViewModel,
+) {
     val currency = state.check.balance.currency
     val enabled = !state.submitting
     BackHandler(onBack = viewModel::dismissPay)
@@ -495,20 +501,12 @@ private fun PayReview(state: PayState, shifts: List<com.restia.mobile.data.check
             } else {
                 Text(stringResource(R.string.pay_terminal_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            when {
-                shifts == null && shiftsFailure != null -> {
-                    Text(failureText(shiftsFailure), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    TextButton(onClick = viewModel::retryShifts) { Text(stringResource(R.string.action_retry)) }
-                }
-                shifts == null -> CircularProgressIndicator()
-                shifts.isEmpty() -> Text(stringResource(R.string.pay_no_shift), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                shifts.size > 1 -> {
-                    Text(stringResource(R.string.pay_register), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                        shifts.forEach { shift ->
-                            FilterTag(shift.registerName.ifEmpty { stringResource(R.string.pay_register_unnamed) }, state.shiftId == shift.id) {
-                                if (enabled) viewModel.setShift(shift.id)
-                            }
+            if (shifts != null && shifts.size > 1) {
+                Text(stringResource(R.string.pay_register), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                    shifts.forEach { shift ->
+                        FilterTag(shift.registerName.ifEmpty { stringResource(R.string.pay_register_unnamed) }, state.shiftId == shift.id) {
+                            if (enabled) viewModel.setShift(shift.id)
                         }
                     }
                 }
@@ -521,6 +519,17 @@ private fun PayReview(state: PayState, shifts: List<com.restia.mobile.data.check
             modifier = Modifier.readableWidth().navigationBarsPadding().padding(horizontal = ScreenPadding, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
+            // Junto al botón: si no hay caja, el mesero ve por qué no puede cobrar.
+            when {
+                shiftsLoading -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Text(stringResource(R.string.pay_shift_loading), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                shiftsFailure != null -> ShiftProblem(failureText(shiftsFailure), viewModel::retryShifts)
+                shifts?.isEmpty() == true -> ShiftProblem(stringResource(R.string.pay_no_shift), viewModel::retryShifts)
+                shifts != null && shifts.size > 1 && state.shiftId == null ->
+                    Text(stringResource(R.string.pay_choose_register), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
             PrimaryButton(
                 stringResource(R.string.review_confirm, money(due, currency)),
                 onClick = viewModel::confirmPay,
@@ -532,6 +541,14 @@ private fun PayReview(state: PayState, shifts: List<com.restia.mobile.data.check
                 Text(stringResource(R.string.review_back), style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold))
             }
         }
+    }
+}
+
+@Composable
+private fun ShiftProblem(text: String, onRetry: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text(text, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+        TextButton(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
     }
 }
 
@@ -753,7 +770,7 @@ fun CheckScreen(viewModel: CheckViewModel, tableNumber: Int, can: CheckPermissio
     state.action?.let { ActionDialog(it, viewModel) }
     val paying = state.paying
     if (paying != null) {
-        PayReview(paying, state.shifts, state.shiftsFailure, viewModel)
+        PayReview(paying, state.shifts, state.shiftsFailure, state.shiftsLoading, viewModel)
         return
     }
     Column(modifier = Modifier.fillMaxSize()) {
