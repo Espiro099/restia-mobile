@@ -13,9 +13,9 @@ class HomeTabsTest {
     private val manager = waiter + listOf("order_units.prepare", "cash.read")
 
     @Test
-    fun `cocina solo ve su cola y Mas, y empieza en la cola`() {
+    fun `cocina ve su cola, Inventario y Mas, y empieza en la cola`() {
         val tabs = homeTabs("KITCHEN", kitchen)
-        assertEquals(listOf(HomeTab.KITCHEN, HomeTab.MORE), tabs)
+        assertEquals(listOf(HomeTab.KITCHEN, HomeTab.INVENTORY, HomeTab.MORE), tabs)
         assertEquals(HomeTab.KITCHEN, startTab(tabs))
     }
 

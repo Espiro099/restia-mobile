@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Inventario: caja de línea, con el mismo trazo que los íconos de la propuesta. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="22"
+    android:viewportHeight="22"
+    android:tint="?android:attr/colorControlNormal">
+    <path
+        android:pathData="M19.25 6.875L11 2.75L2.75 6.875M19.25 6.875V15.125L11 19.25M19.25 6.875L11 11M11 19.25L2.75 15.125V6.875M11 19.25V11M2.75 6.875L11 11M6.875 4.8125L15.125 8.9375"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.4875"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

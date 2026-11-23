@@ -9,6 +9,7 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -485,6 +486,64 @@ interface SessionApi {
         @Path("branchId") branchId: String,
         @Path("sessionId") sessionId: String,
     ): Envelope<TableSessionDto>
+
+    // Inventario de cocina (Decisiones_Inventario): insumos, merma, recepción, conteo e inocuidad.
+
+    @GET("branches/{branchId}/ingredients")
+    suspend fun listIngredients(
+        @Path("branchId") branchId: String,
+        @Query("status") status: String,
+        @Query("page") page: Int,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<IngredientDto>
+
+    /** WASTE (inventory.record_waste): cantidad positiva y motivo. Idempotente por clave. */
+    @POST("branches/{branchId}/inventory-movements")
+    suspend fun createInventoryMovement(
+        @Path("branchId") branchId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: InventoryMovementRequest,
+    ): ResponseBody
+
+    /** Entrada de mercancía (inventory.receive), con proveedor y costo unitario. */
+    @POST("branches/{branchId}/inventory-receipts")
+    suspend fun createInventoryReceipt(
+        @Path("branchId") branchId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: InventoryReceiptRequest,
+    ): ResponseBody
+
+    @GET("branches/{branchId}/inventory-counts")
+    suspend fun listInventoryCounts(
+        @Path("branchId") branchId: String,
+        @Query("status") status: String,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<InventoryCountDto>
+
+    /** Un solo conteo abierto por sucursal: si ya hay uno, 409 INVENTORY_COUNT_ALREADY_OPEN. */
+    @POST("branches/{branchId}/inventory-counts")
+    suspend fun createInventoryCount(
+        @Path("branchId") branchId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: InventoryCountCreateRequest,
+    ): Envelope<InventoryCountDto>
+
+    /** Reemplaza todas las líneas del conteo; lo esperado lo calcula el servidor. */
+    @PUT("branches/{branchId}/inventory-counts/{countId}/lines")
+    suspend fun replaceInventoryCountLines(
+        @Path("branchId") branchId: String,
+        @Path("countId") countId: String,
+        @Header("If-Match") ifMatch: String,
+        @Body body: InventoryCountLinesRequest,
+    ): Envelope<InventoryCountDto>
+
+    /** Cocina puede bloquear un insumo por inocuidad; desbloquear es del gerente. */
+    @POST("branches/{branchId}/ingredients/{ingredientId}/food-safety")
+    suspend fun setFoodSafety(
+        @Path("branchId") branchId: String,
+        @Path("ingredientId") ingredientId: String,
+        @Body body: FoodSafetyRequest,
+    ): ResponseBody
 
     /** Avisos propios en la sucursal, los más recientes primero; `meta.unreadCount` da los no leídos. */
     @GET("branches/{branchId}/notifications")

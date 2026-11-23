@@ -25,6 +25,7 @@ import com.restia.mobile.data.auth.AuthStateHolder
 import com.restia.mobile.data.auth.TokenRefresher
 import com.restia.mobile.data.cash.CashRepository
 import com.restia.mobile.data.checks.CheckRepository
+import com.restia.mobile.data.inventory.InventoryRepository
 import com.restia.mobile.data.kitchen.KitchenRepository
 import com.restia.mobile.data.customers.CustomersRepository
 import com.restia.mobile.data.orders.DraftRepository
@@ -58,6 +59,7 @@ class Repositories(
     val printing: PrintingRepository,
     val notifications: NotificationsRepository,
     val sessions: SessionsRepository,
+    val inventory: InventoryRepository,
 )
 
 fun buildRepositories(
@@ -105,6 +107,7 @@ fun buildRepositories(
         PrintingRepository(sessionApi),
         NotificationsRepository(sessionApi),
         SessionsRepository(sessionApi),
+        InventoryRepository(sessionApi),
     )
 }
 
