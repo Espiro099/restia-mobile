@@ -281,6 +281,46 @@ class CheckFlowTest {
     }
 
     @Test
+    fun `si no habia caja al volver a cobrar se vuelve a preguntar y queda elegida`() {
+        val open = gets.getValue("/branches/b1/cash-shifts")
+        gets["/branches/b1/cash-shifts"] = { MockResponse().setBody(pageOf()) }
+        loaded()
+        vm.startPay(vm.state.value.checks[0])
+        waitFor { vm.state.value.shifts != null && !vm.state.value.shiftsLoading }
+        vm.dismissPay()
+        // Un gerente abre el turno desde el panel.
+        gets["/branches/b1/cash-shifts"] = open
+        vm.startPay(vm.state.value.checks[0])
+        waitFor { vm.state.value.paying?.shiftId != null }
+        assertEquals("sh1", vm.state.value.paying?.shiftId)
+        assertFalse(vm.state.value.shiftsLoading)
+    }
+
+    @Test
+    fun `si fallo la consulta de cajas reintentar la recupera`() {
+        gets["/branches/b1/cash-shifts"] = { MockResponse().setResponseCode(500).setBody("""{"error":{"code":"INTERNAL","message":"x"}}""") }
+        loaded()
+        vm.startPay(vm.state.value.checks[0])
+        waitFor { vm.state.value.shiftsFailure != null && !vm.state.value.shiftsLoading }
+        gets["/branches/b1/cash-shifts"] = { MockResponse().setBody(pageOf("""{"id":"sh1","branchId":"b1","cashRegisterId":"r1","status":"OPEN","businessDate":"2026-11-10","openedBy":"m","openedAt":"2026-11-10T12:00:00Z","version":1}""")) }
+        vm.retryShifts()
+        waitFor { vm.state.value.paying?.shiftId != null }
+        assertEquals(null, vm.state.value.shiftsFailure)
+    }
+
+    @Test
+    fun `con cajas ya conocidas no se vuelve a preguntar`() {
+        var calls = 0
+        val open = gets.getValue("/branches/b1/cash-shifts")
+        gets["/branches/b1/cash-shifts"] = { calls++; open() }
+        startPaying()
+        vm.dismissPay()
+        vm.startPay(vm.state.value.checks[0])
+        assertEquals("sh1", vm.state.value.paying?.shiftId)
+        assertEquals(1, calls)
+    }
+
+    @Test
     fun `pedir la cuenta usa la version de la cuenta`() {
         loaded()
         answers += MockResponse().setBody("""{"data":${checkJson(status = "REQUESTED", version = 3)}}""")

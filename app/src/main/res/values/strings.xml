@@ -232,6 +232,8 @@
     <string name="payment_unknown">Sin confirmar: lo resuelve un gerente</string>
     <string name="pay_available">Por cobrar: %1$s</string>
     <string name="pay_no_shift">No hay una caja abierta. Pide a un gerente que abra el turno.</string>
+    <string name="pay_shift_loading">Buscando la caja abierta…</string>
+    <string name="pay_choose_register">Elige la caja donde entra el cobro.</string>
     <string name="pay_register">Caja</string>
     <string name="pay_register_unnamed">Caja sin nombre</string>
     <string name="pay_amount">Monto</string>
