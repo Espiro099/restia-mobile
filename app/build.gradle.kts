@@ -83,6 +83,10 @@ dependencies {
     // Fotos del menú, con el cliente de ImageClient (sin token de sesión).
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    // Inicio de sesión con Google (Decisiones_Google_Login en restia-api): el ID token lo verifica la API.
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.googleid)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)

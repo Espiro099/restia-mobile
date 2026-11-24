@@ -53,6 +53,13 @@ data class MobileLoginRequest(
 )
 
 @Serializable
+data class MobileGoogleLoginRequest(val idToken: String, val deviceUuid: String, val deviceCredential: String)
+
+/** GET /auth/google: el ID de cliente Web es el serverClientId de Credential Manager. */
+@Serializable
+data class GoogleLoginConfigData(val enabled: Boolean, val clientId: String? = null)
+
+@Serializable
 data class MobileRefreshRequest(val deviceUuid: String, val refreshToken: String)
 
 @Serializable

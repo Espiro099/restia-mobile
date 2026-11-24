@@ -510,6 +510,13 @@
     <string name="welcome_action">Iniciar sesión</string>
     <string name="welcome_note">Aplicación privada para empleados</string>
     <string name="login_hint">Usa tu cuenta de empleado.</string>
+    <!-- Inicio de sesión con Google (Decisiones_Google_Login en restia-api) -->
+    <string name="login_or">o</string>
+    <string name="action_google">Continuar con Google</string>
+    <string name="google_signing_in">Entrando con Google…</string>
+    <string name="google_not_staff">Esa cuenta de Google no está dada de alta en Restia. Usa el correo con el que te registraron o tu contraseña.</string>
+    <string name="google_no_account">No hay una cuenta de Google en este teléfono. Agrégala en Ajustes o entra con tu contraseña.</string>
+    <string name="google_failed">No se pudo entrar con Google. Intenta de nuevo o usa tu contraseña.</string>
     <string name="login_help">¿No puedes entrar? Contacta a tu responsable.</string>
     <string name="greeting_morning">Buenos días, %1$s</string>
     <string name="greeting_afternoon">Buenas tardes, %1$s</string>

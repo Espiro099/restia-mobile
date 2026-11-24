@@ -15,6 +15,9 @@ androidxTestExt = "1.3.0"
 zxing = "3.5.4"
 # Coil 3.6 ya exige Kotlin 2.4; se sube junto con Kotlin.
 coil = "3.3.0"
+# Inicio de sesión con Google: Credential Manager y la opción de Google.
+credentials = "1.5.0"
+googleid = "1.1.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -40,6 +43,9 @@ androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
+androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
+androidx-credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
+googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

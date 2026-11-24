@@ -4,11 +4,14 @@ import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.ApiJson
 import com.restia.mobile.core.network.ApiResult
 import com.restia.mobile.core.network.DeviceEnrollRequest
+import com.restia.mobile.core.network.Envelope
 import com.restia.mobile.core.network.MeData
+import com.restia.mobile.core.network.MobileGoogleLoginRequest
 import com.restia.mobile.core.network.MobileLoginRequest
 import com.restia.mobile.core.network.MobileRefreshRequest
 import com.restia.mobile.core.network.PublicAuthApi
 import com.restia.mobile.core.network.SessionApi
+import com.restia.mobile.core.network.TokenData
 import com.restia.mobile.core.network.apiCall
 import com.restia.mobile.core.security.AccessTokenHolder
 import com.restia.mobile.core.security.CredentialStore
@@ -65,14 +68,27 @@ class AuthRepository(
         }
     }
 
-    suspend fun login(email: String, password: String): ApiFailure? {
+    suspend fun login(email: String, password: String): ApiFailure? =
+        signIn { uuid, credential -> publicApi.login(MobileLoginRequest(email, password, uuid, credential)) }
+
+    /** Con el ID token que entrega Credential Manager (GOOGLE-1). */
+    suspend fun loginWithGoogle(idToken: String): ApiFailure? =
+        signIn { uuid, credential -> publicApi.loginGoogle(MobileGoogleLoginRequest(idToken, uuid, credential)) }
+
+    /** ID de cliente Web para pedir el token a Google; null si está apagado o no hay conexión. */
+    suspend fun googleClientId(): String? = when (val r = apiCall { publicApi.googleConfig() }) {
+        is ApiResult.Success -> r.value.data.clientId?.takeIf { r.value.data.enabled && it.isNotBlank() }
+        is ApiResult.Failure -> null
+    }
+
+    private suspend fun signIn(call: suspend (deviceUuid: String, deviceCredential: String) -> Envelope<TokenData>): ApiFailure? {
         val uuid = store.deviceUuid
         val credential = store.deviceCredential
         if (uuid == null || credential == null) {
             stateHolder.set(AuthState.NeedsEnrollment)
             return null
         }
-        return when (val r = apiCall { publicApi.login(MobileLoginRequest(email, password, uuid, credential)) }) {
+        return when (val r = apiCall { call(uuid, credential) }) {
             is ApiResult.Success -> {
                 store.saveRefreshToken(r.value.data.refreshToken)
                 accessToken.token = r.value.data.accessToken

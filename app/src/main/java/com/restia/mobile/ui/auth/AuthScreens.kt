@@ -59,6 +59,7 @@ import com.restia.mobile.ui.theme.PrimaryButton
 import com.restia.mobile.ui.theme.Restia
 import com.restia.mobile.ui.theme.RestiaLogo
 import com.restia.mobile.ui.theme.ScreenPadding
+import com.restia.mobile.ui.theme.SecondaryButton
 
 /**
  * Fondo del acceso (propuesta 01 y 11): la foto del restaurante abajo y, encima, la crema con su borde curvo.
@@ -215,10 +216,13 @@ fun OfflineScreen(onRetry: () -> Unit) {
 }
 
 @Composable
-private fun failureText(failure: ApiFailure): String = when (failure) {
+private fun failureText(failure: ApiFailure, google: Boolean = false): String = when (failure) {
     ApiFailure.Network -> stringResource(R.string.error_network)
     ApiFailure.Unexpected -> stringResource(R.string.error_unexpected)
     is ApiFailure.Server -> when {
+        // Con Google no hay contraseña: lo que falla es que esa cuenta no sea del personal.
+        google && failure.code == "AUTHENTICATION_INVALID" -> stringResource(R.string.google_not_staff)
+        google && failure.status == 404 -> stringResource(R.string.google_failed)
         failure.status == 429 && failure.retryAfterSeconds != null -> {
             val seconds = failure.retryAfterSeconds.coerceIn(1L, Int.MAX_VALUE.toLong()).toInt()
             pluralStringResource(R.plurals.error_too_many, seconds, seconds)
@@ -237,8 +241,11 @@ private fun Messages(form: FormState, notice: SessionNotice?) {
         }
         Text(stringResource(text), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
     }
+    form.problem?.let {
+        Text(stringResource(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
+    }
     form.failure?.let {
-        Text(failureText(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
+        Text(failureText(it, form.google), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
     }
 }
 
@@ -282,7 +289,14 @@ fun EnrollScreen(form: FormState, notice: SessionNotice?, onEnroll: (String, Str
 
 /** Iniciar sesión (propuesta 11). */
 @Composable
-fun LoginScreen(form: FormState, notice: SessionNotice?, onLogin: (String, String) -> Unit, onForgot: (email: String) -> Unit) {
+fun LoginScreen(
+    form: FormState,
+    notice: SessionNotice?,
+    onLogin: (String, String) -> Unit,
+    onForgot: (email: String) -> Unit,
+    googleEnabled: Boolean = false,
+    onGoogle: () -> Unit = {},
+) {
     var email by rememberSaveable { mutableStateOf("") }
     // Sin rememberSaveable: la contraseña no debe sobrevivir en el estado guardado.
     var password by remember { mutableStateOf("") }
@@ -308,8 +322,23 @@ fun LoginScreen(form: FormState, notice: SessionNotice?, onLogin: (String, Strin
             stringResource(R.string.action_login),
             onClick = { onLogin(email, password) },
             enabled = email.contains('@') && password.isNotEmpty(),
-            busy = form.busy,
+            busy = form.busy && !form.google,
         )
+        // Solo si la API tiene GOOGLE_CLIENT_ID; entra el personal ya dado de alta con ese correo.
+        if (googleEnabled) {
+            Text(
+                stringResource(R.string.login_or),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+            )
+            SecondaryButton(
+                if (form.busy && form.google) stringResource(R.string.google_signing_in) else stringResource(R.string.action_google),
+                onClick = onGoogle,
+                enabled = !form.busy,
+            )
+        }
         Text(
             stringResource(R.string.login_help),
             style = MaterialTheme.typography.bodySmall,
