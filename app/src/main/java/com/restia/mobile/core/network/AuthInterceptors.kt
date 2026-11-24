@@ -44,10 +44,14 @@ class BearerInterceptor(
     }
 }
 
-/** Ante un 401 renueva y reintenta una sola vez. */
-class TokenAuthenticator(private val refresher: TokenRefresher) : Authenticator {
+/**
+ * Ante un 401 renueva y reintenta una sola vez. Solo si el 401 viene del host de la API (`apiHost`): un 401
+ * de otro host (tras una redirección) nunca recibe un token nuevo.
+ */
+class TokenAuthenticator(private val refresher: TokenRefresher, private val apiHost: String? = null) : Authenticator {
     override fun authenticate(route: Route?, response: Response): Request? {
         if (response.request.header(RETRY_HEADER) != null) return null
+        if (apiHost != null && !response.request.url.host.equals(apiHost, ignoreCase = true)) return null
         val sent = response.request.header("Authorization")?.removePrefix("Bearer ")
         val result = refresher.refresh(sent) as? RefreshResult.Success ?: return null
         return response.request.newBuilder()

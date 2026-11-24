@@ -17,6 +17,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -49,6 +50,7 @@ class AuthFlowTest {
     private lateinit var state: AuthStateHolder
     private lateinit var repo: AuthRepository
     private lateinit var sessionApi: SessionApi
+    private lateinit var refresher: TokenRefresher
     private val blobs = InMemoryBlobStore()
 
     @Before
@@ -62,7 +64,7 @@ class AuthFlowTest {
         val converter = ApiJson.asConverterFactory("application/json".toMediaType())
         val base = OkHttpClient.Builder().readTimeout(2, TimeUnit.SECONDS).build()
         val publicApi = Retrofit.Builder().baseUrl(url).client(base).addConverterFactory(converter).build().create(PublicAuthApi::class.java)
-        val refresher = TokenRefresher(store, access, publicApi, state)
+        refresher = TokenRefresher(store, access, publicApi, state)
         val client = base.newBuilder().addInterceptor(BearerInterceptor(access, refresher)).authenticator(TokenAuthenticator(refresher)).build()
         sessionApi = Retrofit.Builder().baseUrl(url).client(client).addConverterFactory(converter).build().create(SessionApi::class.java)
         repo = AuthRepository(store, access, publicApi, sessionApi, refresher, state, blobs, newUuid = { "uuid-${++uuids}" })
@@ -167,6 +169,17 @@ class AuthFlowTest {
         assertEquals("AUTHENTICATION_INVALID", failure.code)
         assertNull(store.refreshToken)
         assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun `un 401 de otro host no renueva ni recibe token`() = runBlocking {
+        access.token = "access-1"
+        route { MockResponse().setResponseCode(401) }
+        val client = OkHttpClient.Builder().authenticator(TokenAuthenticator(refresher, "api.restia.com")).build()
+        val response = withContext(Dispatchers.IO) { client.newCall(okhttp3.Request.Builder().url(server.url("/algo")).build()).execute() }
+        assertEquals(401, response.code)
+        assertEquals(1, server.requestCount)
+        assertEquals("refresh-1", store.refreshToken)
     }
 
     @Test

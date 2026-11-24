@@ -37,6 +37,7 @@ import com.restia.mobile.data.orders.MenuRepository
 import com.restia.mobile.data.orders.OrderRepository
 import com.restia.mobile.data.tables.TablesRepository
 import java.util.concurrent.TimeUnit
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -87,7 +88,7 @@ fun buildRepositories(
     val sessionClient = base.newBuilder()
         .addInterceptor(BearerInterceptor(accessToken, refresher))
         .addInterceptor(ContactInterceptor(contact))
-        .authenticator(TokenAuthenticator(refresher))
+        .authenticator(TokenAuthenticator(refresher, baseUrl.toHttpUrl().host))
         .build()
     val sessionApi = Retrofit.Builder().baseUrl(baseUrl).client(sessionClient).addConverterFactory(converter).build()
         .create(SessionApi::class.java)
