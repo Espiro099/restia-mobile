@@ -173,6 +173,29 @@ class InventoryFlowTest {
     }
 
     @Test
+    fun `consulta el consumo reciente del insumo seleccionado con su platillo`() {
+        routes["GET /branches/b1/inventory-movements"] = {
+            MockResponse().setBody(
+                """{"data":[{"quantity":"-0.120","sourceProductName":"Tacos al pastor","recipeVersion":2,"createdAt":"2026-11-24T18:30:00Z"}],"meta":{}}""",
+            )
+        }
+        loaded()
+        vm.select(vm.state.value.ingredients.first())
+        vm.loadConsumption()
+        waitFor { vm.state.value.consumption != null }
+        val row = vm.state.value.consumption!!.single()
+        assertEquals("Tacos al pastor", row.sourceProductName)
+        assertEquals(2, row.recipeVersion)
+        assertEquals("-0.120", row.quantity)
+        val query = sent("GET", "/branches/b1/inventory-movements").first.requestUrl!!
+        assertEquals("i1", query.queryParameter("ingredientId"))
+        assertEquals("CONSUMPTION", query.queryParameter("type"))
+        assertEquals("5", query.queryParameter("perPage"))
+        vm.select(null)
+        assertEquals(null, vm.state.value.consumption)
+    }
+
+    @Test
     fun `registra merma con clave de idempotencia y vuelve a cargar hasta ver el stock nuevo`() {
         routes["POST /branches/b1/inventory-movements"] = { MockResponse().setResponseCode(201).setBody("""{"data":{"id":"m1"}}""") }
         loaded()

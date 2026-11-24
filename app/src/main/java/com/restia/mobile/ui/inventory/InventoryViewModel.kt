@@ -6,11 +6,13 @@ import androidx.lifecycle.viewModelScope
 import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.ApiResult
 import com.restia.mobile.core.network.IngredientDto
+import com.restia.mobile.core.network.InventoryConsumptionDto
 import com.restia.mobile.data.inventory.InventoryRepository
 import com.restia.mobile.data.inventory.isLow
 import com.restia.mobile.data.inventory.normalizeCost
 import com.restia.mobile.data.inventory.normalizeQuantity
 import java.text.Normalizer
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -78,6 +80,8 @@ data class InventoryUiState(
     val form: InventoryForm = InventoryForm(),
     val saving: Boolean = false,
     val actionFailure: ApiFailure? = null,
+    val consumption: List<InventoryConsumptionDto>? = null,
+    val consumptionFailure: ApiFailure? = null,
     /** Lo último que se guardó, para confirmarlo en pantalla. */
     val done: Pair<InventoryAction, String>? = null,
 ) {
@@ -99,6 +103,7 @@ class InventoryViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(InventoryUiState())
     val state: StateFlow<InventoryUiState> = _state
+    private var consumptionRequest: Job? = null
 
     fun load() {
         if (_state.value.refreshing) return
@@ -125,7 +130,30 @@ class InventoryViewModel(
     fun setQuery(query: String) { _state.value = _state.value.copy(query = query.take(60)) }
 
     fun select(ingredient: IngredientDto?) {
-        _state.value = _state.value.copy(selected = ingredient, action = null, form = InventoryForm(), actionFailure = null)
+        consumptionRequest?.cancel()
+        _state.value = _state.value.copy(
+            selected = ingredient,
+            action = null,
+            form = InventoryForm(),
+            actionFailure = null,
+            consumption = null,
+            consumptionFailure = null,
+        )
+    }
+
+    fun loadConsumption() {
+        val ingredient = _state.value.selected ?: return
+        consumptionRequest?.cancel()
+        _state.value = _state.value.copy(consumption = null, consumptionFailure = null)
+        consumptionRequest = viewModelScope.launch {
+            val result = repo.recentConsumption(branchId, ingredient.id)
+            val current = _state.value
+            if (current.selected?.id != ingredient.id) return@launch
+            _state.value = when (result) {
+                is ApiResult.Success -> current.copy(consumption = result.value)
+                is ApiResult.Failure -> current.copy(consumptionFailure = result.failure)
+            }
+        }
     }
 
     fun start(action: InventoryAction) {
@@ -135,7 +163,7 @@ class InventoryViewModel(
     fun edit(form: InventoryForm) { _state.value = _state.value.copy(form = form, actionFailure = null) }
 
     fun cancel() {
-        if (!_state.value.saving) _state.value = _state.value.copy(selected = null, action = null, form = InventoryForm(), actionFailure = null)
+        if (!_state.value.saving) select(null)
     }
 
     fun clearDone() { _state.value = _state.value.copy(done = null) }

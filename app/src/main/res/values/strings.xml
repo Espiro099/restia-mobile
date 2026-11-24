@@ -733,6 +733,12 @@
     <!-- Inventario de cocina -->
     <string name="tab_inventory">Inventario</string>
     <string name="inventory_title">Inventario</string>
+    <string name="inventory_recent_consumption">Consumo reciente en cocina</string>
+    <string name="inventory_recent_consumption_help">Al iniciar la preparación, se descuentan las cantidades configuradas en la receta y sus modificadores.</string>
+    <string name="inventory_no_consumption">Todavía no hay consumo de este insumo registrado en comandas.</string>
+    <string name="inventory_recipe_version">Receta v%1$d</string>
+    <string name="inventory_consumption_order">Consumo de comanda</string>
+    <string name="inventory_consumption_amount">%1$s %2$s</string>
     <string name="inventory_search">Buscar insumo</string>
     <string name="inventory_filter_all">Todos</string>
     <string name="inventory_filter_low">Bajo mínimo (%1$d)</string>

@@ -672,6 +672,14 @@ data class IngredientDto(
 data class InventoryMovementRequest(val ingredientId: String, val type: String, val quantity: String, val reason: String)
 
 @Serializable
+data class InventoryConsumptionDto(
+    val quantity: String,
+    val sourceProductName: String? = null,
+    val recipeVersion: Int? = null,
+    val createdAt: String,
+)
+
+@Serializable
 data class InventoryReceiptLineRequest(val ingredientId: String, val quantity: String, val unitCost: MoneyDto)
 
 @Serializable
