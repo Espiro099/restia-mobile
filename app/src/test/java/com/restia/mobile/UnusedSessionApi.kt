@@ -151,6 +151,7 @@ open class UnusedSessionApi : SessionApi {
         body: PaymentResultRequest,
     ): Envelope<PaymentDto> = error("sin uso")
     override suspend fun listPrintJobs(branchId: String, status: String?, page: Int, perPage: Int): PagedEnvelope<PrintJobDto> = error("sin uso")
+    override suspend fun getPrintJob(branchId: String, printJobId: String): Envelope<PrintJobDto> = error("sin uso")
     override suspend fun listPrinters(branchId: String, page: Int, perPage: Int): PagedEnvelope<PrinterDto> = error("sin uso")
     override suspend fun retryPrintJob(branchId: String, printJobId: String, ifMatch: String, body: PrintJobRetryRequest): Envelope<PrintJobDto> = error("sin uso")
     override suspend fun resolvePrintJob(branchId: String, printJobId: String, ifMatch: String, body: PrintJobResolveRequest): Envelope<PrintJobDto> =

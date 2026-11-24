@@ -8,6 +8,7 @@ import com.restia.mobile.core.network.SessionApi
 import com.restia.mobile.data.checks.CheckRepository
 import com.restia.mobile.ui.checks.CheckViewModel
 import com.restia.mobile.ui.checks.PayState
+import com.restia.mobile.ui.checks.TIP_OPTIONS
 import com.restia.mobile.ui.checks.ResultState
 import com.restia.mobile.ui.checks.available
 import com.restia.mobile.ui.checks.isPayable
@@ -346,12 +347,37 @@ class CheckFlowTest {
     }
 
     @Test
-    fun `sin ruta de impresion muestra el aviso del servidor`() {
+    fun `las propinas se recalculan sobre el importe parcial con redondeo a centavos`() {
+        val base = PayState(check(), shiftId = "sh1", amount = "10.05")
+        assertEquals(listOf("0.00", "0.50", "1.01", "2.01"), TIP_OPTIONS.map {
+            base.copy(tipPercent = it).tipValue?.toPlainString()
+        })
+        val partial = base.copy(amount = "20.15", tipPercent = 10, tendered = "25")
+        assertEquals("22.17", partial.totalValue?.toPlainString())
+        assertEquals("2.83", partial.change?.toPlainString())
+    }
+
+    @Test
+    fun `sin ruta de impresion ni un pago confirmado muestra el aviso del servidor`() {
         loaded()
         answers += MockResponse().setResponseCode(409).setBody("""{"error":{"code":"PRINT_ROUTE_NOT_CONFIGURED","message":"No hay una ruta activa para este documento."}}""")
         vm.print(CheckViewModel.PAYMENT_RECEIPT, "p1")
         waitFor { vm.state.value.actionFailure != null }
         assertEquals("No hay una ruta activa para este documento.", (vm.state.value.actionFailure as ApiFailure.Server).message)
         assertNull(vm.state.value.notice)
+    }
+
+    @Test
+    fun `sin ruta abre el PDF del pago confirmado que se quiso imprimir`() {
+        gets["/branches/b1/payments"] = { MockResponse().setBody(pageOf(paymentJson("p1", "CASH", "CONFIRMED"))) }
+        loaded()
+        answers += MockResponse().setResponseCode(409)
+            .setBody("""{"error":{"code":"PRINT_ROUTE_NOT_CONFIGURED","message":"Sin impresora."}}""")
+        vm.print(CheckViewModel.PAYMENT_RECEIPT, "p1")
+        waitFor { vm.state.value.receiptPreview != null }
+        assertEquals("p1", vm.state.value.receiptPreview?.id)
+        assertNull(vm.state.value.actionFailure)
+        vm.consumeReceiptPreview()
+        assertNull(vm.state.value.receiptPreview)
     }
 }

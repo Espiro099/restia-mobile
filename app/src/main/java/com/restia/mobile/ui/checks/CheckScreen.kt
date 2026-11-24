@@ -62,6 +62,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -200,7 +201,14 @@ private fun PaymentRow(payment: PaymentDto, canRecord: Boolean, canPrint: Boolea
             TextButton(onClick = { viewModel.startResult(payment) }, enabled = !busy) { Text(stringResource(R.string.result_action)) }
         }
         if (canPrint && payment.status == "CONFIRMED") {
-            TextButton(onClick = { viewModel.print(CheckViewModel.PAYMENT_RECEIPT, payment.id) }, enabled = !busy) { Text(stringResource(R.string.print_receipt)) }
+            Column(horizontalAlignment = Alignment.End) {
+                TextButton(onClick = { viewModel.print(CheckViewModel.PAYMENT_RECEIPT, payment.id) }, enabled = !busy) {
+                    Text(stringResource(R.string.print_receipt))
+                }
+                TextButton(onClick = { viewModel.previewReceipt(payment) }, enabled = !busy) {
+                    Text(stringResource(R.string.receipt_pdf))
+                }
+            }
         }
     }
 }
@@ -456,6 +464,7 @@ private fun AmountField(value: String, onChange: (String) -> Unit, @StringRes la
  * Revisar cobro (propuesta 12): el importe en grande, consumo, importe y propina editables, el método elegido
  * y, en efectivo, lo recibido y el cambio. Confirmar registra el pago en la caja abierta.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PayReview(
     state: PayState,
@@ -467,7 +476,7 @@ private fun PayReview(
     val currency = state.check.balance.currency
     val enabled = !state.submitting
     BackHandler(onBack = viewModel::dismissPay)
-    val due = (state.amountValue ?: BigDecimal.ZERO) + (state.tipValue ?: BigDecimal.ZERO)
+    val due = state.totalValue
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).imePadding()) {
         BackHeader(stringResource(R.string.review_title), viewModel::dismissPay)
         Column(
@@ -484,22 +493,51 @@ private fun PayReview(
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            BigMoney(due, currency)
+            BigMoney(due ?: BigDecimal.ZERO, currency)
             Text(itemsLine(state.check), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Separator()
             MoneyRow(stringResource(R.string.check_consumption), money(state.check.total))
             AmountField(state.amount, viewModel::setAmount, R.string.pay_amount, enabled, error = state.amountValue == null || state.exceeds)
             Text(stringResource(R.string.pay_available, money(available(state.check), currency)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (state.exceeds) Text(stringResource(R.string.pay_exceeds), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-            AmountField(state.tip, viewModel::setTip, R.string.pay_tip, enabled, error = state.tipValue == null)
+            Text(stringResource(R.string.pay_tip), style = MaterialTheme.typography.titleSmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                (TIP_OPTIONS + listOf(null)).forEach { percent ->
+                    val option = when (percent) {
+                        null -> stringResource(R.string.pay_tip_custom)
+                        0 -> stringResource(R.string.pay_tip_none)
+                        else -> stringResource(R.string.pay_tip_percent, percent)
+                    }
+                    FilterChip(
+                        selected = state.tipPercent == percent,
+                        onClick = { viewModel.setTipPercent(percent) },
+                        enabled = enabled,
+                        label = { Text(option) },
+                    )
+                }
+            }
+            if (state.tipPercent == null) {
+                AmountField(state.tip, viewModel::setTip, R.string.pay_tip, enabled, error = state.tipValue == null)
+            } else {
+                state.tipValue?.takeIf { it.signum() > 0 }?.let {
+                    AmountRow(stringResource(R.string.pay_tip), money(it, currency))
+                }
+            }
             Separator()
             Text(stringResource(R.string.review_method), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
             METHODS.forEach { m -> MethodCard(m, state.method == m, enabled) { viewModel.setMethod(m) } }
             if (state.method == CASH) {
                 AmountField(state.tendered, viewModel::setTendered, R.string.pay_tendered, enabled, error = state.tendered.isNotEmpty() && state.change == null)
+                TextButton(onClick = viewModel::useExactCash, enabled = enabled && due != null && !state.exceeds) {
+                    Text(stringResource(R.string.pay_exact_cash))
+                }
                 state.change?.let { Text(stringResource(R.string.pay_change, money(it, currency)), style = MaterialTheme.typography.titleMedium) }
             } else {
-                Text(stringResource(R.string.pay_terminal_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    stringResource(if (state.method == "TRANSFER") R.string.pay_transfer_hint else R.string.pay_terminal_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             if (shifts != null && shifts.size > 1) {
                 Text(stringResource(R.string.pay_register), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
@@ -531,7 +569,10 @@ private fun PayReview(
                     Text(stringResource(R.string.pay_choose_register), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
             PrimaryButton(
-                stringResource(R.string.review_confirm, money(due, currency)),
+                stringResource(
+                    if (state.method == CASH) R.string.review_cash else R.string.review_prepare,
+                    money(due ?: BigDecimal.ZERO, currency),
+                ),
                 onClick = viewModel::confirmPay,
                 enabled = state.canConfirm,
                 busy = state.submitting,
@@ -555,9 +596,10 @@ private fun ShiftProblem(text: String, onRetry: () -> Unit) {
 @Composable
 private fun ResultDialog(state: ResultState, viewModel: CheckViewModel) {
     val enabled = !state.submitting
+    val total = money(amountOf(state.payment.amount) + amountOf(state.payment.tip), state.payment.amount.currency)
     AlertDialog(
         onDismissRequest = viewModel::dismissResult,
-        title = { Text(stringResource(R.string.result_title, stringResource(methodLabel(state.payment.method)), money(state.payment.amount))) },
+        title = { Text(stringResource(R.string.result_title, stringResource(methodLabel(state.payment.method)), total)) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(if (state.isCard) R.string.result_body_card else R.string.result_body_transfer))
@@ -754,6 +796,7 @@ private fun ActionDialog(state: CheckAction, viewModel: CheckViewModel) {
 @Composable
 fun CheckScreen(viewModel: CheckViewModel, tableNumber: Int, can: CheckPermissions, onBack: () -> Unit) {
     val state by viewModel.state.collectAsState()
+    val context = LocalContext.current
     BackHandler(onBack = onBack)
     LifecycleStartEffect(viewModel) {
         viewModel.startPolling()
@@ -763,6 +806,12 @@ fun CheckScreen(viewModel: CheckViewModel, tableNumber: Int, can: CheckPermissio
         if (state.notice != null) {
             delay(6_000)
             viewModel.clearNotice()
+        }
+    }
+    LaunchedEffect(state.receiptPreview) {
+        state.receiptPreview?.let { payment ->
+            viewModel.consumeReceiptPreview()
+            previewReceiptPdf(context, tableNumber, payment)
         }
     }
     state.recording?.let { ResultDialog(it, viewModel) }
@@ -806,6 +855,14 @@ fun CheckScreen(viewModel: CheckViewModel, tableNumber: Int, can: CheckPermissio
                 ) {
                     items(checks, key = { it.id }) { check ->
                         CheckSection(check, state.payments[check.id].orEmpty(), can, state.busy, showTitle = checks.size > 1, viewModel = viewModel)
+                    }
+                    if (checks.any { it.status == "PAID" } && checks.all { it.status in setOf("PAID", "REFUNDED") }) {
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(stringResource(R.string.check_guest_departure), style = MaterialTheme.typography.bodyMedium)
+                                OutlinedButton(onClick = onBack) { Text(stringResource(R.string.check_back_to_table)) }
+                            }
+                        }
                     }
                 }
             }

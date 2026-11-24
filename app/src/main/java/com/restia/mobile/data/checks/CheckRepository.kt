@@ -82,6 +82,9 @@ class CheckRepository(private val api: SessionApi) {
     suspend fun print(branchId: String, idempotencyKey: String, type: String, sourceId: String): ApiResult<PrintJobDto> =
         apiCall { api.createPrintJob(branchId, idempotencyKey, PrintJobRequest(type, sourceId)).data }
 
+    suspend fun printJob(branchId: String, id: String): ApiResult<PrintJobDto> =
+        apiCall { api.getPrintJob(branchId, id).data }
+
     private suspend fun <T> all(fetch: suspend (Int) -> PagedEnvelope<T>): List<T> {
         val rows = mutableListOf<T>()
         var page = 1
