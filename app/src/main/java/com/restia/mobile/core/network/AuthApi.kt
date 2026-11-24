@@ -511,6 +511,14 @@ interface SessionApi {
         @Query("perPage") perPage: Int,
     ): PagedEnvelope<IngredientDto>
 
+    @GET("branches/{branchId}/inventory-movements")
+    suspend fun listInventoryConsumption(
+        @Path("branchId") branchId: String,
+        @Query("ingredientId") ingredientId: String,
+        @Query("type") type: String,
+        @Query("perPage") perPage: Int,
+    ): PagedEnvelope<InventoryConsumptionDto>
+
     /** WASTE (inventory.record_waste): cantidad positiva y motivo. Idempotente por clave. */
     @POST("branches/{branchId}/inventory-movements")
     suspend fun createInventoryMovement(

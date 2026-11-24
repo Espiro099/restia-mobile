@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +49,10 @@ import com.restia.mobile.ui.theme.ScreenHeader
 import com.restia.mobile.ui.theme.ScreenPadding
 import com.restia.mobile.ui.theme.Separator
 import com.restia.mobile.ui.theme.StatusPill
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import kotlinx.coroutines.delay
 
 /** Unidad base como se lee en pantalla. */
@@ -94,7 +100,7 @@ fun InventoryScreen(viewModel: InventoryViewModel, branchName: String, permissio
     }
     state.selected?.let { ingredient ->
         val action = state.action
-        if (action == null) ActionSheet(ingredient, permissions.actions(ingredient), viewModel) else ActionDialog(ingredient, action, state, viewModel)
+        if (action == null) ActionSheet(ingredient, permissions.actions(ingredient), state, viewModel) else ActionDialog(ingredient, action, state, viewModel)
     }
     Column(modifier = Modifier.fillMaxSize()) {
         ScreenHeader(stringResource(R.string.inventory_title)) {
@@ -138,7 +144,7 @@ fun InventoryScreen(viewModel: InventoryViewModel, branchName: String, permissio
             }
             else -> LazyColumn(contentPadding = PaddingValues(start = ScreenPadding, end = ScreenPadding, top = 8.dp, bottom = 32.dp)) {
                 items(state.visible, key = { it.id }) { ingredient ->
-                    IngredientRow(ingredient, enabled = permissions.actions(ingredient).isNotEmpty()) { viewModel.select(ingredient) }
+                    IngredientRow(ingredient) { viewModel.select(ingredient) }
                     Separator()
                 }
             }
@@ -147,10 +153,10 @@ fun InventoryScreen(viewModel: InventoryViewModel, branchName: String, permissio
 }
 
 @Composable
-private fun IngredientRow(ingredient: IngredientDto, enabled: Boolean, onClick: () -> Unit) {
+private fun IngredientRow(ingredient: IngredientDto, onClick: () -> Unit) {
     val unit = stringResource(unitLabel(ingredient.baseUnit))
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, role = Role.Button, onClick = onClick).padding(vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -171,13 +177,14 @@ private fun IngredientRow(ingredient: IngredientDto, enabled: Boolean, onClick: 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ActionSheet(ingredient: IngredientDto, actions: List<InventoryAction>, viewModel: InventoryViewModel) {
+private fun ActionSheet(ingredient: IngredientDto, actions: List<InventoryAction>, state: InventoryUiState, viewModel: InventoryViewModel) {
+    LaunchedEffect(ingredient.id) { viewModel.loadConsumption() }
     ModalBottomSheet(
         onDismissRequest = viewModel::cancel,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
     ) {
-        Column(modifier = Modifier.padding(start = ScreenPadding, end = ScreenPadding, bottom = 32.dp)) {
+        Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(start = ScreenPadding, end = ScreenPadding, bottom = 32.dp)) {
             Text(ingredient.name, style = MaterialTheme.typography.headlineSmall, color = Restia.colors.heading)
             ingredient.foodSafetyBlock?.let {
                 Text(stringResource(R.string.inventory_blocked_reason, it.reason), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
@@ -189,6 +196,48 @@ private fun ActionSheet(ingredient: IngredientDto, actions: List<InventoryAction
                     modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { viewModel.start(action) }.padding(vertical = 14.dp),
                 )
                 Separator()
+            }
+            Text(
+                stringResource(R.string.inventory_recent_consumption),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+            )
+            Text(
+                stringResource(R.string.inventory_recent_consumption_help),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            val failure = state.consumptionFailure
+            val consumption = state.consumption
+            when {
+                failure != null -> {
+                    Text(failureMessage(failure), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = viewModel::loadConsumption) { Text(stringResource(R.string.action_retry)) }
+                }
+                consumption == null -> CircularProgressIndicator(modifier = Modifier.padding(top = 12.dp).size(24.dp), strokeWidth = 2.dp)
+                consumption.isEmpty() -> Text(
+                    stringResource(R.string.inventory_no_consumption),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+                else -> consumption.forEach { movement ->
+                    val date = runCatching {
+                        DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withZone(ZoneId.systemDefault())
+                            .format(Instant.parse(movement.createdAt))
+                    }.getOrDefault(movement.createdAt)
+                    val recipe = movement.recipeVersion?.let { stringResource(R.string.inventory_recipe_version, it) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(movement.sourceProductName ?: stringResource(R.string.inventory_consumption_order), style = MaterialTheme.typography.bodyMedium)
+                            Text(listOfNotNull(date, recipe).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text(stringResource(R.string.inventory_consumption_amount, movement.quantity, stringResource(unitLabel(ingredient.baseUnit))))
+                    }
+                }
             }
         }
     }

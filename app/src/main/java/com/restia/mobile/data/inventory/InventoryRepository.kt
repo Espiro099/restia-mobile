@@ -4,6 +4,7 @@ import com.restia.mobile.core.network.ApiFailure
 import com.restia.mobile.core.network.ApiResult
 import com.restia.mobile.core.network.FoodSafetyRequest
 import com.restia.mobile.core.network.IngredientDto
+import com.restia.mobile.core.network.InventoryConsumptionDto
 import com.restia.mobile.core.network.InventoryCountCreateRequest
 import com.restia.mobile.core.network.InventoryCountDto
 import com.restia.mobile.core.network.InventoryCountLineDto
@@ -59,6 +60,9 @@ class InventoryRepository(private val api: SessionApi, private val clock: Clock 
         }
         rows
     }
+
+    suspend fun recentConsumption(branchId: String, ingredientId: String): ApiResult<List<InventoryConsumptionDto>> =
+        apiCall { api.listInventoryConsumption(branchId, ingredientId, "CONSUMPTION", perPage = 5).data }
 
     suspend fun waste(branchId: String, ingredientId: String, quantity: String, reason: String): ApiResult<Unit> = apiCall {
         api.createInventoryMovement(branchId, key(), InventoryMovementRequest(ingredientId, "WASTE", quantity, reason.trim())).close()

@@ -18,6 +18,7 @@ import com.restia.mobile.core.network.InventoryCountCreateRequest
 import com.restia.mobile.core.network.InventoryCountDto
 import com.restia.mobile.core.network.InventoryCountLinesRequest
 import com.restia.mobile.core.network.InventoryMovementRequest
+import com.restia.mobile.core.network.InventoryConsumptionDto
 import com.restia.mobile.core.network.InventoryReceiptRequest
 import com.restia.mobile.core.network.NotificationPageDto
 import com.restia.mobile.core.network.NotificationsReadDto
@@ -182,6 +183,7 @@ open class UnusedSessionApi : SessionApi {
     override suspend fun createCustomer(branchId: String, idempotencyKey: String, body: CustomerCreateRequest): Envelope<CustomerDto> = error("sin uso")
     override suspend fun getTableSession(branchId: String, sessionId: String): Envelope<TableSessionDto> = error("sin uso")
     override suspend fun listIngredients(branchId: String, status: String, page: Int, perPage: Int): PagedEnvelope<IngredientDto> = error("sin uso")
+    override suspend fun listInventoryConsumption(branchId: String, ingredientId: String, type: String, perPage: Int): PagedEnvelope<InventoryConsumptionDto> = error("sin uso")
     override suspend fun createInventoryMovement(branchId: String, idempotencyKey: String, body: InventoryMovementRequest): ResponseBody = error("sin uso")
     override suspend fun createInventoryReceipt(branchId: String, idempotencyKey: String, body: InventoryReceiptRequest): ResponseBody = error("sin uso")
     override suspend fun listInventoryCounts(branchId: String, status: String, perPage: Int): PagedEnvelope<InventoryCountDto> = error("sin uso")
