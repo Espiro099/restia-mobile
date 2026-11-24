@@ -21,6 +21,14 @@ interface PublicAuthApi {
     @POST("auth/mobile/login")
     suspend fun login(@Body body: MobileLoginRequest): Envelope<TokenData>
 
+    /** Si el inicio de sesión con Google está encendido y con qué ID de cliente. */
+    @GET("auth/google")
+    suspend fun googleConfig(): Envelope<GoogleLoginConfigData>
+
+    /** Como login, con el ID token de Credential Manager en lugar de la contraseña. */
+    @POST("auth/mobile/google")
+    suspend fun loginGoogle(@Body body: MobileGoogleLoginRequest): Envelope<TokenData>
+
     @POST("auth/mobile/refresh")
     fun refresh(@Body body: MobileRefreshRequest): Call<Envelope<TokenData>>
 

@@ -134,6 +134,42 @@ class AuthFlowTest {
     }
 
     @Test
+    fun `login con Google manda el token con el dispositivo y abre la misma sesion`() = runBlocking {
+        store.refreshToken = null
+        route { if (it.path == "/auth/me") ok(ME) else ok(tokens("access-g", "refresh-g"), 201) }
+        assertNull(repo.loginWithGoogle("id-token-de-google"))
+        val sent = server.takeRequest()
+        assertEquals("/auth/mobile/google", sent.path)
+        assertEquals(
+            """{"idToken":"id-token-de-google","deviceUuid":"00000000-0000-4000-8000-000000000001","deviceCredential":"credencial-de-prueba-de-al-menos-32-caracteres"}""",
+            sent.body.readUtf8(),
+        )
+        assertEquals("refresh-g", store.refreshToken)
+        assertEquals("access-g", access.token)
+        assertTrue(state.state.value is AuthState.Authenticated)
+    }
+
+    @Test
+    fun `Google apagado, sin conexion o encendido`() = runBlocking {
+        route { ok("""{"data":{"enabled":true,"clientId":"123-abc.apps.googleusercontent.com"},"meta":{}}""") }
+        assertEquals("123-abc.apps.googleusercontent.com", repo.googleClientId())
+        route { ok("""{"data":{"enabled":false,"clientId":null},"meta":{}}""") }
+        assertNull(repo.googleClientId())
+        route { MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START) }
+        assertNull(repo.googleClientId())
+    }
+
+    @Test
+    fun `cuenta de Google que no es del personal no abre sesion`() = runBlocking {
+        store.refreshToken = null
+        route { ok(error("AUTHENTICATION_INVALID"), 401) }
+        val failure = repo.loginWithGoogle("id-token-ajeno") as ApiFailure.Server
+        assertEquals("AUTHENTICATION_INVALID", failure.code)
+        assertNull(store.refreshToken)
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
     fun `credenciales incorrectas no intentan renovar`() = runBlocking {
         store.refreshToken = null
         route { ok(error("AUTHENTICATION_INVALID"), 401) }

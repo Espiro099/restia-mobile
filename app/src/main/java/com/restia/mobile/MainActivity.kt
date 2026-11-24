@@ -8,6 +8,7 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.restia.mobile.data.auth.AuthState
@@ -16,11 +17,14 @@ import com.restia.mobile.ui.account.ForgotPasswordDialog
 import com.restia.mobile.ui.account.ForgotPasswordViewModel
 import com.restia.mobile.ui.auth.AuthViewModel
 import com.restia.mobile.ui.auth.EnrollScreen
+import com.restia.mobile.ui.auth.GoogleSignInResult
 import com.restia.mobile.ui.auth.LoadingScreen
 import com.restia.mobile.ui.auth.LoginScreen
 import com.restia.mobile.ui.auth.OfflineScreen
 import com.restia.mobile.ui.auth.WelcomeScreen
+import com.restia.mobile.ui.auth.requestGoogleIdToken
 import com.restia.mobile.ui.theme.RestiaTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val repositories get() = (application as RestiaApplication).container.repositories
@@ -52,7 +56,23 @@ class MainActivity : ComponentActivity() {
                             WelcomeScreen(onContinue = { welcomed = true })
                             return@RestiaTheme
                         }
-                        LoginScreen(form, notice, viewModel::login, forgot::open)
+                        val googleClientId by viewModel.googleClientId.collectAsState()
+                        val scope = rememberCoroutineScope()
+                        LoginScreen(
+                            form, notice, viewModel::login, forgot::open,
+                            googleEnabled = googleClientId != null,
+                            onGoogle = {
+                                val clientId = googleClientId ?: return@LoginScreen
+                                scope.launch {
+                                    when (val r = requestGoogleIdToken(this@MainActivity, clientId)) {
+                                        is GoogleSignInResult.Token -> viewModel.loginWithGoogle(r.idToken)
+                                        GoogleSignInResult.Cancelled -> Unit
+                                        GoogleSignInResult.NoAccount -> viewModel.googleProblem(R.string.google_no_account)
+                                        GoogleSignInResult.Failed -> viewModel.googleProblem(R.string.google_failed)
+                                    }
+                                }
+                            },
+                        )
                         val forgotState by forgot.state.collectAsState()
                         if (forgotState.open) ForgotPasswordDialog(forgotState, forgot::setEmail, forgot::submit, forgot::dismiss)
                     }
