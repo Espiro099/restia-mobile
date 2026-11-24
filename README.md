@@ -25,6 +25,8 @@ Con un emulador abierto, para probar el cifrado en Android Keystore:
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
+**Producción:** la versión release se firma con una llave que no está en el repositorio; los pasos para crearla, configurarla y obtener su SHA-1 están en [docs/Firma_Release.md](docs/Firma_Release.md).
+
 **CI:** cada pull request y cada cambio en `main` corren las pruebas unitarias y lint en GitHub Actions (`.github/workflows/ci.yml`). Los reportes quedan como artefacto de la ejecución. Las pruebas con emulador no corren ahí.
 
 ## Backend local
