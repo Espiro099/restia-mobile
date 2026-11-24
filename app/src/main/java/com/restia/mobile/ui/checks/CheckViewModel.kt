@@ -45,6 +45,7 @@ fun available(check: CheckDto): BigDecimal = (amountOf(check.balance) - amountOf
 const val CASH = "CASH"
 val METHODS = listOf(CASH, "CARD_CREDIT", "CARD_DEBIT", "TRANSFER")
 val BRANDS = listOf("VISA", "MASTERCARD", "AMEX", "OTHER")
+val TIP_OPTIONS = listOf(0, 5, 10, 20)
 
 data class PayState(
     val check: CheckDto,
@@ -55,16 +56,25 @@ data class PayState(
     val tendered: String = "",
     val submitting: Boolean = false,
     val failure: ApiFailure? = null,
+    val tipPercent: Int? = null,
 ) {
     val amountValue: BigDecimal? get() = parseAmount(amount)?.takeIf { it.signum() > 0 }
-    val tipValue: BigDecimal? get() = if (tip.isBlank()) BigDecimal.ZERO.setScale(2) else parseAmount(tip)
+    val tipValue: BigDecimal?
+        get() {
+            val percent = tipPercent
+            if (percent == null) return parseAmount(tip.ifBlank { "0" })
+            if (percent == 0) return BigDecimal.ZERO.setScale(2)
+            return amountValue?.multiply(BigDecimal.valueOf(percent.toLong()))?.movePointLeft(2)
+                ?.setScale(2, RoundingMode.HALF_UP)
+        }
+    val totalValue: BigDecimal? get() = amountValue?.let { amount -> tipValue?.let(amount::add) }
     val tenderedValue: BigDecimal? get() = parseAmount(tendered)
     val exceeds: Boolean get() = amountValue?.let { it > available(check) } ?: false
 
     /** Cambio en efectivo; null si todavía no se puede calcular o no alcanza. */
     val change: BigDecimal?
         get() {
-            val due = (amountValue ?: return null) + (tipValue ?: return null)
+            val due = totalValue ?: return null
             return tenderedValue?.minus(due)?.takeIf { it.signum() >= 0 }
         }
 
@@ -107,6 +117,7 @@ data class CheckUiState(
     val working: Boolean = false,
     val actionFailure: ApiFailure? = null,
     val notice: Notice? = null,
+    val receiptPreview: PaymentDto? = null,
 ) {
     val busy: Boolean
         get() = working || paying?.submitting == true || recording?.submitting == true || moving?.submitting == true || action?.submitting == true
@@ -127,6 +138,7 @@ class CheckViewModel(
     val state: StateFlow<CheckUiState> = _state
 
     private var polling: Job? = null
+    private var watchingReceipt: Job? = null
 
     // Mismo intento, misma clave: un reintento tras perder la respuesta no cobra dos veces.
     private var intent: Any? = null
@@ -153,6 +165,7 @@ class CheckViewModel(
     fun stopPolling() {
         polling?.cancel()
         polling = null
+        watchingReceipt?.cancel()
     }
 
     fun refresh() {
@@ -198,20 +211,65 @@ class CheckViewModel(
 
     // --- Imprimir ---
 
+    fun previewReceipt(payment: PaymentDto) {
+        watchingReceipt?.cancel()
+        if (payment.status == "CONFIRMED") _state.value = _state.value.copy(receiptPreview = payment)
+    }
+
+    fun consumeReceiptPreview() {
+        _state.value = _state.value.copy(receiptPreview = null)
+    }
+
     fun print(type: String, sourceId: String) {
         if (_state.value.busy) return
+        val receipt = if (type == PAYMENT_RECEIPT) {
+            _state.value.payments.values.asSequence().flatten().firstOrNull { it.id == sourceId && it.status == "CONFIRMED" }
+        } else null
+        if (receipt != null) watchingReceipt?.cancel()
         val key = keyFor(Pair(type, sourceId))
         _state.value = _state.value.copy(working = true, actionFailure = null, notice = null)
         viewModelScope.launch {
             val r = repository.print(branchId, key, type, sourceId)
             val failure = (r as? ApiResult.Failure)?.failure
+            val fallback = receipt?.takeIf {
+                failure == ApiFailure.Network || (failure as? ApiFailure.Server)?.code == "PRINT_ROUTE_NOT_CONFIGURED"
+            }
             // Impreso o rechazado, otro toque es otra impresión; sin respuesta, el reintento no la duplica.
             if (failure == null || !isRetryable(failure)) intent = null
             _state.value = _state.value.copy(
                 working = false,
-                actionFailure = failure,
+                actionFailure = failure.takeIf { fallback == null },
+                receiptPreview = fallback,
                 notice = if (failure == null) Notice(if (type == PRE_CHECK) R.string.print_pre_check_sent else R.string.print_receipt_sent) else null,
             )
+            if (receipt != null && r is ApiResult.Success && polling?.isActive == true) {
+                watchReceipt(r.value.id, r.value.status, receipt)
+            }
+        }
+    }
+
+    private fun watchReceipt(jobId: String, initialStatus: String, receipt: PaymentDto) {
+        watchingReceipt = viewModelScope.launch {
+            var status = initialStatus
+            for (attempt in 1..4) {
+                if (status !in setOf("PENDING", "CLAIMED", "PRINTING")) break
+                delay(3_000)
+                when (val response = repository.printJob(branchId, jobId)) {
+                    is ApiResult.Success -> status = response.value.status
+                    is ApiResult.Failure -> if (response.failure is ApiFailure.Server && response.failure.status == 403) {
+                        return@launch
+                    }
+                }
+            }
+            when (status) {
+                "PRINTED" -> _state.value = _state.value.copy(notice = Notice(R.string.print_receipt_done))
+                "PENDING", "CLAIMED", "PRINTING", "FAILED", "UNKNOWN", "CANCELLED" -> {
+                    _state.value = _state.value.copy(
+                        notice = Notice(R.string.print_receipt_pdf_fallback),
+                        receiptPreview = receipt.takeUnless { _state.value.busy || _state.value.paying != null || _state.value.recording != null },
+                    )
+                }
+            }
         }
     }
 
@@ -222,7 +280,7 @@ class CheckViewModel(
         val amount = available(check).setScale(2, RoundingMode.HALF_UP).toPlainString()
         val shifts = _state.value.shifts
         _state.value = _state.value.copy(
-            paying = PayState(check, shiftId = shifts?.singleOrNull()?.id, amount = amount),
+            paying = PayState(check, shiftId = shifts?.singleOrNull()?.id, amount = amount, tipPercent = 0),
             actionFailure = null,
             notice = null,
         )
@@ -263,9 +321,15 @@ class CheckViewModel(
 
     fun setAmount(text: String) = editPay { it.copy(amount = text.take(16)) }
 
-    fun setTip(text: String) = editPay { it.copy(tip = text.take(16)) }
+    fun setTip(text: String) = editPay { it.copy(tip = text.take(16), tipPercent = null) }
+
+    fun setTipPercent(percent: Int?) = editPay {
+        if (percent == null || percent in TIP_OPTIONS) it.copy(tipPercent = percent) else it
+    }
 
     fun setTendered(text: String) = editPay { it.copy(tendered = text.take(16)) }
+
+    fun useExactCash() = editPay { it.copy(tendered = it.totalValue?.toPlainString().orEmpty()) }
 
     fun setShift(id: String) = editPay { it.copy(shiftId = id) }
 

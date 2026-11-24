@@ -162,7 +162,7 @@
     </plurals>
     <string name="close_action">Cerrar mesa</string>
     <string name="close_title">¿Cerrar la mesa %1$d?</string>
-    <string name="close_body">Todos los platillos deben estar entregados o cancelados y las cuentas pagadas. La mesa quedará por limpiar.</string>
+    <string name="close_body">Cierra la mesa cuando el cliente se haya retirado, los platillos estén entregados o cancelados y las cuentas estén pagadas. Después, confirma la limpieza para dejarla disponible.</string>
     <string name="close_confirm">Cerrar mesa</string>
     <string name="close_pending_units">Hay platillos sin entregar. Entrégalos o cancélalos antes de cerrar.</string>
     <string name="close_open_checks">Hay cuentas sin pagar. Cóbralas antes de cerrar.</string>
@@ -218,7 +218,16 @@
     <string name="print_pre_check">Imprimir precuenta</string>
     <string name="print_receipt">Imprimir recibo</string>
     <string name="print_pre_check_sent">La precuenta se mandó a imprimir.</string>
-    <string name="print_receipt_sent">El recibo se mandó a imprimir.</string>
+    <string name="print_receipt_sent">Recibo en cola de impresión. También puedes guardarlo como PDF.</string>
+    <string name="print_receipt_done">Recibo impreso.</string>
+    <string name="print_receipt_pdf_fallback">La impresora aún no confirma el recibo. Puedes guardarlo como PDF.</string>
+    <string name="receipt_pdf">Ver PDF</string>
+    <string name="receipt_pdf_title">Comprobante de pago · La Mesa</string>
+    <string name="receipt_pdf_job">La Mesa - %1$s</string>
+    <string name="receipt_pdf_folio">Folio %1$s</string>
+    <string name="receipt_pdf_table">Mesa %1$d</string>
+    <string name="receipt_pdf_total">Total pagado</string>
+    <string name="receipt_pdf_error">No se pudo abrir la vista previa del comprobante.</string>
     <string name="method_cash">Efectivo</string>
     <string name="method_credit">Crédito</string>
     <string name="method_debit">Débito</string>
@@ -241,7 +250,12 @@
     <string name="pay_tendered">Recibido</string>
     <string name="pay_change">Cambio: %1$s</string>
     <string name="pay_exceeds">El monto supera lo que falta por cobrar.</string>
-    <string name="pay_terminal_hint">Después de cobrar en la terminal o recibir la transferencia, registra el resultado.</string>
+    <string name="pay_terminal_hint">Prepara el cobro y usa la terminal para cobrar el total. Registra el resultado con la referencia del comprobante de la terminal.</string>
+    <string name="pay_transfer_hint">Prepara el cobro y verifica el abono en el banco. Registra el resultado con su referencia.</string>
+    <string name="pay_tip_none">Sin propina</string>
+    <string name="pay_tip_custom">Otro monto</string>
+    <string name="pay_tip_percent">%1$d%%</string>
+    <string name="pay_exact_cash">Usar importe exacto</string>
     <string name="pay_done">Pago registrado.</string>
     <string name="pay_done_change">Pago registrado. Entrega $%1$s de cambio.</string>
     <string name="result_action">Registrar resultado</string>
@@ -591,7 +605,10 @@
     <string name="review_title">Revisar cobro</string>
     <string name="review_hint">Revisa el importe antes de cobrar</string>
     <string name="review_method">Método seleccionado</string>
-    <string name="review_confirm">Confirmar cobro · %1$s</string>
+    <string name="review_cash">Registrar efectivo · %1$s</string>
+    <string name="review_prepare">Preparar cobro · %1$s</string>
+    <string name="check_guest_departure">Cuando el cliente se retire, cierra la mesa y confirma la limpieza para dejarla disponible.</string>
+    <string name="check_back_to_table">Volver a la mesa</string>
     <string name="review_back">Volver a la cuenta</string>
     <string name="review_no_tip">Sin propina</string>
     <string name="table_change_guests">Cambiar comensales</string>

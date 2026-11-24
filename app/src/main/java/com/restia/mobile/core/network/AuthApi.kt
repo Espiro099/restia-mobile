@@ -377,6 +377,12 @@ interface SessionApi {
         @Query("perPage") perPage: Int,
     ): PagedEnvelope<PrintJobDto>
 
+    @GET("branches/{branchId}/print-jobs/{printJobId}")
+    suspend fun getPrintJob(
+        @Path("branchId") branchId: String,
+        @Path("printJobId") printJobId: String,
+    ): Envelope<PrintJobDto>
+
     @GET("branches/{branchId}/printers")
     suspend fun listPrinters(
         @Path("branchId") branchId: String,
