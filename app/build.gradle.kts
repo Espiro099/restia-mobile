@@ -38,6 +38,8 @@ android {
         create("staging") {
             initWith(getByName("debug"))
             applicationIdSuffix = ".staging"
+            // Hereda de debug, pero no se puede depurar: con ADB no se podría leer su sesión (run-as).
+            isDebuggable = false
             versionNameSuffix = "-staging"
             matchingFallbacks += listOf("debug")
             buildConfigField("String", "API_BASE_URL", "\"https://restia-api-staging.onrender.com/api/v1/\"")
