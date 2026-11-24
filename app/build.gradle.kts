@@ -22,6 +22,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Firma de producción: la llave vive fuera del repositorio (docs/Firma_Release.md). Se toma de local.properties
+    // (restia.release.*) o de variables de entorno (RESTIA_RELEASE_*, para CI). Sin ella, release sale sin firmar.
+    val releaseStore = signingValue("restia.release.storeFile", "RESTIA_RELEASE_STORE_FILE")
+    signingConfigs {
+        if (releaseStore != null) {
+            create("release") {
+                storeFile = file(releaseStore)
+                storePassword = signingValue("restia.release.storePassword", "RESTIA_RELEASE_STORE_PASSWORD")
+                keyAlias = signingValue("restia.release.keyAlias", "RESTIA_RELEASE_KEY_ALIAS") ?: "restia"
+                keyPassword = signingValue("restia.release.keyPassword", "RESTIA_RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             // restia-api local por adb reverse. 10.0.2.2 requeriría ACCESS_LOCAL_NETWORK en Android 17.
@@ -48,7 +62,11 @@ android {
             buildConfigField("int", "API_TIMEOUT_SECONDS", "60")
         }
         release {
-            buildConfigField("String", "API_BASE_URL", "\"https://api.restia.com/api/v1/\"")
+            signingConfig = signingConfigs.findByName("release")
+            // Con el dominio definitivo se pone restia.releaseApiBaseUrl; mientras, el nombre reservado.
+            val releaseUrl = localProperty("restia.releaseApiBaseUrl") ?: providers.gradleProperty("restia.releaseApiBaseUrl").orNull ?: "https://api.restia.com/api/v1/"
+            require(releaseUrl.startsWith("https://")) { "restia.releaseApiBaseUrl debe ser HTTPS" }
+            buildConfigField("String", "API_BASE_URL", "\"$releaseUrl\"")
             // Obligatorio en release: huella actual y de respaldo del certificado de api.restia.com.
             buildConfigField("String", "API_CERT_PINS", "\"${localProperty("restia.releaseApiPins") ?: providers.gradleProperty("restia.releaseApiPins").orNull ?: ""}\"")
             buildConfigField("int", "API_TIMEOUT_SECONDS", "15")
@@ -97,6 +115,9 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
 }
+
+/** Dato de la firma: primero local.properties, luego la variable de entorno (CI). */
+fun signingValue(property: String, env: String): String? = localProperty(property) ?: System.getenv(env)?.takeIf { it.isNotBlank() }
 
 fun localProperty(name: String): String? {
     val file = rootProject.file("local.properties")
